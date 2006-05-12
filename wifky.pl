@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/05/13 05:20:53 $)';
+$::version  = '1.1.0_0 ($Date: 2006/05/13 05:37:28 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -130,7 +130,7 @@ sub init_globals{
     @::body_header = <DATA>;
 
     @::menubar = (
-        $::a->( 'FrontPage' , { p=>'FrontPage'} ) ,
+        $::a->( 'FrontPage' , undef  ) ,
         $::a->( 'New'       , { a=>'new' } ) ,
     );
 
