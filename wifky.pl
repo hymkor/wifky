@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/05/13 05:37:28 $)';
+$::version  = '1.1.0_0 ($Date: 2006/05/13 08:24:57 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -330,10 +330,6 @@ sub anchor{
     $attr ||= {}; $attr->{href}= &myurl($cgiprm,$sharp); 
     my $attr=unpack('h*',join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr})));
     "<a \a$attr\a>$text</a>";
-}
-
-sub title2url{ ### obsolute ###
-    $::me . '?p=' . &percent( $_[0] );
 }
 
 sub is{ exists $::config{$_[0]} && $::config{$_[0]} eq 'OK' ; }
