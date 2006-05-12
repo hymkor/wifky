@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.12.0';
+my $version='0.13.0 ($Date: 2006/05/13 06:16:02 $)';
 my $nextday;
 my $prevday;
 
@@ -55,27 +55,24 @@ unshift( @main::copyright ,
     <a href="$main::me?a=rss" style="border-width:1px;border-color:white;border-style:solid;font-size:small;font-weight:bold;text-decoration:none;background-color:darkorange;color:white;font-style:normal">RSS</a><br>)
 );
 
-grep( (/New/ and $_=qq(<a href="$main::me?a=newdiary">New</a>) )
-    , @main::menubar );
+grep( (/New/ and $_=$main::a->('New',{ a=>'newdiary' } ),0) , @main::menubar );
 
 ### Next/Prev bar ###
 &set_nextprev;
 
 sub nikky_core{
     my $days = shift;
-    my $h = (exists $main::config{cssstyle} && $main::config{cssstyle} eq 'OK'
-                ? 2 : 1);
     my @list=&main::ls_core( { r=>1 , number=>$days } , '(????.??.??)*' );
     splice(@list,10) if $#list > 10;
     foreach my $p (@list){
         my $pagename=$p->{title};
-        &main::puts('<div class="day">');
-        &main::putenc('<h%d><a href="%s">%s</a></h%d><div class="body">',
-                    $h , &main::title2url( $pagename ) , $pagename , $h );
+        &main::puts('<div class="day"><h2>');
+        &main::puts($main::a->($pagename,{p=>$pagename}) );
+        &main::puts('</h2><div class="body">');
         local $main::form{p} = $pagename;
         &main::print_page( title=>$pagename );
         &main::puts('</div></div>');
-        &main::print_page( title=>'Footer' , class=>$main::ss{terminator} );
+        &main::print_page( title=>'Footer' , class=>'terminator' );
     }
 }
 
@@ -89,7 +86,7 @@ sub lastdiary{
 sub action_nikky{
     &main::print_header( userheader=>'YES' );
     &nikky_core($main::config{nikky_days} || 3);
-    &main::puts('<div class="'.$main::ss{copyright}.'">',@::copyright,'</div>');
+    &main::puts('<div class="footer copyright">',@::copyright,'</div>');
     &main::print_sidebar_and_footer;
 }
 
@@ -97,10 +94,11 @@ sub recentdiary{
     my ($session,$day)=@_;
     my @list=&main::ls_core({ r=>1 , number=>$day } , '(????.??.??)*' );
     if( $#list >= 0 ){
-        "<ul>\n" . join('' , map( sprintf('<li><a href="%s">%s</a></li>',
-                                &main::title2url($_->{title}) ,
-                                &main::enc($_->{title}) ) , @list ))
-        . "</ul>\n";
+        "<ul>\n<li>" .
+         join("</li>\n<li>" ,
+            map( $main::a->( &main::enc($_->{title}) , { p=>$_->{title} }) 
+                , @list ) )
+        . "</li></ul>\n";
     }else{
         '';
     }
