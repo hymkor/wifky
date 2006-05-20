@@ -5,14 +5,14 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/05/13 08:24:57 $)';
+$::version  = '1.1.0_0 ($Date: 2006/05/20 15:09:59 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 $::psuffix   = '.pl';
 $::syntax_engine = \&default_syntax_engine;
-$::a = \&main::anchor;
+$::a = \&::anchor;
 
 binmode(STDOUT);
 binmode(STDIN);
@@ -179,6 +179,18 @@ sub init_globals{
             { desc=>'subsubsection mark' , name=>'subsubsectionmark' , size=>3 }
         ]
     );
+
+    @::preprocessers = (
+        \&preprocess_innerlink1  ,
+        \&preprocess_innerlink2  ,
+        \&preprocess_outerlink1  ,
+        \&preprocess_outerlink2  ,
+        \&preprocess_attachment  ,
+        \&preprecess_htmltag     ,
+        \&preprocess_decorations ,
+        \&preprocess_plugin      ,
+        \&preprocess_rawurl
+    );
 }
 
 sub read_multimedia{
@@ -328,8 +340,8 @@ sub myurl{
 sub anchor{
     my ($text,$cgiprm,$attr,$sharp)=@_;
     $attr ||= {}; $attr->{href}= &myurl($cgiprm,$sharp); 
-    my $attr=unpack('h*',join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr})));
-    "<a \a$attr\a>$text</a>";
+    $attr=&verb(join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr})));
+    "<a $attr>$text</a>";
 }
 
 sub is{ exists $::config{$_[0]} && $::config{$_[0]} eq 'OK' ; }
@@ -897,7 +909,9 @@ sub list_page{
 }
 
 sub object_exists{
-    exists $::work_directory_cache{ &title2fname($_[0]) };
+      defined( %::work_directory_cache )
+    ? exists $::work_directory_cache{ &title2fname($_[0]) }
+    : -f &title2fname($_[0]) ;
 }
 
 sub list_attachment{
@@ -1033,7 +1047,8 @@ sub ls_core{
         @list = sort{ $a->{title} cmp $b->{title} } @list;
     }
     exists $opt->{r}         and @list = reverse @list;
-    exists $opt->{number}    and splice(@list,$opt->{number});
+    exists $opt->{number} && $#list > $opt->{number}
+        and splice(@list,$opt->{number});
     exists $opt->{countdown} and splice(@list,$opt->{countdown});
     @list;
 }
@@ -1137,51 +1152,64 @@ sub cr2br{
     $s;
 }
 
+sub preprocess_innerlink1{ ### >>{ ... } ###
+    ${$_[0]} =~ s|&gt;&gt;\{([^\}]+)\}|&inner_link($1,$1)|ge;
+}
+
+sub preprocess_innerlink2{ ### [[ ... | ... ] ###
+    ${$_[0]} =~ s!\[\[(?:([^\|\]]+)\|)?(.+?)\]\]!
+        &inner_link(defined($1)?$1:$2,$2)!ge;
+}
+
+sub preprocess_outerlink1{ ### http://...{ ... } style ###
+    ${$_[0]} =~ s!($::RXURL)\{([^\}]+)\}!
+        &verb(sprintf('<a href="%s"%s>',$1,$::target)).$2.'</a>'!goe;
+}
+
+sub preprocess_outerlink2{ ### [...|http://...] style ###
+    ${$_[0]} =~ s!\[([^\|]+)\|((?:\.\.?/|$::PROTOCOL://)[^\]]+)\]!
+        &verb(sprintf('<a href="%s"%s>',$2,$::target)).$1.'</a>'!goe;
+}
+
+sub preprocess_attachment{
+    my ($text,$session)=@_;
+    my $attachment = $session->{attachment};
+    ${$_[0]} =~ s|&lt;&lt;\{([^\}]+)\}|
+        &verb( exists $attachment->{$1}
+        ? $session->{attachment}->{$1}->{tag} : "<blink>$&</blink>" )|ge;
+}
+
+sub preprecess_htmltag{
+    ${$_[0]} =~ s!&lt;(/?(b|big|br|cite|code|del|dfn|em|hr|i|ins|kbd|q|s|samp|small|span|strike|strong|sup|sub|tt|u|var)\s*/?)&gt;!<$1>!gi;
+}
+
+sub preprocess_decorations{
+    my $text=shift;
+    $$text =~ s|^//.*$||mg;
+    $$text =~ s|&#39;&#39;&#39;&#39;(.*?)&#39;&#39;&#39;&#39;|<big>$1</big>|gs;
+    $$text =~ s|&#39;&#39;&#39;(.*?)&#39;&#39;&#39;|<strong>$1</strong>|gs;
+    $$text =~ s|&#39;&#39;(.*?)&#39;&#39;|<em>$1</em>|gs;
+    $$text =~ s|__(.*?)__|<u>$1</u>|gs;
+    $$text =~ s|==(.*?)==|<strike>$1</strike>|gs;
+    $$text =~ s|``(.*?)``|'<tt class="pre">'.&cr2br($1).'</tt>'|ges;
+}
+
+
+sub preprocess_plugin{
+    ${$_[0]} =~ s/\(\((.+?)\)\)/&plugin(${$_[2]},$1)/ges;
+}
+
+sub preprocess_rawurl{
+    my $text=shift;
+    $$text = " $$text";
+    $$text =~ s/([^-\"\>\w\.!~'\(\);\/?\@&=+\$,%#])($::RXURL)/
+        $1.&verb(sprintf('<a href="%s"%s>',$2,$::target)).$2.'<\/a>'/goe;
+    substr($$text,0,1)='';
+}
+
 sub preprocess{
     my ($text,$session) = @_;
-    my $attachment = $session->{attachment};
-
-    ## >> style
-    $text =~ s|&gt;&gt;\{([^\}]+)\}|&inner_link($1,$1)|ge;
-
-    ## [[...]] style
-    $text =~
-    s!\[\[(?:([^\|\]]+)\|)?(.+?)\]\]!
-        &inner_link(defined($1)?$1:$2,$2)!ge;
-
-    ### http://...{ ... } style
-    $text =~ s!($::RXURL)\{([^\}]+)\}!
-        &verb(sprintf('<a href="%s"%s>',$1,$::target)).$2.'</a>'!goe;
-
-    ### [...|http://...] style
-    $text =~ s!\[([^\|]+)\|((?:\.\.?/|$::PROTOCOL://)[^\]]+)\]!
-        &verb(sprintf('<a href="%s"%s>',$2,$::target)).$1.'</a>'!goe;
-
-    ### attachment ###
-    $text =~ s|&lt;&lt;\{([^\}]+)\}|
-        &verb( exists $attachment->{$1}
-        ? $attachment->{$1}->{tag} : "<blink>$&</blink>" )|ge;
-
-    ### tag listed white list ###
-    $text =~ s!&lt;(/?(b|big|br|cite|code|del|dfn|em|hr|i|ins|kbd|q|s|samp|small|span|strike|strong|sup|sub|tt|u|var)\s*/?)&gt;!<$1>!gi;
-
-    ### text decorations ###
-    $text =~ s|^//.*$||mg;
-    $text =~ s|&#39;&#39;&#39;&#39;(.*?)&#39;&#39;&#39;&#39;|<big>$1</big>|gs;
-    $text =~ s|&#39;&#39;&#39;(.*?)&#39;&#39;&#39;|<strong>$1</strong>|gs;
-    $text =~ s|&#39;&#39;(.*?)&#39;&#39;|<em>$1</em>|gs;
-    $text =~ s|__(.*?)__|<u>$1</u>|gs;
-    $text =~ s|==(.*?)==|<strike>$1</strike>|gs;
-    $text =~ s|``(.*?)``|'<tt class="pre">'.&cr2br($1).'</tt>'|ges;
-
-    #### plugin ###
-    $text =~ s/\(\((.+?)\)\)/&plugin($session,$1)/ges;
-
-    ### raw url
-    $text = " $text";
-    $text =~ s/([^-\"\>\w\.!~'\(\);\/?\@&=+\$,%#])($::RXURL)/
-        $1.&verb(sprintf('<a href="%s"%s>',$2,$::target)).$2.'<\/a>'/goe;
-    substr($text,0,1)='';
+    grep( $_->( \$text , $session ) , @::preprocessers );
     $text;
 }
 
