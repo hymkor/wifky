@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/05/20 15:09:59 $)';
+$::version  = '1.1.0_0 ($Date: 2006/05/20 15:18:58 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -1209,7 +1209,9 @@ sub preprocess_rawurl{
 
 sub preprocess{
     my ($text,$session) = @_;
-    grep( $_->( \$text , $session ) , @::preprocessers );
+    foreach my $p ( @::preprocessers ){
+	$p->( \$text , $session );
+    }
     $text;
 }
 
