@@ -5,14 +5,15 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/05/20 15:18:58 $)';
+$::version  = '1.1.0_0 ($Date: 2006/05/21 14:35:58 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 $::psuffix   = '.pl';
 $::syntax_engine = \&default_syntax_engine;
-$::a = \&::anchor;
+$::anchor   = \&::anchor;
+$::img = \&::img;
 
 binmode(STDOUT);
 binmode(STDIN);
@@ -130,30 +131,30 @@ sub init_globals{
     @::body_header = <DATA>;
 
     @::menubar = (
-        $::a->( 'FrontPage' , undef  ) ,
-        $::a->( 'New'       , { a=>'new' } ) ,
+        $::anchor->( 'FrontPage' , undef  ) ,
+        $::anchor->( 'New'       , { a=>'new' } ) ,
     );
 
     ### menubar ###
     unless( exists $::form{a} ){
         &is_frozen() or
             push(@::menubar,
-                $::a->('Edit',{
+                $::anchor->('Edit',{
                     a=>'edt',
                     p=>( exists $::form{p} ? $::form{p} : 'FrontPage' )
                 },{
                     rel=>'nofollow'
                 }) );
         push( @::menubar ,
-            $::a->('Edit(Admin)',{
+            $::anchor->('Edit(Admin)',{
                 a=>'edt',
                 p=>( exists $::form{p} ? $::form{p} : 'FrontPage' ),
                 admin=>'admin'
             },{rel=>'nofollow'}) );
     }
     push(@::menubar ,
-        $::a->('Tools',{a=>'tools'},{ref=>'nofollow'}) ,
-        $::a->('Index',{a=>'recent'})
+        $::anchor->('Tools',{a=>'tools'},{ref=>'nofollow'}) ,
+        $::anchor->('Index',{a=>'recent'})
     );
 
     @::copyright = (
@@ -340,8 +341,14 @@ sub myurl{
 sub anchor{
     my ($text,$cgiprm,$attr,$sharp)=@_;
     $attr ||= {}; $attr->{href}= &myurl($cgiprm,$sharp); 
-    $attr=&verb(join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr})));
-    "<a $attr>$text</a>";
+    '<a '.&verb(join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr})))
+        . ">$text</a>";
+}
+
+sub img{
+    my ($text,$cgiprm,$attr)=@_;
+    $attr ||= {}; $attr->{src}=&myurl($cgiprm,''); $attr->{alt}=$text;
+    '<img '.&verb(join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr}))).'>';
 }
 
 sub is{ exists $::config{$_[0]} && $::config{$_[0]} eq 'OK' ; }
@@ -712,12 +719,12 @@ sub action_seek{
     foreach my $fn ( &list_page() ){
         my $title  = &fname2title( $fn );
         if( index($title ,$keyword) >= 0 ){
-            &puts('<li>' . $::a->($title,{ p=>$title }) . ' (title)</li>');
+            &puts('<li>' . $::anchor->($title,{ p=>$title }) . ' (title)</li>');
         }else{
             open(FP,$fn) or die("Can not open the file $fn");
             while( <FP> ){
                 if( index($_,$keyword) >= 0 ){
-                    &puts('<li>' . $::a->($title,{ p=>$title } ) . '</li>' );
+                    &puts('<li>' . $::anchor->($title,{ p=>$title } ) . '</li>' );
                     last;
                 }
             }
@@ -775,8 +782,8 @@ sub do_index{
 
     &print_header( title=>'IndexPage' , userheader=>1 );
     &begin_day('IndexPage');
-        &puts('<ul><li><tt>' . $::a->(' Last Modified Time' , { a=>$t } ) .
-                '&nbsp' . $::a->('Page Title' , { a=>$n } ) .
+        &puts('<ul><li><tt>' . $::anchor->(' Last Modified Time' , { a=>$t } ) .
+                '&nbsp' . $::anchor->('Page Title' , { a=>$n } ) .
                 '</li>' , &ls(@_) , '</ul>' );
     &end_day();
     &print_copyright;
@@ -934,8 +941,8 @@ sub print_page{
             name => $attach ,
             url  => $url ,
             tag  => $attach =~ /\.(png|gif|jpg|jpeg)$/i
-                    ? qq(<img src="${url}" alt="${e_attach}">)
-                    : $::a->($e_attach,{ p=>$title , f=>$attach } ,
+                    ? $::img->($e_attach,{ p=>$title , f=>$attach } )
+                    : $::anchor->($e_attach,{ p=>$title , f=>$attach } ,
                                   ,{ title=>$e_attach } )
         };
     }
@@ -973,7 +980,7 @@ sub inner_link{
     my $title  = &denc( shift );
 
     if( &object_exists($title) ){
-        $::a->( $symbol , { p=>$title } );
+        $::anchor->( $symbol , { p=>$title } );
     }else{
         qq(<blink>${symbol}?</blink>);
     }
@@ -1076,7 +1083,7 @@ sub ls{
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
         exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
-        $buf .= $::a->( &enc($p->{title}) , { p=>$p->{title} } );
+        $buf .= $::anchor->( &enc($p->{title}) , { p=>$p->{title} } );
         $buf .= "</li>\r\n";
     }
     $buf;
@@ -1175,8 +1182,8 @@ sub preprocess_attachment{
     my ($text,$session)=@_;
     my $attachment = $session->{attachment};
     ${$_[0]} =~ s|&lt;&lt;\{([^\}]+)\}|
-        &verb( exists $attachment->{$1}
-        ? $session->{attachment}->{$1}->{tag} : "<blink>$&</blink>" )|ge;
+        exists $attachment->{$1}
+        ? $session->{attachment}->{$1}->{tag} : "<blink>$&</blink>"|ge;
 }
 
 sub preprecess_htmltag{
@@ -1210,7 +1217,7 @@ sub preprocess_rawurl{
 sub preprocess{
     my ($text,$session) = @_;
     foreach my $p ( @::preprocessers ){
-	$p->( \$text , $session );
+        $p->( \$text , $session );
     }
     $text;
 }
@@ -1232,7 +1239,7 @@ sub midashi{
         my $cls  = ('sub' x $depth).'section' ;
 
         $text =~ s/^\+/${tag}. /;
-        $text = $::a->( &enc($::config{"${cls}mark"})
+        $text = $::anchor->( &enc($::config{"${cls}mark"})
                   , { p     => $session->{title} } 
                   , { class => "${cls}mark sanchor" }
                   , "#p${tag}"
