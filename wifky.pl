@@ -5,7 +5,7 @@ use strict; use warnings;
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/06/09 14:05:05 $)';
+$::version  = '1.1.0_0 ($Date: 2006/06/10 00:37:16 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -1319,14 +1319,15 @@ sub default_syntax_engine{
             &puts('<blockquote>'.&preprocess($fragment,$session).
                     '</blockquote>' );
         }elsif( $fragment =~ /\A\s*\|\|/ ){
+	    my $i=0;
             &puts('<table>');
             foreach my $tr ( split(/\|\|/,&preprocess($',$session) ) ){
                 my $tag='td';
                 if( $tr =~ /\A\|/ ){
                     $tag = 'th'; $tr = $';
-                }
-                &puts( '<tr>',map("<${tag}>$_</${tag}>",split(/\|/,$tr) ),
-                        '</tr>' );
+		}
+                &puts( '<tr class="'.(++$i % 2 ? "odd":"even").'">',
+		       map("<${tag}>$_</${tag}>",split(/\|/,$tr) ) , '</tr>' );
             }
             &puts('</table>');
         }elsif( $fragment =~ /\A\s*&lt;(blockquote|center)&gt;(.*)&lt;\/\1&gt;\s*\Z/si ){
