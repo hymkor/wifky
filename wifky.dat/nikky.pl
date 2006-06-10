@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.13.0 ($Date: 2006/05/13 06:16:02 $)';
+my $version='0.14.0 ($Date: 2006/06/10 15:39:47 $)';
 my $nextday;
 my $prevday;
 
@@ -42,6 +42,7 @@ $main::preferences{'Plugin: nikky.pl'}= [
     { desc=>'Print diary as FrontPage' , type=>'checkbox' ,
         name=>'nikky_front' } ,
     { desc=>'Days of top diary' , type=>'text' , name=>'nikky_days', size=>1 },
+    { desc=>'1-section to 1-rss-item' , type=>'checkbox' , name=>'nikky_rssitemsize' } ,
 ];
 
 
@@ -55,24 +56,27 @@ unshift( @main::copyright ,
     <a href="$main::me?a=rss" style="border-width:1px;border-color:white;border-style:solid;font-size:small;font-weight:bold;text-decoration:none;background-color:darkorange;color:white;font-style:normal">RSS</a><br>)
 );
 
-grep( (/New/ and $_=$main::a->('New',{ a=>'newdiary' } ),0) , @main::menubar );
+grep( (/New/ and $_=qq(<a href="$main::me?a=newdiary">New</a>) )
+    , @main::menubar );
 
 ### Next/Prev bar ###
 &set_nextprev;
 
 sub nikky_core{
     my $days = shift;
+    my $h = (exists $main::config{cssstyle} && $main::config{cssstyle} eq 'OK'
+                ? 2 : 1);
     my @list=&main::ls_core( { r=>1 , number=>$days } , '(????.??.??)*' );
     splice(@list,10) if $#list > 10;
     foreach my $p (@list){
         my $pagename=$p->{title};
-        &main::puts('<div class="day"><h2>');
-        &main::puts($main::a->($pagename,{p=>$pagename}) );
-        &main::puts('</h2><div class="body">');
+        &main::puts('<div class="day">');
+        &main::putenc('<h%d><a href="%s">%s</a></h%d><div class="body">',
+                    $h , &main::title2url( $pagename ) , $pagename , $h );
         local $main::form{p} = $pagename;
         &main::print_page( title=>$pagename );
         &main::puts('</div></div>');
-        &main::print_page( title=>'Footer' , class=>'terminator' );
+        &main::print_page( title=>'Footer' , class=>$main::ss{terminator} );
     }
 }
 
@@ -86,7 +90,7 @@ sub lastdiary{
 sub action_nikky{
     &main::print_header( userheader=>'YES' );
     &nikky_core($main::config{nikky_days} || 3);
-    &main::puts('<div class="footer copyright">',@::copyright,'</div>');
+    &main::puts('<div class="'.$main::ss{copyright}.'">',@::copyright,'</div>');
     &main::print_sidebar_and_footer;
 }
 
@@ -94,11 +98,10 @@ sub recentdiary{
     my ($session,$day)=@_;
     my @list=&main::ls_core({ r=>1 , number=>$day } , '(????.??.??)*' );
     if( $#list >= 0 ){
-        "<ul>\n<li>" .
-         join("</li>\n<li>" ,
-            map( $main::a->( &main::enc($_->{title}) , { p=>$_->{title} }) 
-                , @list ) )
-        . "</li></ul>\n";
+        "<ul>\n" . join('' , map( sprintf('<li><a href="%s">%s</a></li>',
+                                &main::title2url($_->{title}) ,
+                                &main::enc($_->{title}) ) , @list ))
+        . "</ul>\n";
     }else{
         '';
     }
@@ -224,54 +227,72 @@ sub action_rss{
         my $pageurl = &main::percent($p->{title});
         my $id=0;
         my $desc=[];
-        foreach my $frag ( split(/\r?\n\r?\n/,$text) ){
-            if( $frag =~ /^\s*&lt;&lt;(?!&lt;)(.*)&gt;&gt;\s*$/s ||
-                $frag =~ /^!!!(.*)$/s )
-            {
-                if( scalar(@{$desc}) > 0 ){
-                    unshift(@topics ,
-                        $id == 0 ? +{
-                            page  => $p->{title} ,
-                            url   => sprintf('%s?p=%s',$URL,$pageurl),
-                            title => $p->{title} ,
-                            timestamp => $p->{timestamp},
-                            desc  => $desc ,
-                            attachment => $p->{attachment} ,
-                        } : +{
-                            page  => $p->{title} ,
-                            url   => sprintf('%s?p=%s#p%d',$URL,$pageurl,$id),
-                            title => $title ,
-                            timestamp => $p->{timestamp},
-                            desc  => $desc ,
-                            attachment => $p->{attachment} ,
-                        }
-                    );
+
+        if( $main::config{'nikky_rssitemsize'} && 
+            $main::config{'nikky_rssitemsize'} ne 'NG' )
+        {
+            ### 1 section to 1 rssitem ###
+
+            foreach my $frag ( split(/\r?\n\r?\n/,$text) ){
+                if( $frag =~ /^\s*&lt;&lt;(?!&lt;)(.*)&gt;&gt;\s*$/s ||
+                    $frag =~ /^!!!(.*)$/s )
+                {
+                    if( scalar(@{$desc}) > 0 ){
+                        unshift(@topics ,
+                            $id == 0 ? +{
+                                page  => $p->{title} ,
+                                url   => sprintf('%s?p=%s',$URL,$pageurl),
+                                title => $p->{title} ,
+                                timestamp => $p->{timestamp},
+                                desc  => $desc ,
+                                attachment => $p->{attachment} ,
+                            } : +{
+                                page  => $p->{title} ,
+                                url   => sprintf('%s?p=%s#p%d',$URL,$pageurl,$id),
+                                title => $title ,
+                                timestamp => $p->{timestamp},
+                                desc  => $desc ,
+                                attachment => $p->{attachment} ,
+                            }
+                        );
+                    }
+                    ++$id;
+                    $title = &main::preprocess($1,{ attachment=>{} } );
+                    $title =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
+                    $title =~ s/\<[^\>]*\>\s*//g;
+                    $desc = [];
                 }
-                ++$id;
-                $title = &main::preprocess($1,{ attachment=>{} } );
-                $title =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
-                $title =~ s/\<[^\>]*\>\s*//g;
-                $desc = [];
+                push(@{$desc}, $frag );
             }
-            push(@{$desc}, $frag );
-        }
-        if( scalar(@{$desc}) > 0 ){
-            unshift(@topics ,
-                $id == 0 ? +{
+            if( scalar(@{$desc}) > 0 ){
+                unshift(@topics ,
+                    $id == 0 ? +{
+                        page  => $p->{title} ,
+                        url   => sprintf('%s?p=%s',$URL,$pageurl),
+                        title => $p->{title} ,
+                        timestamp => $p->{timestamp},
+                        desc  => $desc ,
+                        attachment => $p->{attachment} ,
+                    } : +{
+                        page  => $p->{title} ,
+                        url   => sprintf('%s?p=%s#p%d',$URL,$pageurl,$id),
+                        title => $title ,
+                        timestamp => $p->{timestamp},
+                        desc  => $desc ,
+                        attachment => $p->{attachment} ,
+                    }
+                );
+            }
+        }else{
+            ### blog-mode ( 1 page to 1 rss-item) ###
+            unshift(@topics , +{
                     page  => $p->{title} ,
                     url   => sprintf('%s?p=%s',$URL,$pageurl),
                     title => $p->{title} ,
                     timestamp => $p->{timestamp},
-                    desc  => $desc ,
+                    desc  => [ $text ] ,
                     attachment => $p->{attachment} ,
-                } : +{
-                    page  => $p->{title} ,
-                    url   => sprintf('%s?p=%s#p%d',$URL,$pageurl,$id),
-                    title => $title ,
-                    timestamp => $p->{timestamp},
-                    desc  => $desc ,
-                    attachment => $p->{attachment} ,
-                }
+                } 
             );
         }
     }
@@ -305,9 +326,9 @@ sub action_rss{
                 , $tm[5]+1900,$tm[4]+1,@tm[3,2,1,0] ;
         local $main::print='';
         print  '<description><![CDATA[';
-        &main::syntax_engine( join("\n\n",@{$t->{desc}}) , {
-                attachment => $t->{attachment} ,
-            }
+        &main::syntax_engine(
+            join("\n\n",@{$t->{desc}}) ,
+            { title => $t->{title} , attachment => $t->{attachment} }
         );
         &main::flush;
         print  "]]></description>\n</item>\n";
