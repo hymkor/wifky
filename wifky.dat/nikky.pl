@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.14.0 ($Date: 2006/06/10 15:39:47 $)';
+my $version='0.15.0 ($Date: 2006/06/11 17:41:02 $)';
 my $nextday;
 my $prevday;
 
@@ -26,8 +26,9 @@ $main::inline_plugin{nikky_referer} = sub {
 $main::action_plugin{rss} = \&action_rss ;
 $main::action_plugin{newdiary} = \&action_newdiary;
 $main::action_plugin{nikky} = \&action_nikky ;
+$main::action_plugin{date} = \&action_date;
 
-&set_date2p;
+exists $main::form{date} and $main::form{a}='date';
 
 if( exists $main::config{nikky_front}  &&
     $main::config{nikky_front} eq 'OK' &&
@@ -64,11 +65,30 @@ grep( (/New/ and $_=qq(<a href="$main::me?a=newdiary">New</a>) )
 
 sub nikky_core{
     my $days = shift;
-    my $h = (exists $main::config{cssstyle} && $main::config{cssstyle} eq 'OK'
-                ? 2 : 1);
     my @list=&main::ls_core( { r=>1 , number=>$days } , '(????.??.??)*' );
     splice(@list,10) if $#list > 10;
-    foreach my $p (@list){
+    &concat_article( @list );
+}
+
+sub action_date{
+    my $ymd=$main::form{date};
+    my @list=&main::ls_core({},
+	    sprintf('(%2s.%2s.%2s)*'
+		,substr($ymd,0,4)
+		,substr($ymd,4,2)
+		,substr($ymd,6,2) )
+    );
+
+    &main::print_header( userheader=>'YES' );
+    &concat_article( @list );
+    &main::puts('<div class="'.$main::ss{copyright}.'">',@::copyright,'</div>');
+    &main::print_sidebar_and_footer;
+}
+
+sub concat_article{
+    my $h = (exists $main::config{cssstyle} && $main::config{cssstyle} eq 'OK'
+                ? 2 : 1);
+    foreach my $p (@_){
         my $pagename=$p->{title};
         &main::puts('<div class="day">');
         &main::putenc('<h%d><a href="%s">%s</a></h%d><div class="body">',
@@ -356,24 +376,6 @@ sub quote{
         quote1($session,$a,$f)
     }else{
         $f || $t;
-    }
-}
-
-sub set_date2p{
-    if( exists $main::form{date} ){
-        my $date=$main::form{date};
-        my $p=sprintf('(%04d.%02d.%02d)'
-                    , substr($date,0,4)
-                    , substr($date,4,2)
-                    , substr($date,6,2) );
-        if( &main::object_exists( $p ) ){
-            $main::form{p} = $p;
-        }else{
-            my $prefix = &main::title2fname($p);
-            my @fn=grep( /^${prefix}([0-9a-f][0-9a-f])+$/,&main::directory() );
-            $#fn >= 0 and $main::form{p} = &main::fname2title($fn[0]) ;
-        }
-        grep( s/p\=(.*?)(?=;a=edt)/p=$p/ , @main::menubar );
     }
 }
 
