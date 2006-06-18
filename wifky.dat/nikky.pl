@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.15.0 ($Date: 2006/06/11 17:41:02 $)';
+my $version='0.15.0 ($Date: 2006/06/18 16:59:17 $)';
 my $nextday;
 my $prevday;
 
@@ -72,12 +72,7 @@ sub nikky_core{
 
 sub action_date{
     my $ymd=$main::form{date};
-    my @list=&main::ls_core({},
-	    sprintf('(%2s.%2s.%2s)*'
-		,substr($ymd,0,4)
-		,substr($ymd,4,2)
-		,substr($ymd,6,2) )
-    );
+    my @list=&main::ls_core({},sprintf('(%2s.%2s.%2s)*',unpack('A4A2A2',$ymd)));
 
     &main::print_header( userheader=>'YES' );
     &concat_article( @list );
@@ -381,7 +376,9 @@ sub quote{
 
 sub set_nextprev{
     my $p=$main::form{p};
-    if( ! defined($p) || $p !~ /^\(\d\d\d\d.\d\d.\d\d\)/ ){
+    if( exists $main::form{date} ){
+        $p = sprintf('(%04s.%02s.%02s)',unpack('A4A2A2',$main::form{date}) );
+    }elsif( ! defined($p) || $p !~ /^\(\d\d\d\d.\d\d.\d\d\)/ ){
         $p = '(9999.99.99)';
     }
     my $cur=&main::title2fname($p);
@@ -430,6 +427,9 @@ sub calender{
     if( defined($main::form{p}) &&
         $main::form{p} =~ /^\((\d\d\d\d)\.(\d\d)\.(\d\d)\)/ ){
         ($y,$m,$today)=($1,$2,$3);
+    }elsif( defined($main::form{date}) && 
+        $main::form{date} =~ /^(\d\d\d\d)(\d\d)(\d\d)$/ ){
+        ($y,$m,$today)=($1,$2,$3);
     }else{
         ($y,$m,$today)=(localtime)[5,4,3];
         $y += 1900 ; ++$m; $today = sprintf('%02d',$today);
@@ -469,9 +469,8 @@ sub calender{
                 $today eq $D ? ' Today' : '' );
 
         if( exists $thismonth{$D} ){
-            $buffer .= sprintf('<a href="%s">%s</a></td>'
-                                , &main::title2url($thismonth{$D})
-                                , $d );
+            $buffer .= sprintf('<a href="%s?date=%04d%02d%02d">%s</a></td>'
+                                , $main::me , $y , $m , $d , $d);
         }else{
             $buffer .= qq($d</td>);
         }
