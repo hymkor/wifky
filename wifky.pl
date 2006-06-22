@@ -5,15 +5,12 @@ use strict; use warnings;
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/06/10 00:37:16 $)';
+$::version  = '1.1.0_0 ($Date: 2006/06/22 13:08:43 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
-$::psuffix   = '.pl';
-$::syntax_engine = \&default_syntax_engine;
-$::anchor   = \&::anchor;
-$::img = \&::img;
+$::psuffix  = '.pl';
 
 binmode(STDOUT);
 binmode(STDIN);
@@ -131,30 +128,30 @@ sub init_globals{
     @::body_header = <DATA>;
 
     @::menubar = (
-        $::anchor->( 'FrontPage' , undef  ) ,
-        $::anchor->( 'New'       , { a=>'new' } ) ,
+        &anchor( 'FrontPage' , undef  ) ,
+        &anchor( 'New'       , { a=>'new' } ) ,
     );
 
     ### menubar ###
     unless( exists $::form{a} ){
         &is_frozen() or
             push(@::menubar,
-                $::anchor->('Edit',{
+                &anchor('Edit',{
                     a=>'edt',
                     p=>( exists $::form{p} ? $::form{p} : 'FrontPage' )
                 },{
                     rel=>'nofollow'
                 }) );
         push( @::menubar ,
-            $::anchor->('Edit(Admin)',{
+            &anchor('Edit(Admin)',{
                 a=>'edt',
                 p=>( exists $::form{p} ? $::form{p} : 'FrontPage' ),
                 admin=>'admin'
             },{rel=>'nofollow'}) );
     }
     push(@::menubar ,
-        $::anchor->('Tools',{a=>'tools'},{ref=>'nofollow'}) ,
-        $::anchor->('Index',{a=>'recent'})
+        &anchor('Tools',{a=>'tools'},{ref=>'nofollow'}) ,
+        &anchor('Index',{a=>'recent'})
     );
 
     @::copyright = (
@@ -718,12 +715,12 @@ sub action_seek{
     foreach my $fn ( &list_page() ){
         my $title  = &fname2title( $fn );
         if( index($title ,$keyword) >= 0 ){
-            &puts('<li>' . $::anchor->($title,{ p=>$title }) . ' (title)</li>');
+            &puts('<li>' . &anchor($title,{ p=>$title }) . ' (title)</li>');
         }else{
             open(FP,$fn) or die("Can not open the file $fn");
             while( <FP> ){
                 if( index($_,$keyword) >= 0 ){
-                    &puts('<li>' . $::anchor->($title,{ p=>$title } ) . '</li>' );
+                    &puts('<li>' . &anchor($title,{ p=>$title } ) . '</li>' );
                     last;
                 }
             }
@@ -781,8 +778,8 @@ sub do_index{
 
     &print_header( title=>'IndexPage' , userheader=>1 );
     &begin_day('IndexPage');
-        &puts('<ul><li><tt>' . $::anchor->(' Last Modified Time' , { a=>$t } ) .
-                '&nbsp' . $::anchor->('Page Title' , { a=>$n } ) .
+        &puts('<ul><li><tt>' . &anchor(' Last Modified Time' , { a=>$t } ) .
+                '&nbsp' . &anchor('Page Title' , { a=>$n } ) .
                 '</li>' , &ls(@_) , '</ul>' );
     &end_day();
     &print_copyright;
@@ -940,8 +937,8 @@ sub print_page{
             name => $attach ,
             url  => $url ,
             tag  => $attach =~ /\.(png|gif|jpg|jpeg)$/i
-                    ? $::img->($e_attach,{ p=>$title , f=>$attach } )
-                    : $::anchor->($e_attach,{ p=>$title , f=>$attach } ,
+                    ? &img($e_attach,{ p=>$title , f=>$attach } )
+                    : &anchor($e_attach,{ p=>$title , f=>$attach } ,
                                   ,{ title=>$e_attach } )
         };
     }
@@ -979,7 +976,7 @@ sub inner_link{
     my $title  = &denc( shift );
 
     if( &object_exists($title) ){
-        $::anchor->( $symbol , { p=>$title } );
+        &anchor( $symbol , { p=>$title } );
     }else{
         qq(<blink>${symbol}?</blink>);
     }
@@ -1082,7 +1079,7 @@ sub ls{
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
         exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
-        $buf .= $::anchor->( &enc($p->{title}) , { p=>$p->{title} } );
+        $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
         $buf .= "</li>\r\n";
     }
     $buf;
@@ -1238,7 +1235,7 @@ sub midashi{
         my $cls  = ('sub' x $depth).'section' ;
 
         $text =~ s/^\+/${tag}. /;
-        $text = $::anchor->( &enc($::config{"${cls}mark"})
+        $text = &anchor( &enc($::config{"${cls}mark"})
                   , { p     => $session->{title} } 
                   , { class => "${cls}mark sanchor" }
                   , "#p${tag}"
@@ -1264,7 +1261,7 @@ sub midashi{
 
 sub syntax_engine{
     my ($html,$session) = @_;
-    $::syntax_engine->( ref($html) ? $html : \$html , $session );
+    &default_syntax_engine( ref($html) ? $html : \$html , $session );
     &plugin_footnote_flush( $session );
 }
 
