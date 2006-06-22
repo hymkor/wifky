@@ -5,7 +5,7 @@ use strict; use warnings;
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/06/22 13:08:43 $)';
+$::version  = '1.1.0_0 ($Date: 2006/06/22 16:25:52 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -337,8 +337,8 @@ sub myurl{
 sub anchor{
     my ($text,$cgiprm,$attr,$sharp)=@_;
     $attr ||= {}; $attr->{href}= &myurl($cgiprm,$sharp); 
-    '<a '.&verb(join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr})))
-        . ">$text</a>";
+    &verb('<a '.join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr})).'>')
+        . $text . '</a>';
 }
 
 sub img{
