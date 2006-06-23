@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.15.0 ($Date: 2006/06/18 16:59:17 $)';
+my $version='0.16.0 ($Date: 2006/06/24 04:04:07 $)';
 my $nextday;
 my $prevday;
 
@@ -65,7 +65,11 @@ grep( (/New/ and $_=qq(<a href="$main::me?a=newdiary">New</a>) )
 
 sub nikky_core{
     my $days = shift;
-    my @list=&main::ls_core( { r=>1 , number=>$days } , '(????.??.??)*' );
+    my @list=&main::ls_core( { r=>1 } , '(????.??.??)*' );
+    my @tm=localtime(time+24*60*60);
+    my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
+    @list = grep( $_->{title} lt $tomorrow , @list );
+    splice(@list,$days) if $#list > $days;
     splice(@list,10) if $#list > 10;
     &concat_article( @list );
 }
@@ -379,7 +383,8 @@ sub set_nextprev{
     if( exists $main::form{date} ){
         $p = sprintf('(%04s.%02s.%02s)',unpack('A4A2A2',$main::form{date}) );
     }elsif( ! defined($p) || $p !~ /^\(\d\d\d\d.\d\d.\d\d\)/ ){
-        $p = '(9999.99.99)';
+	my @tm=localtime(time);
+	$p = sprintf( "(%04d.%02d.%02d)\xFF", 1900+$tm[5], 1+$tm[4], $tm[3] );
     }
     my $cur=&main::title2fname($p);
     foreach my $t ( &main::list_page() ){
