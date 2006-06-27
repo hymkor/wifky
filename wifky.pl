@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/06/27 11:08:52 $)';
+$::version  = '1.1.0_0 ($Date: 2006/06/27 18:09:46 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -543,14 +543,12 @@ sub action_new{
 }
 
 sub load_config{
-    defined($::load_config) and return &$::load_config;
     rename(&title2fname('','password'),'index.cgi');
     grep( (/^\#?([^\#\!\t ]+)\t(.*)$/ and $::config{$1}=&deyen($2),0)
         , split(/\n/,&read_file('index.cgi') ) );
 }
 
 sub save_config{
-    defined($::save_config) and return &$::save_config;
     my @settings;
     while( my ($key,$val)=each %::config ){
         push( @settings , "#$key\t$val" );
