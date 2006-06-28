@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/06/27 18:09:46 $)';
+$::version  = '1.1.0_0 ($Date: 2006/06/28 15:21:50 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -320,10 +320,10 @@ sub title2fname{
     join('__',map(unpack('h*',$_),@_) );
 }
 sub percent{
-    my $e_title = shift;
-    $e_title =~ s/([^\w\'\.\-\*\(\)\_ ])/sprintf('%%%02X',ord($1))/eg;
-    $e_title =~ s/ /+/g;
-    $e_title;
+    my $s = shift;
+    $s =~ s/([^\w\'\.\-\*\(\)\_ ])/sprintf('%%%02X',ord($1))/eg;
+    $s =~ s/ /+/g;
+    $s;
 }
 
 sub myurl{
