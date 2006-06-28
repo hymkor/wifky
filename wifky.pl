@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/06/28 15:21:50 $)';
+$::version  = '1.1.0_0 ($Date: 2006/06/28 15:42:04 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -691,6 +691,10 @@ sub action_rename{
     my $title    = $::form{p};
     my $fname    = &title2fname($title);
     my $newfname = &title2fname($newtitle);
+
+    if( -f $newfname ){
+        die("!The new page name '$newtitle' is already used.!");
+    }
 
     foreach my $fn ( &directory() ){
         my @p=split('__',$fn);
