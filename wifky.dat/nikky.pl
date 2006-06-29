@@ -2,17 +2,23 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.16.0 ($Date: 2006/06/24 04:04:07 $)';
+my $version='0.17.0 ($Date: 2006/06/29 15:55:02 $)';
 my $nextday;
 my $prevday;
+my $nextmonth;
+my $prevmonth;
 
 $main::inline_plugin{'nikky.pl_version'} = sub{ "nikky.pl $version" };
 $main::inline_plugin{lastdiary}=\&lastdiary;
+$main::inline_plugin{olddiary}=\&olddiary;
+$main::inline_plugin{newdiary}=\&newdiary;
 $main::inline_plugin{recentdiary}=\&recentdiary;
 $main::inline_plugin{referer}=\&referer;
 $main::inline_plugin{calender}= \&calender;
 $main::inline_plugin{prevday}=\&prevday;
 $main::inline_plugin{nextday}=\&nextday;
+$main::inline_plugin{prevmonth}=\&prevmonth;
+$main::inline_plugin{nextmonth}=\&nextmonth;
 $main::inline_plugin{a_nikky} = sub {
     qq(<a href="$main::me?a=nikky">) .  join(' ',@_[1..$#_]) . '</a>';
 };
@@ -44,6 +50,12 @@ $main::preferences{'Plugin: nikky.pl'}= [
         name=>'nikky_front' } ,
     { desc=>'Days of top diary' , type=>'text' , name=>'nikky_days', size=>1 },
     { desc=>'1-section to 1-rss-item' , type=>'checkbox' , name=>'nikky_rssitemsize' } ,
+    { desc=>'Symbol of prev day link' , type=>'text' , name=>'nikky_symbolprevdaylink', size=>2 },
+    { desc=>'Symbol of next day link' , type=>'text' , name=>'nikky_symbolnextdaylink', size=>2 },
+    { desc=>'Symbol of prev month link' , type=>'text' , name=>'nikky_symbolprevmonthlink', size=>2 },
+    { desc=>'Symbol of next month link' , type=>'text' , name=>'nikky_symbolnextmonthlink', size=>2 },
+    { desc=>'Print symbol, if "prevday link" and "nextday link" terminate.' , type=>'checkbox' , name=>'nikky_daylinkterminate' } ,
+    { desc=>'Print symbol, if "prevmonth link" and "nextmonth link" terminate.' , type=>'checkbox' , name=>'nikky_monthlinkterminate' } ,
 ];
 
 
@@ -70,6 +82,20 @@ sub nikky_core{
     my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
     @list = grep( $_->{title} lt $tomorrow , @list );
     splice(@list,$days) if $#list > $days;
+    splice(@list,10) if $#list > 10;
+    &concat_article( @list );
+}
+
+sub nikky_core_r{
+    my $days = shift;
+    my @list = reverse &main::ls_core( { number=>$days } , '(????.??.??)*' );
+    splice(@list,10) if $#list > 10;
+    &concat_article( @list );
+}
+
+sub nikky_core_n{
+    my $days = shift;
+    my @list=&main::ls_core( { r=>1 , number=>$days } , '(????.??.??)*' );
     splice(@list,10) if $#list > 10;
     &concat_article( @list );
 }
@@ -103,6 +129,20 @@ sub lastdiary{
     local $main::inline_plugin{lastdiary}=sub{};
     local $main::print='';
     &nikky_core($#_ >= 1 ? $_[1] : 3);
+    $main::print;
+}
+
+sub olddiary{
+    local $main::inline_plugin{olddiary}=sub{};
+    local $main::print='';
+    &nikky_core_r($#_ >= 1 ? $_[1] : 3);
+    $main::print;
+}
+
+sub newdiary{
+    local $main::inline_plugin{newdiary}=sub{};
+    local $main::print='';
+    &nikky_core_n($#_ >= 1 ? $_[1] : 3);
     $main::print;
 }
 
@@ -387,6 +427,8 @@ sub set_nextprev{
 	$p = sprintf( "(%04d.%02d.%02d)\xFF", 1900+$tm[5], 1+$tm[4], $tm[3] );
     }
     my $cur=&main::title2fname($p);
+    my $month_first=&main::title2fname( substr($p,0,9).'01)' );
+    my $month_end=&main::title2fname( substr($p,0,9).'31)\xFF' );
     foreach my $t ( &main::list_page() ){
         next if $t !~ /^822303/;
         if( $t lt $cur && ( !defined($prevday) || $t gt $prevday ) ){
@@ -394,25 +436,69 @@ sub set_nextprev{
         }elsif( $t gt $cur && ( !defined($nextday) || $t lt $nextday ) ){
             $nextday = $t;
         }
+        if( $t lt $month_first && ( !defined($prevmonth) || $t gt $prevmonth ) ){
+            $prevmonth = $t;
+	}
+	if( $t gt $month_end && ( !defined($nextmonth) || $t lt $nextmonth ) ){
+            $nextmonth = $t;
+        }
     }
     if( $prevday ){
         $prevday = &main::title2url(&main::fname2title($prevday));
-        push(@main::html_header,qq(<link rel="prev" href="${prevday}">));
-        unshift(@main::menubar,qq(<a href="${prevday}">&lt;&lt;</a>));
+        push(@main::html_header,qq(<link rel="prevday" href="${prevday}">));
     }
+    unshift(@main::menubar,&prevday);
     if( $nextday ){
         $nextday= &main::title2url(&main::fname2title($nextday));
-        push(@main::html_header,qq(<link rel="next" href="${nextday}">));
-        push(@main::menubar,qq(<a href="${nextday}">&gt;&gt;</a>));
+        push(@main::html_header,qq(<link rel="nextday" href="${nextday}">));
     }
+    push(@main::menubar,&nextday);
+    if( $prevmonth ){
+        $prevmonth = &main::title2url(&main::fname2title($prevmonth));
+        push(@main::html_header,qq(<link rel="prevmonth" href="${prevmonth}">));
+    }
+    unshift(@main::menubar,&prevmonth);
+    if( $nextmonth ){
+        $nextmonth= &main::title2url(&main::fname2title($nextmonth));
+        push(@main::html_header,qq(<link rel="nextmonth" href="${nextmonth}">));
+    }
+    push(@main::menubar,&nextmonth);
 }
 
 sub prevday{
-    $prevday ? qq(<a href="${prevday}">).($_[1] || '&lt;&lt;').'</a>' : '';
+    my $symbol = $main::config{nikky_symbolprevdaylink} || '&lt;&lt;';
+    $prevday ? qq(<a href="${prevday}">).$symbol.'</a>'
+    : ( $main::config{'nikky_daylinkterminate'} &&
+        $main::config{'nikky_daylinkterminate'} ne 'NG'
+	? $symbol : ''
+    );
 }
 
 sub nextday{
-    $nextday ? qq(<a href="${nextday}">).($_[1] || '&gt;&gt;').'</a>' : '';
+    my $symbol = $main::config{nikky_symbolnextdaylink} || '&gt;&gt;';
+    $nextday ? qq(<a href="${nextday}">).$symbol.'</a>'
+    : ( $main::config{'nikky_daylinkterminate'} &&
+        $main::config{'nikky_daylinkterminate'} ne 'NG'
+	? $symbol : ''
+    );
+}
+
+sub prevmonth{
+    my $symbol = $main::config{nikky_symbolprevmonthlink} || '&lt;-';
+    $prevmonth ? qq(<a href="${prevmonth}">).$symbol.'</a>'
+    : ( $main::config{'nikky_monthlinkterminate'} &&
+        $main::config{'nikky_monthlinkterminate'} ne 'NG'
+	? $symbol : ''
+    );
+}
+
+sub nextmonth{
+    my $symbol = $main::config{nikky_symbolnextmonthlink} || '-&gt;';
+    $nextmonth ? qq(<a href="${nextmonth}">).$symbol.'</a>'
+    : ( $main::config{'nikky_monthlinkterminate'} &&
+        $main::config{'nikky_monthlinkterminate'} ne 'NG'
+	? ($_[1] || '&lt;-') : ''
+    );
 }
 
 sub action_newdiary{
@@ -459,10 +545,13 @@ sub calender{
     );
 
     my $buffer = sprintf(
-        '<table class="calender"><caption>%d %s</caption><tr>%s'
+        '<table class="calender"><caption>%s%s %d/%02d %s%s</caption><tr>%s'
+	, &prevmonth
+	, &prevday
         , $y
-        , ( qw(Dummy January Feburary March April May June
-           July August September October November December) )[$m]
+        , $m
+	, &nextday
+	, &nextmonth
         , '<td>'x($wday%7)
     );
     for(my $d=1;$d<=$mdays[$m];++$d){
