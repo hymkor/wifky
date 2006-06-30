@@ -1,8 +1,8 @@
 package nikky;
 
-# use strict; use warnings;
+use strict; use warnings;
 
-my $version='0.17.0 ($Date: 2006/06/29 15:55:02 $)';
+my $version='0.17.0 ($Date: 2006/07/01 05:12:15 $)';
 my $nextday;
 my $prevday;
 my $nextmonth;
@@ -445,29 +445,28 @@ sub set_nextprev{
     }
     if( $prevday ){
         $prevday = &main::title2url(&main::fname2title($prevday));
-        push(@main::html_header,qq(<link rel="prevday" href="${prevday}">));
+        push(@main::html_header,qq(<link rel="prev" href="${prevday}">));
     }
     unshift(@main::menubar,&prevday);
     if( $nextday ){
         $nextday= &main::title2url(&main::fname2title($nextday));
-        push(@main::html_header,qq(<link rel="nextday" href="${nextday}">));
+        push(@main::html_header,qq(<link rel="next" href="${nextday}">));
     }
     push(@main::menubar,&nextday);
     if( $prevmonth ){
         $prevmonth = &main::title2url(&main::fname2title($prevmonth));
-        push(@main::html_header,qq(<link rel="prevmonth" href="${prevmonth}">));
     }
     unshift(@main::menubar,&prevmonth);
     if( $nextmonth ){
         $nextmonth= &main::title2url(&main::fname2title($nextmonth));
-        push(@main::html_header,qq(<link rel="nextmonth" href="${nextmonth}">));
     }
     push(@main::menubar,&nextmonth);
 }
 
 sub prevday{
-    my $symbol = $main::config{nikky_symbolprevdaylink} || '&lt;&lt;';
-    $prevday ? qq(<a href="${prevday}">).$symbol.'</a>'
+    my $symbol = &main::enc($main::config{nikky_symbolprevdaylink} || '');
+      !$symbol ? ''
+    : $prevday ? qq(<a href="${prevday}">${symbol}</a>)
     : ( $main::config{'nikky_daylinkterminate'} &&
         $main::config{'nikky_daylinkterminate'} ne 'NG'
 	? $symbol : ''
@@ -475,7 +474,7 @@ sub prevday{
 }
 
 sub nextday{
-    my $symbol = $main::config{nikky_symbolnextdaylink} || '&gt;&gt;';
+    my $symbol = &main::enc($main::config{nikky_symbolnextdaylink} || '');
     $nextday ? qq(<a href="${nextday}">).$symbol.'</a>'
     : ( $main::config{'nikky_daylinkterminate'} &&
         $main::config{'nikky_daylinkterminate'} ne 'NG'
@@ -484,7 +483,7 @@ sub nextday{
 }
 
 sub prevmonth{
-    my $symbol = $main::config{nikky_symbolprevmonthlink} || '&lt;-';
+    my $symbol = &main::enc($main::config{nikky_symbolprevmonthlink} || '');
     $prevmonth ? qq(<a href="${prevmonth}">).$symbol.'</a>'
     : ( $main::config{'nikky_monthlinkterminate'} &&
         $main::config{'nikky_monthlinkterminate'} ne 'NG'
@@ -493,7 +492,7 @@ sub prevmonth{
 }
 
 sub nextmonth{
-    my $symbol = $main::config{nikky_symbolnextmonthlink} || '-&gt;';
+    my $symbol = &main::enc($main::config{nikky_symbolnextmonthlink} || '');
     $nextmonth ? qq(<a href="${nextmonth}">).$symbol.'</a>'
     : ( $main::config{'nikky_monthlinkterminate'} &&
         $main::config{'nikky_monthlinkterminate'} ne 'NG'
