@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.17.0 ($Date: 2006/07/01 16:07:25 $)';
+my $version='0.17.0 ($Date: 2006/07/01 16:30:29 $)';
 my $nextday;
 my $prevday;
 my $nextmonth;
@@ -532,7 +532,7 @@ sub calender{
     );
 
     my $buffer = sprintf(
-        '<table class="calender"><caption>%s%s %d/%s %s%s</caption><tr>%s'
+        '<table class="calender"><caption>%s%s %d %s %s%s</caption><tr>%s'
         , &prevmonth
         , &prevday
         , $y
