@@ -1,8 +1,8 @@
 package nikky;
 
-use strict; use warnings;
+# use strict; use warnings;
 
-my $version='0.17.0 ($Date: 2006/07/01 13:38:48 $)';
+my $version='0.17.0 ($Date: 2006/07/01 13:47:19 $)';
 my $nextday;
 my $prevday;
 my $nextmonth;
