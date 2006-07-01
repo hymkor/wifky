@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/07/01 15:08:54 $)';
+$::version  = '1.1.0_0 ($Date: 2006/07/01 18:20:29 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -192,6 +192,8 @@ sub init_globals{
         \&preprocess_plugin      ,
         \&preprocess_rawurl
     );
+
+    @::footer_plugin = ( \&plugin_footnote_flush );
 }
 
 sub read_multimedia{
@@ -351,7 +353,7 @@ sub img{
     '<img '.&verb(join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr}))).'>';
 }
 
-sub is{ exists $::config{$_[0]} && $::config{$_[0]} eq 'OK' ; }
+sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
 
 sub print_form{
     my ($title,$html,$stamp) = @_;
@@ -674,7 +676,7 @@ sub action_preferences{
         foreach my $i (@{$::preferences{$section}} ){
             if( $i->{type} eq 'checkbox' ){
                 $::config{ $i->{name} } =
-                    ( $::form{ $i->{name} } eq 'OK' ? 'OK' : 'NG' );
+                    ( $::form{ $i->{name} } eq 'OK' ? '1' : '0' );
             }elsif( $i->{type} eq 'password' ){
                 if( length($::form{$i->{name}}) > 0 ){
                     $::form{$i->{name}} eq $::form{$i->{name}.'_'}
@@ -1204,7 +1206,7 @@ sub preprocess_decorations{
 
 
 sub preprocess_plugin{
-    ${$_[0]} =~ s/\(\((.+?)\)\)/&plugin(${$_[2]},$1)/ges;
+    ${$_[0]} =~ s/\(\((.+?)\)\)/&plugin($_[1],$1)/ges;
 }
 
 sub preprocess_rawurl{
@@ -1234,7 +1236,7 @@ sub preprocess{
 sub midashi{
     my ($depth,$text,$session)=(@_);
     $text = &preprocess($text,$session);
-    my $section = ($session->{section} || ($session->{section}=[0,0,0,0,0])) ;
+    my $section = ($session->{section} ||= [0,0,0,0,0]) ;
 
     if( $depth < 0 ){
         &puts( "<h1>$text</h1>" );
@@ -1275,7 +1277,7 @@ sub midashi{
 sub syntax_engine{
     my ($html,$session) = @_;
     &default_syntax_engine( ref($html) ? $html : \$html , $session );
-    &plugin_footnote_flush( $session );
+    foreach my $p (@main::footer_plugin){ $p->( $session ); }
 }
 
 sub default_syntax_engine{
