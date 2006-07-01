@@ -2,11 +2,13 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.17.0 ($Date: 2006/07/01 13:47:19 $)';
+my $version='0.17.0 ($Date: 2006/07/01 14:23:29 $)';
 my $nextday;
 my $prevday;
 my $nextmonth;
 my $prevmonth;
+my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
+my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
 
 $main::inline_plugin{'nikky.pl_version'} = sub{ "nikky.pl $version" };
 $main::inline_plugin{lastdiary}=\&lastdiary;
@@ -110,12 +112,13 @@ sub action_date{
 
     &main::print_header( userheader=>'YES' );
     &concat_article( @list );
-    &main::puts('<div class="'.$main::ss{copyright}.'">',@::copyright,'</div>');
+    &main::puts('<div class="$ss_copyright">',@::copyright,'</div>');
     &main::print_sidebar_and_footer;
 }
 
 sub concat_article{
-    my $h = (exists $main::config{cssstyle} && $main::config{cssstyle} eq 'OK'
+    my $h = ( $main::version ge '1.1' ? 2
+            : exists $main::config{cssstyle} && $main::config{cssstyle} eq 'OK'
                 ? 2 : 1);
     foreach my $p (@_){
         my $pagename=$p->{title};
@@ -125,7 +128,7 @@ sub concat_article{
         local $main::form{p} = $pagename;
         &main::print_page( title=>$pagename );
         &main::puts('</div></div>');
-        &main::print_page( title=>'Footer' , class=>$main::ss{terminator} );
+        &main::print_page( title=>'Footer' , class=>$ss_terminater );
     }
 }
 
@@ -153,7 +156,7 @@ sub newdiary{
 sub action_nikky{
     &main::print_header( userheader=>'YES' );
     &nikky_core($main::config{nikky_days} || 3);
-    &main::puts('<div class="'.$main::ss{copyright}.'">',@::copyright,'</div>');
+    &main::puts('<div class="$ss_copyright">',@::copyright,'</div>');
     &main::print_sidebar_and_footer;
 }
 
