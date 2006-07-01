@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.17.0 ($Date: 2006/07/01 14:23:29 $)';
+my $version='0.17.0 ($Date: 2006/07/01 16:07:25 $)';
 my $nextday;
 my $prevday;
 my $nextmonth;
@@ -38,10 +38,8 @@ $main::action_plugin{date} = \&action_date;
 
 exists $main::form{date} and $main::form{a}='date';
 
-if( exists $main::config{nikky_front}  &&
-    $main::config{nikky_front} eq 'OK' &&
-    !exists $main::form{a}             &&
-    !exists $main::form{p} )
+if( &main::is('nikky_front') && 
+    !exists $main::form{a} && !exists $main::form{p} )
 {
     $main::form{a} = 'nikky';
 }
@@ -117,9 +115,7 @@ sub action_date{
 }
 
 sub concat_article{
-    my $h = ( $main::version ge '1.1' ? 2
-            : exists $main::config{cssstyle} && $main::config{cssstyle} eq 'OK'
-                ? 2 : 1);
+    my $h = ( $main::version ge '1.1' || &main::is('cssstyle') ? 2 : 1 );
     foreach my $p (@_){
         my $pagename=$p->{title};
         &main::puts('<div class="day">');
@@ -294,9 +290,7 @@ sub action_rss{
         my $id=0;
         my $desc=[];
 
-        if( $main::config{'nikky_rssitemsize'} && 
-            $main::config{'nikky_rssitemsize'} ne 'NG' )
-        {
+        if( &main::is('nikky_rssitemsize') ){
             ### 1 section to 1 rssitem ###
 
             foreach my $frag ( split(/\r?\n\r?\n/,$text) ){
