@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/06/28 15:42:04 $)';
+$::version  = '1.1.0_0 ($Date: 2006/07/01 15:08:54 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -16,6 +16,9 @@ binmode(STDOUT);
 binmode(STDIN);
 
 eval{
+    local $SIG{ALRM} = sub { die("Time out"); };
+    eval{ alarm 60; };
+
     &read_form(\%::form);
     &change_directory;
     foreach my $pl (sort grep(/\.plg$/,&directory) ){
@@ -41,6 +44,7 @@ eval{
         &do_index('recent','rindex','-l');
     }
     &flush;
+    eval{ alarm 0; };
 };
 if( $@ ){
     print "Content-Type: text/html;\n\n<html><body>\n",
@@ -298,7 +302,8 @@ sub deyen{
 
 sub mtime{
     unless( exists $::mtime_cache{ $_[0] } ){
-        my @tm=localtime((stat($_[0]))[9]);
+        my @stat=(stat($_[0])) or return '';
+        my @tm=localtime($stat[9]);
         $::mtime_cache{ $_[0] } = sprintf('%04d/%02d/%02d %02d:%02d:%02d'
             , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0]);
     }
@@ -1002,14 +1007,13 @@ sub plugin_search{
 sub plugin_footnote{
     my $session = shift;
     my $footnotetext=$session->{argv};
-    my $footnotes = ($session->{footnotes} || ($session->{footnotes}=[]));
-    push(@{$footnotes} , $footnotetext );
+    push(@{$session->{footnotes}}, $footnotetext );
 
     $footnotetext =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
     $footnotetext =~ s/\r?\n/ /g;
     $footnotetext =~ s/\<[^\>]*\>//g;
 
-    my $i=$#{$footnotes} + 1;
+    my $i=$#{$session->{footnotes}} + 1;
     qq(<sup><a href="#ft${i}" name="fm${i}" title="${footnotetext}">*${i}</a></sup>);
 }
 
@@ -1325,15 +1329,15 @@ sub default_syntax_engine{
             &puts('<blockquote>'.&preprocess($fragment,$session).
                     '</blockquote>' );
         }elsif( $fragment =~ /\A\s*\|\|/ ){
-	    my $i=0;
+            my $i=0;
             &puts('<table>');
             foreach my $tr ( split(/\|\|/,&preprocess($',$session) ) ){
                 my $tag='td';
                 if( $tr =~ /\A\|/ ){
                     $tag = 'th'; $tr = $';
-		}
+                }
                 &puts( '<tr class="'.(++$i % 2 ? "odd":"even").'">',
-		       map("<${tag}>$_</${tag}>",split(/\|/,$tr) ) , '</tr>' );
+                       map("<${tag}>$_</${tag}>",split(/\|/,$tr) ) , '</tr>' );
             }
             &puts('</table>');
         }elsif( $fragment =~ /\A\s*&lt;(blockquote|center)&gt;(.*)&lt;\/\1&gt;\s*\Z/si ){
