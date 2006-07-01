@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.17.0 ($Date: 2006/07/01 16:30:29 $)';
+my $version='0.17.0 ($Date: 2006/07/01 19:11:36 $)';
 my $nextday;
 my $prevday;
 my $nextmonth;
@@ -110,7 +110,7 @@ sub action_date{
 
     &main::print_header( userheader=>'YES' );
     &concat_article( @list );
-    &main::puts('<div class="$ss_copyright">',@::copyright,'</div>');
+    &main::puts(qq(<div class="$ss_copyright">),@::copyright,'</div>');
     &main::print_sidebar_and_footer;
 }
 
@@ -152,7 +152,7 @@ sub newdiary{
 sub action_nikky{
     &main::print_header( userheader=>'YES' );
     &nikky_core($main::config{nikky_days} || 3);
-    &main::puts('<div class="$ss_copyright">',@::copyright,'</div>');
+    &main::puts(qq(<div class="$ss_copyright">),@::copyright,'</div>');
     &main::print_sidebar_and_footer;
 }
 
