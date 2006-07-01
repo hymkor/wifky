@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/07/01 18:20:29 $)';
+$::version  = '1.1.0_0 ($Date: 2006/07/01 19:02:04 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -353,6 +353,8 @@ sub img{
     '<img '.&verb(join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr}))).'>';
 }
 
+sub title2url{ &myurl( { p=>$_[0] } ); }
+sub attach2url{ &myurl( { p=>$_[0] , f=>$_[1]} );}
 sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
 
 sub print_form{
@@ -1215,14 +1217,6 @@ sub preprocess_rawurl{
     $$text =~ s/([^-\"\>\w\.!~'\(\);\/?\@&=+\$,%#])($::RXURL)/
         $1.&verb(sprintf('<a href="%s"%s>',$2,$::target)).$2.'<\/a>'/goe;
     substr($$text,0,1)='';
-}
-
-sub title2url{
-    $main::me . '?p=' . &main::percent( $_[0] );
-}
-
-sub attach2url{
-    $main::me . '?p=' . &main::percent($_[0]) . ';f=' . &main::percent($_[1]);
 }
 
 sub preprocess{
