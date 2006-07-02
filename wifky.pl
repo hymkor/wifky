@@ -5,9 +5,9 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/07/02 16:22:20 $)';
+$::version  = '1.1.0_0 ($Date: 2006/07/02 16:44:42 $)';
 %::form     = ();
-$::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
+$::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 $::psuffix  = '.pl';
