@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/07/02 16:14:45 $)';
+$::version  = '1.1.0_0 ($Date: 2006/07/02 16:22:20 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -190,7 +190,7 @@ sub init_globals{
     );
 
     @::block_syntax = (
-        block_listing     , \&block_definition ,
+        \&block_listing   , \&block_definition ,
         \&block_midashi1  , \&block_midashi2 ,
         \&block_centering , \&block_quoting ,
         \&block_table     , \&block_quote_center ,
