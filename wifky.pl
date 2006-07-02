@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/07/01 19:02:04 $)';
+$::version  = '1.1.0_0 ($Date: 2006/07/02 16:14:45 $)';
 %::form     = ();
 $::me       = $::postme = ( split(/[\/\\]/,$0) )[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -182,17 +182,20 @@ sub init_globals{
     );
 
     @::preprocessers = (
-        \&preprocess_innerlink1  ,
-        \&preprocess_innerlink2  ,
-        \&preprocess_outerlink1  ,
-        \&preprocess_outerlink2  ,
-        \&preprocess_attachment  ,
-        \&preprecess_htmltag     ,
-        \&preprocess_decorations ,
-        \&preprocess_plugin      ,
+        \&preprocess_innerlink1  , \&preprocess_innerlink2 ,
+        \&preprocess_outerlink1  , \&preprocess_outerlink2 ,
+        \&preprocess_attachment  , \&preprecess_htmltag ,
+        \&preprocess_decorations , \&preprocess_plugin ,
         \&preprocess_rawurl
     );
 
+    @::block_syntax = (
+        block_listing     , \&block_definition ,
+        \&block_midashi1  , \&block_midashi2 ,
+        \&block_centering , \&block_quoting ,
+        \&block_table     , \&block_quote_center ,
+        \&block_separator , \&block_normal
+    );
     @::footer_plugin = ( \&plugin_footnote_flush );
 }
 
@@ -334,7 +337,7 @@ sub percent{
 }
 
 sub myurl{
-    my ($cgiprm,$sharp)=@_; $sharp ||='' ; 
+    my ($cgiprm,$sharp)=@_; $sharp ||='' ;
     ( $cgiprm && %{$cgiprm}
     ? "$::me?".join(';',map($_.'='.&percent($cgiprm->{$_}),keys %{$cgiprm}))
     : $::me ) . $sharp;
@@ -342,7 +345,7 @@ sub myurl{
 
 sub anchor{
     my ($text,$cgiprm,$attr,$sharp)=@_;
-    $attr ||= {}; $attr->{href}= &myurl($cgiprm,$sharp); 
+    $attr ||= {}; $attr->{href}= &myurl($cgiprm,$sharp);
     &verb('<a '.join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr})).'>')
         . $text . '</a>';
 }
@@ -1206,7 +1209,6 @@ sub preprocess_decorations{
     $$text =~ s|``(.*?)``|'<tt class="pre">'.&cr2br($1).'</tt>'|ges;
 }
 
-
 sub preprocess_plugin{
     ${$_[0]} =~ s/\(\((.+?)\)\)/&plugin($_[1],$1)/ges;
 }
@@ -1245,7 +1247,7 @@ sub midashi{
 
         $text =~ s/^\+/${tag}. /;
         $text = &anchor( &enc($::config{"${cls}mark"})
-                  , { p     => $session->{title} } 
+                  , { p     => $session->{title} }
                   , { class => "${cls}mark sanchor" }
                   , "#p${tag}"
                   ) . $text ;
@@ -1271,85 +1273,137 @@ sub midashi{
 sub syntax_engine{
     my ($html,$session) = @_;
     &default_syntax_engine( ref($html) ? $html : \$html , $session );
-    foreach my $p (@main::footer_plugin){ $p->( $session ); }
+    foreach my $proc (@main::footer_plugin){ $proc->( $session ); }
 }
 
 sub default_syntax_engine{
     my ($ref2html,$session) = @_;
-    my $anchor_count=0;
-
     &verbatim( $ref2html );
 
     foreach my $fragment( split(/\r?\n\r?\n/,$$ref2html) ){
-        if( $fragment =~ /\A\s*[\*\+]/ ){
-            my @stack;
-            foreach ( split(  /\n[ \t]*(?=[\*\+])/
-                            , &preprocess($fragment,$session) ) )
-            {
-                my ($mark,$text)=(/\A\s*(\*+|\++)/ ? ($1,$') : ('',$_) );
-                my $nest=length($mark);
-                my $diff=$nest - scalar(@stack);
-                if( $diff > 0 ){### more deep ###
-                    if( $mark =~ /\+/ ){
-                        &puts( '<ol><li>' x $diff );
-                        push( @stack,('</li></ol>') x $diff );
-                    }else{
-                        &puts('<ul><li>' x $diff );
-                        push( @stack,('</li></ul>') x $diff );
-                    }
-                    $nest > 0 and &puts( $text );
-                }else{
-                    $diff < 0    and &puts( reverse splice(@stack,$nest) );
-                    $#stack >= 0 and &puts( '</li>' );
-                    $nest > 0    and &puts( "<li>${text}" );
-                }
-            }
-            &puts( reverse @stack );
-
-        }elsif( $fragment =~ /\A\s*\:/ ){
-            ### <DL>...</DL> block ###
-            my @s=split(/\n\s*:/, &preprocess($',$session) );
-            &puts('<dl>',
-                   map( /^:/ ? "<dd>$'</dd>\r\n" : "<dt>$_</dt>\r\n" , @s) ,
-                  '</dl>');
-        }elsif( $fragment =~ /\A\s*((?:\&lt;){2,6})(.*?)(?:\&gt;){2,6}\s*\Z/s ){
-            ### <Hn>...</Hn> block ###
-            &midashi( length($1)/4-2 , $2 , $session );
-        }elsif( $fragment =~ /\A\s*(\!{1,4})(.*)\Z/s ){
-            &midashi( 3 - length($1) , $2 , $session );
-        }elsif( $fragment =~ /\A\s*\&gt;&gt;\s*(.*)\s*\&lt;\&lt;\s*\Z/s ){
-            my $s=&preprocess($1,$session);
-            &puts('<p class="centering" align="center">',$s,'</p>');
-        }elsif( $fragment =~ /\A&quot;&quot;/s ){
-            $fragment =~ s/^&quot;&quot;//gm;
-            &puts('<blockquote>'.&preprocess($fragment,$session).
-                    '</blockquote>' );
-        }elsif( $fragment =~ /\A\s*\|\|/ ){
-            my $i=0;
-            &puts('<table>');
-            foreach my $tr ( split(/\|\|/,&preprocess($',$session) ) ){
-                my $tag='td';
-                if( $tr =~ /\A\|/ ){
-                    $tag = 'th'; $tr = $';
-                }
-                &puts( '<tr class="'.(++$i % 2 ? "odd":"even").'">',
-                       map("<${tag}>$_</${tag}>",split(/\|/,$tr) ) , '</tr>' );
-            }
-            &puts('</table>');
-        }elsif( $fragment =~ /\A\s*&lt;(blockquote|center)&gt;(.*)&lt;\/\1&gt;\s*\Z/si ){
-            &puts( "<$1>",&preprocess($2,$session),"</$1>" );
-        }elsif( $fragment =~ /\A\s*\-\-\-+\s*\Z/ ){
-            &puts( '<hr class="sep">' );
-        }elsif( (my $s = &preprocess($fragment,$session)) !~ /^\s*$/s ){
-            if( $s =~ /\A\s*<(\w+).*<\/\1[^\/]*>\s*\Z/si ){
-                &puts( "<div>${s}</div>" );
-            }else{
-                &puts("<p>${s}</p>");
-            }
+        foreach my $proc (@main::block_syntax){
+            $proc->($fragment,$session) and last;
         }
     }
     exists $session->{section} and
         grep( $_ && &puts('</div></div>'),@{$session->{section}} );
+}
+
+sub block_listing{ ### <UL><OL>... block ###
+    my ($fragment,$session)=@_;
+    return 0 unless $fragment =~ /\A\s*[\*\+]/;
+
+    my @stack;
+    foreach( split(/\n[ \t]*(?=[\*\+])/,&preprocess($fragment,$session))){
+        my ($mark,$text)=(/\A\s*(\*+|\++)/ ? ($1,$') : ('',$_) );
+        my $nest=length($mark);
+        my $diff=$nest - scalar(@stack);
+        if( $diff > 0 ){### more deep ###
+            if( $mark =~ /\+/ ){
+                &puts( '<ol><li>' x $diff );
+                push( @stack,('</li></ol>') x $diff );
+            }else{
+                &puts('<ul><li>' x $diff );
+                push( @stack,('</li></ul>') x $diff );
+            }
+            $nest > 0 and &puts( $text );
+        }else{
+            $diff < 0    and &puts( reverse splice(@stack,$nest) );
+            $#stack >= 0 and &puts( '</li>' );
+            $nest > 0    and &puts( "<li>${text}" );
+        }
+    }
+    &puts( reverse @stack );
+    1;
+}
+
+sub block_definition{ ### <DL>...</DL> block ###
+    my ($fragment,$session)=@_;
+    return 0 unless $fragment =~ /\A\s*\:/;
+
+    my @s=split(/\n\s*:/, &preprocess($',$session) );
+    &puts('<dl>',map( /^:/ ? "<dd>$'</dd>\r\n" : "<dt>$_</dt>\r\n",@s),'</dl>');
+    1;
+}
+
+sub block_midashi1{ ### <<...>>
+    my ($fragment,$session)=@_;
+    return 0 unless $fragment =~ /\A\s*((?:\&lt;){2,6})(.*?)(?:\&gt;){2,6}\s*\Z/s;
+    &midashi( length($1)/4-2 , $2 , $session );
+    1;
+}
+
+sub block_midashi2{ ### !!!... ###
+    my ($fragment,$session)=@_;
+    return 0 unless $fragment =~ /\A\s*(\!{1,4})(.*)\Z/s;
+
+    &midashi( 3 - length($1) , $2 , $session );
+    1;
+}
+
+sub block_centering{ ### >> ... <<
+    my ($fragment,$session)=@_;
+    return 0 unless $fragment =~ /\A\s*\&gt;&gt;\s*(.*)\s*\&lt;\&lt;\s*\Z/s;
+
+    my $s=&preprocess($1,$session);
+    &puts('<p class="centering" align="center">',$s,'</p>');
+    1;
+}
+
+sub block_quoting{ ### "" ...
+    my ($fragment,$session)=@_;
+    return 0 unless $fragment =~ /\A&quot;&quot;/s;
+
+    $fragment =~ s/^&quot;&quot;//gm;
+    &puts('<blockquote>'.&preprocess($fragment,$session).'</blockquote>' );
+    1;
+}
+
+sub block_table{ ### || ... | ... |
+    my ($fragment,$session)=@_;
+    return 0 unless $fragment =~ /\A\s*\|\|/;
+
+    my $i=0;
+    &puts('<table>');
+    foreach my $tr ( split(/\|\|/,&preprocess($',$session) ) ){
+        my $tag='td';
+        if( $tr =~ /\A\|/ ){
+            $tag = 'th'; $tr = $';
+        }
+        &puts( '<tr class="'.(++$i % 2 ? "odd":"even").'">',
+               map("<${tag}>$_</${tag}>",split(/\|/,$tr) ) , '</tr>' );
+    }
+    &puts('</table>');
+    1;
+}
+
+sub block_quote_center{ ### <blockquote> or <center>
+    my ($fragment,$session)=@_;
+    return 0 unless
+        $fragment =~ /\A\s*&lt;(blockquote|center)&gt;(.*)&lt;\/\1&gt;\s*\Z/si ;
+
+    &puts( "<$1>",&preprocess($2,$session),"</$1>" );
+    1;
+}
+
+sub block_separator{ ### ---
+    my ($fragment,$session)=@_;
+    return 0 unless $fragment =~ /\A\s*\-\-\-+\s*\Z/;
+
+    &puts( '<hr class="sep">' );
+    1;
+}
+
+sub block_normal{
+    my ($fragment,$session)=@_;
+    if( (my $s = &preprocess($fragment,$session)) !~ /^\s*$/s ){
+        if( $s =~ /\A\s*<(\w+).*<\/\1[^\/]*>\s*\Z/si ){
+            &puts( "<div>${s}</div>" );
+        }else{
+            &puts("<p>${s}</p>");
+        }
+    }
+    1;
 }
 __END__
 <!-- Generated with wifky (c) 2005-2006 HAYAMA_Kaoru. -->
