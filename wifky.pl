@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_0 ($Date: 2006/07/02 16:44:42 $)';
+$::version  = '1.1.0_1 ($Date: 2006/07/03 16:41:49 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -181,7 +181,7 @@ sub init_globals{
         ]
     );
 
-    @::preprocessers = (
+    @::inline_syntax_plugin = (
         \&preprocess_innerlink1  , \&preprocess_innerlink2 ,
         \&preprocess_outerlink1  , \&preprocess_outerlink2 ,
         \&preprocess_attachment  , \&preprecess_htmltag ,
@@ -189,7 +189,7 @@ sub init_globals{
         \&preprocess_rawurl
     );
 
-    @::block_syntax = (
+    @::block_syntax_plugin = (
         \&block_listing   , \&block_definition ,
         \&block_midashi1  , \&block_midashi2 ,
         \&block_centering , \&block_quoting ,
@@ -793,7 +793,7 @@ sub do_index{
     &begin_day('IndexPage');
         &puts('<ul><li><tt>' . &anchor(' Last Modified Time' , { a=>$t } ) .
                 '&nbsp' . &anchor('Page Title' , { a=>$n } ) .
-                '</li>' , &ls(@_) , '</ul>' );
+                '</tt></li>' , &ls(@_) , '</ul>' );
     &end_day();
     &print_copyright;
     &print_sidebar_and_footer;
@@ -1223,7 +1223,7 @@ sub preprocess_rawurl{
 
 sub preprocess{
     my ($text,$session) = @_;
-    foreach my $p ( @::preprocessers ){
+    foreach my $p ( @::inline_syntax_plugin ){
         $p->( \$text , $session );
     }
     $text;
@@ -1281,7 +1281,7 @@ sub default_syntax_engine{
     &verbatim( $ref2html );
 
     foreach my $fragment( split(/\r?\n\r?\n/,$$ref2html) ){
-        foreach my $proc (@main::block_syntax){
+        foreach my $proc (@main::block_syntax_plugin){
             $proc->($fragment,$session) and last;
         }
     }
