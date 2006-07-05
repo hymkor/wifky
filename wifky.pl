@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_1 ($Date: 2006/07/03 16:41:49 $)';
+$::version  = '1.1.0_2 ($Date: 2006/07/05 16:42:20 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -168,7 +168,7 @@ sub init_globals{
         ' General Options' => [
             { desc=>'the sitename', name=>'sitename', size=>40 },
             { desc=>'enable link to file://...', name=>'locallink' ,
-              type=>'checkbox', size=>3 },
+              type=>'checkbox' },
             { desc=>'forbid any one but administrator creating a new page.' ,
               name=>'lonely' , type=>'checkbox' },
             { desc=>'target value for external link.',name=>'target'},
