@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_2 ($Date: 2006/07/07 22:47:10 $)';
+$::version  = '1.1.0_2 ($Date: 2006/07/08 01:12:03 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -1248,7 +1248,7 @@ sub midashi{
                   , { p     => $session->{title} }
                   , { class => "${cls}mark sanchor" }
                   , "#p${tag}"
-                  ) . $text ;
+                  ) . qq(<span class="${cls}title">$text</span>) ;
 
         if( $session->{main} ){
             &puts(qq(<div class="${cls} x${cls}">));
