@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.0_2 ($Date: 2006/07/05 16:42:20 $)';
+$::version  = '1.1.0_2 ($Date: 2006/07/07 22:47:10 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -374,8 +374,7 @@ sub print_form{
     my $fname=&title2fname( $::form{p} );
     &puts('<input type="submit" name="a" value="Preview">');
     if( exists $::form{admin} || &is_frozen() ){
-        &puts('Administrator\'s Sign:
-        <input type="password" name="password"
+        &puts('Sign: <input type="password" name="password"
         ><input type="checkbox" name="to_freeze" value="1"');
         &is_frozen() and &puts('checked');
         &puts(' >freeze <input type="hidden" name="admin" value="admin">');
@@ -384,11 +383,12 @@ sub print_form{
     if( &object_exists($::form{p}) ){
         &puts('<h2>Attachment</h2
         ><p>New:<input type="file" name="butsu" size="48">');
-        &is_frozen() and &puts('Sign:<input type="password" name="qassword">');
+        if( exists $::form{admin} || &is_frozen() ){
+	    &puts('Sign:<input type="password" name="qassword">');
+	}
         &puts('<input type="submit" name="a" value="Upload"></p>');
 
-        my @attachments=&list_attachment( $::form{p} );
-        if( scalar(@attachments) > 0 ){
+	if( my @attachments=&list_attachment( $::form{p} ) ){
             &puts('<p>');
             foreach my $attach (sort @attachments){
                 &putenc('<input type="radio" name="f" value="%s" ><input
@@ -482,10 +482,9 @@ sub is_frozen{
 }
 
 sub ninsho{
-    if( $::config{crypt} ne '' &&
-        crypt($::form{password},'wk') ne $::config{crypt} &&
-        crypt($::form{qassword},'wk') ne $::config{crypt} )
-    {
+    my $pwd = $::form{password};
+    exists $::form{qassword} and $pwd .= $::form{qassword};
+    if( $::config{crypt} ne '' && crypt($pwd,'wk') ne $::config{crypt} ){
         die('!Administrator\'s Sign is wrong!');
     }
 }
@@ -864,8 +863,7 @@ sub action_edit{
             <input type="hidden"  name="a" value="ren">
             <input type="hidden"  name="p" value="%s">
             Title: <input type="text" name="newtitle" value="%s" size="80">
-            <br>Administrator\'s Sign:
-            <input type="password" name="password">
+            <br>Sign: <input type="password" name="password">
             <br><input type="submit" name="ren" value="Submit">
             </form>
             </p>
