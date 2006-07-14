@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.1_0 ($Date: 2006/07/15 01:02:12 $)';
+$::version  = '1.1.1_0 ($Date: 2006/07/15 01:04:55 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -931,7 +931,8 @@ sub object_exists{
 sub list_attachment{
     &cache_update();
     map(  &fname2title(substr($_,2))
-	, grep(/^__/,@{ $::dir_cache{&title2fname( shift ) } } ) );
+	, grep(defined($_) && /^__/,
+	       @{ $::dir_cache{&title2fname( shift ) } } ) );
 }
 
 sub print_page{
