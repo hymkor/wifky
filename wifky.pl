@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.1_0 ($Date: 2006/07/15 01:04:55 $)';
+$::version  = '1.1.1_0 ($Date: 2006/07/15 05:13:15 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -309,7 +309,7 @@ sub mtime{
     my $fn=shift;
     unless( exists $::mtime_cache{$fn} ){
         my @stat=stat($fn) 
-	    or return ($::mtime_cache{$fn}='0000/00/00 00:00:00');
+            or return ($::mtime_cache{$fn}='0000/00/00 00:00:00');
         my @tm=localtime($stat[9]);
         $::mtime_cache{ $fn } = sprintf('%04d/%02d/%02d %02d:%02d:%02d'
             , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0]);
@@ -386,25 +386,25 @@ sub print_form{
     &puts('<h2>Attachment</h2>
     <p>New:<input type="file" name="butsu" size="48">');
     if( exists $::form{admin} || &is_frozen() ){
-	&puts('Sign:<input type="password" name="qassword">');
+        &puts('Sign:<input type="password" name="qassword">');
     }
     &puts('<input type="submit" name="a" value="Upload"></p>');
     
     if( my @attachments=&list_attachment( $::form{p} ) ){
-	&puts('<p>');
-	foreach my $attach (sort @attachments){
-	    &putenc('<input type="radio" name="f" value="%s" ><input
-		    type="text" name="dummy" readonly
-		    value="&lt;&lt;{%s}" size="20"
-		    style="font-family:monospace">'
-		      ,$attach ,$attach );
+        &puts('<p>');
+        foreach my $attach (sort @attachments){
+            &putenc('<input type="radio" name="f" value="%s" ><input
+                    type="text" name="dummy" readonly
+                    value="&lt;&lt;{%s}" size="20"
+                    style="font-family:monospace">'
+                      ,$attach ,$attach );
 
-	    my $fn = &title2fname($::form{p}, $attach);
-	    &putenc('(%d bytes, at %s)',(stat $fn)[7],&mtime($fn));
-	    &puts('<br>');
-	}
-	&puts('</p><input type="submit" name="a" value="Delete">
-	    <input type="submit" name="dummybotton" value="Download">');
+            my $fn = &title2fname($::form{p}, $attach);
+            &putenc('(%d bytes, at %s)',(stat $fn)[7],&mtime($fn));
+            &puts('<br>');
+        }
+        &puts('</p><input type="submit" name="a" value="Delete">
+            <input type="submit" name="dummybotton" value="Download">');
     }
     &puts(@::formtext);
     &puts('</form></div>');
@@ -707,10 +707,10 @@ sub action_rename{
 
     my @list;
     foreach my $suffix ( @{$::dir_cache{$fname}} ){
-	my $older=$fname    . $suffix ;
-	my $newer=$newfname . $suffix ;
-	-f $newfname and die("!The new page name '$newtitle' is already used.!");
-	push(@list, [ $older , $newer ] );
+        my $older=$fname    . $suffix ;
+        my $newer=$newfname . $suffix ;
+        -f $newfname and die("!The new page name '$newtitle' is already used.!");
+        push(@list, [ $older , $newer ] );
     }
     rename( $_->[0] , $_->[1] ) foreach @list;
     &transfer_page($newtitle);
@@ -907,11 +907,11 @@ sub action_cat{
 sub cache_update{
     unless( defined(@::dir_cache) ){
         opendir(DIR,'.') or die('can\'t read work directory.');
-	while( my $fn=readdir(DIR) ){
-	    push( @::dir_cache , $fn );
-	    $fn =~ /^((?:[0-9a-f][0-9a-f])+)(__(?:[0-9a-f][0-9a-f])+)?$/
-		and push( @{$::dir_cache{$1}} , $2 );
-	}
+        while( my $fn=readdir(DIR) ){
+            push( @::dir_cache , $fn );
+            $fn =~ /^((?:[0-9a-f][0-9a-f])+)(__(?:[0-9a-f][0-9a-f])+)?$/
+                and push( @{$::dir_cache{$1}} , $2 );
+        }
         closedir(DIR);
     }
 }
@@ -931,8 +931,8 @@ sub object_exists{
 sub list_attachment{
     &cache_update();
     map(  &fname2title(substr($_,2))
-	, grep(defined($_) && /^__/,
-	       @{ $::dir_cache{&title2fname( shift ) } } ) );
+        , grep(defined($_) && /^__/,
+               @{ $::dir_cache{&title2fname( shift ) } } ) );
 }
 
 sub print_page{
