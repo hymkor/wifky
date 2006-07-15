@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.1_0 ($Date: 2006/07/15 05:13:15 $)';
+$::version  = '1.1.1_0 ($Date: 2006/07/15 15:42:46 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -593,8 +593,11 @@ sub action_query_delete{
 
 sub action_commit{
     my $lock=&title2fname($::form{p},'LOCK');
+    if( ! mkdir($lock,0777) ){
+        &do_preview( &errmsg("!File writing conflict (lockfile=$lock)!") );
+        return;
+    }
     eval{
-        mkdir $lock,0777 or die('!File writing conflict!');
         &check_frozen;
         &check_conflict;
     };
@@ -747,7 +750,8 @@ sub action_seek{
 sub action_delete{
     if( exists $::form{yes} ){
         &is_frozen() and &ninsho;
-        unlink( &title2fname( $::form{p} , $::form{f} ) );
+        my $fn=&title2fname( $::form{p} , $::form{f} );
+        unlink( $fn ) or rmdir( $fn );
         &cacheoff;
     }
     &do_preview;
