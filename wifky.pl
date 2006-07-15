@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.1_0 ($Date: 2006/07/15 15:42:46 $)';
+$::version  = '1.1.1_0 ($Date: 2006/07/16 05:18:34 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -181,20 +181,29 @@ sub init_globals{
         ]
     );
 
-    @::inline_syntax_plugin = (
-        \&preprocess_innerlink1  , \&preprocess_innerlink2 ,
-        \&preprocess_outerlink1  , \&preprocess_outerlink2 ,
-        \&preprocess_attachment  , \&preprecess_htmltag ,
-        \&preprocess_decorations , \&preprocess_plugin ,
-        \&preprocess_rawurl
+    %::inline_syntax_plugin = (
+        '100_innerlink1' => \&preprocess_innerlink1 ,
+        '200_innerlink2' => \&preprocess_innerlink2 ,
+        '300_outerlink1' => \&preprocess_outerlink1  ,
+        '400_outerlink2' => \&preprocess_outerlink2 ,
+        '500_attachment' => \&preprocess_attachment  ,
+        '600_htmltag'    => \&preprecess_htmltag ,
+        '700_decoration' => \&preprocess_decorations ,
+        '800_plugin'     => \&preprocess_plugin ,
+        '900_rawurl'     => \&preprocess_rawurl ,
     );
 
-    @::block_syntax_plugin = (
-        \&block_listing   , \&block_definition ,
-        \&block_midashi1  , \&block_midashi2 ,
-        \&block_centering , \&block_quoting ,
-        \&block_table     , \&block_quote_center ,
-        \&block_separator , \&block_normal
+    %::block_syntax_plugin = (
+        '100_list'       => \&block_listing   ,
+        '200_definition' => \&block_definition ,
+        '300_midashi1'   => \&block_midashi1  ,
+        '400_midashi2'   => \&block_midashi2 ,
+        '500_centering'  => \&block_centering ,
+        '600_quoting'    => \&block_quoting ,
+        '700_table'      => \&block_table ,
+        '800_htmltag'    => \&block_htmltag ,
+        '900_seperator'  => \&block_separator ,
+        '990_normal'     => \&block_normal ,
     );
     @::footer_plugin = ( \&plugin_footnote_flush );
 }
@@ -1226,8 +1235,8 @@ sub preprocess_rawurl{
 
 sub preprocess{
     my ($text,$session) = @_;
-    foreach my $p ( @::inline_syntax_plugin ){
-        $p->( \$text , $session );
+    foreach my $p ( sort keys %::inline_syntax_plugin ){
+        $::inline_syntax_plugin{$p}->( \$text , $session );
     }
     $text;
 }
@@ -1284,8 +1293,8 @@ sub default_syntax_engine{
     &verbatim( $ref2html );
 
     foreach my $fragment( split(/\r?\n\r?\n/,$$ref2html) ){
-        foreach my $proc (@main::block_syntax_plugin){
-            $proc->($fragment,$session) and last;
+        foreach my $p (sort keys %::block_syntax_plugin){
+            $::block_syntax_plugin{$p}->($fragment,$session) and last;
         }
     }
     exists $session->{section} and
@@ -1380,7 +1389,7 @@ sub block_table{ ### || ... | ... |
     1;
 }
 
-sub block_quote_center{ ### <blockquote> or <center>
+sub block_htmltag{ ### <blockquote> or <center>
     my ($fragment,$session)=@_;
     return 0 unless
         $fragment =~ /\A\s*&lt;(blockquote|center)&gt;(.*)&lt;\/\1&gt;\s*\Z/si ;
