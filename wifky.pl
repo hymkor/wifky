@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.1_0 ($Date: 2006/07/16 15:34:17 $)';
+$::version  = '1.1.1_0 ($Date: 2006/07/16 15:54:28 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -738,8 +738,7 @@ sub action_seek{
         my $title  = &fname2title( $fn );
         if( index($title ,$keyword) >= 0 ){
             &puts('<li>' . &anchor($title,{ p=>$title }) . ' (title)</li>');
-        }else{
-            open(FP,$fn) or die("Can not open the file $fn");
+        }elsif( open(FP,$fn) ){
             while( <FP> ){
                 if( index($_,$keyword) >= 0 ){
                     &puts('<li>' . &anchor($title,{ p=>$title } ) . '</li>' );
