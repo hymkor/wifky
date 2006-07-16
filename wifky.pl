@@ -5,12 +5,11 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.1_0 ($Date: 2006/07/16 05:18:34 $)';
+$::version  = '1.1.1_0 ($Date: 2006/07/16 15:34:17 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
-$::psuffix  = '.pl';
 
 binmode(STDOUT);
 binmode(STDIN);
@@ -26,7 +25,7 @@ eval{
     }
     &load_config;
     &init_globals;
-    foreach my $pl (sort grep(/$::psuffix$/o,&directory) ){
+    foreach my $pl (sort grep(/\.pl$/,&directory) ){
         do $pl; $@ and die($@);
     }
 
@@ -1033,7 +1032,11 @@ sub plugin_footnote{
     $footnotetext =~ s/\<[^\>]*\>//g;
 
     my $i=$#{$session->{footnotes}} + 1;
-    qq(<sup><a href="#ft${i}" name="fm${i}" title="${footnotetext}">*${i}</a></sup>);
+    my %attr=( title=>$footnotetext );
+    $session->{index} and $attr{name}="fm${i}";
+    '<sup>' . 
+    &anchor("*${i}", { p=> $::form{p} } , \%attr , "#ft${i}" ) .
+    '</sup>' ;
 }
 
 sub plugin_footnote_flush{
@@ -1045,8 +1048,11 @@ sub plugin_footnote_flush{
     &puts(qq(<div class="footnote">));
     foreach my $t (@{$footnotes}){
         ++$i;
-        &puts(qq(<p class="footnote"><a name="ft${i}" href="#fm${i}"
-                >*${i}</a> $t</p>));
+        &puts('<p class="footnote">' ,
+	    &anchor("*$i",{ p=>$::form{p} } , 
+	    ($session->{index} ? { name=>"ft$i"} : undef) ,
+	    "#fm$i"),
+	    "$t</p>");
     }
     &puts(qq(</div><!--footnote-->));
     delete $session->{footnotes};
