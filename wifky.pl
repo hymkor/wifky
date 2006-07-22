@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.1_1 ($Date: 2006/07/21 09:52:28 $)';
+$::version  = '1.1.1_1 ($Date: 2006/07/23 04:45:17 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -374,7 +374,8 @@ sub print_form{
     my ($title,$html,$stamp) = @_;
 
     &putenc('<div class="update"
-        ><form action="%s" enctype="multipart/form-data" method="post"
+        ><form name="editform" action="%s" 
+         enctype="multipart/form-data" method="post"
         ><input type="hidden" name="stamp" value="%s"
         ><input type="hidden" name="p" value="%s"><br>'
         , $::postme,$stamp,$title );
@@ -402,10 +403,10 @@ sub print_form{
         &puts('<p>');
         foreach my $attach (sort @attachments){
             &putenc('<input type="radio" name="f" value="%s" ><input
-                    type="text" name="dummy" readonly
-                    value="&lt;&lt;{%s}" size="20"
-                    style="font-family:monospace">'
-                      ,$attach ,$attach );
+                    type="text" name="dummy" readonly value="&lt;&lt;{%s}"
+                    size="20" style="font-family:monospace"
+                    onClick="this.select();">'
+                  ,$attach ,$attach );
 
             my $fn = &title2fname($::form{p}, $attach);
             &putenc('(%d bytes, at %s)',(stat $fn)[7],&mtime($fn));
@@ -862,7 +863,7 @@ sub do_preview{
 sub action_edit{
     my $title = $::form{p};
     &print_header(divclass=>'max',title=>'Edit');
-    &putenc('<h2>Edit: %s</h2>',$title);
+    &begin_day("Edit: $title");
     &print_form( $title , &enc(&read_object( $title )), &title2mtime($title) );
 
     if( &object_exists($::form{p}) && exists $::form{admin} ){
@@ -876,6 +877,7 @@ sub action_edit{
             </form></p>
         ' , $::postme , $::form{p} , $::form{p} );
     }
+    &end_day();
     &print_footer;
 }
 
@@ -1048,10 +1050,10 @@ sub plugin_footnote_flush{
     foreach my $t (@{$footnotes}){
         ++$i;
         &puts('<p class="footnote">' ,
-	    &anchor("*$i",{ p=>$::form{p} } , 
-	    ($session->{index} ? { name=>"ft$i"} : undef) ,
-	    "#fm$i"),
-	    "$t</p>");
+            &anchor("*$i",{ p=>$::form{p} } , 
+            ($session->{index} ? { name=>"ft$i"} : undef) ,
+            "#fm$i"),
+            "$t</p>");
     }
     &puts(qq(</div><!--footnote-->));
     delete $session->{footnotes};
