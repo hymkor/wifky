@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.1_1 ($Date: 2006/07/23 04:45:17 $)';
+$::version  = '1.1.1_1 ($Date: 2006/07/29 00:15:07 $)';
 %::form     = ();
 $::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -37,8 +37,8 @@ eval{
         }else{ # output page itself.
             &action_view($::form{p});
         }
-    }elsif( &object_exists('FrontPage') ){ # default(no-option)
-        &action_view('FrontPage');
+    }elsif( &object_exists($::config{FrontPage}) ){
+        &action_view($::config{FrontPage});
     }else{
         &do_index('recent','rindex','-l');
     }
@@ -68,6 +68,8 @@ sub init_globals{
     $::target = ( $::config{target}
                 ? sprintf(' target="%s"',$::config{target}) : '' );
     $::config{CSS} ||= 'CSS';
+    $::config{FrontPage} ||= 'FrontPage';
+
     %::inline_plugin = (
         'adminmenu'=> \&plugin_menubar ,
         'menubar'  => \&plugin_menubar ,
@@ -131,8 +133,8 @@ sub init_globals{
     @::body_header = <DATA>;
 
     @::menubar = (
-        &anchor( 'FrontPage' , undef  ) ,
-        &anchor( 'New'       , { a=>'new' } ) ,
+        &anchor( $::config{FrontPage} , undef  ) ,
+        &anchor( 'New'                , { a=>'new' } ) ,
     );
 
     ### menubar ###
@@ -141,14 +143,14 @@ sub init_globals{
             push(@::menubar,
                 &anchor('Edit',{
                     a=>'edt',
-                    p=>( exists $::form{p} ? $::form{p} : 'FrontPage' )
+                    p=>( exists $::form{p} ? $::form{p} : $::config{FrontPage} )
                 },{
                     rel=>'nofollow'
                 }) );
         push( @::menubar ,
             &anchor('Edit(Admin)',{
                 a=>'edt',
-                p=>( exists $::form{p} ? $::form{p} : 'FrontPage' ),
+                p=>( exists $::form{p} ? $::form{p} : $::config{FrontPage} ),
                 admin=>'admin'
             },{rel=>'nofollow'}) );
     }
@@ -172,6 +174,7 @@ sub init_globals{
               name=>'lonely' , type=>'checkbox' },
             { desc=>'target value for external link.',name=>'target'},
             { desc=>'pagename or url for CSS' , name=>'CSS' , size=>40 },
+	    { desc=>'pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
         ],
         ' Section Marks' => [
             { desc=>'section mark', name=>'sectionmark', size=>3 } ,
@@ -484,7 +487,7 @@ sub print_copyright{
 }
 
 sub is_frozen{
-    if( -r &title2fname(exists $::form{p} ? $::form{p} : 'FrontPage' ) ){
+    if( -r &title2fname(exists $::form{p} ? $::form{p} : $::config{FrontPage})){
         ! -w _;
     }else{
         &is('lonely');
@@ -1149,8 +1152,9 @@ sub plugin_comment{
         ><input type="hidden" name="a" value="comment"
         ><input type="hidden" name="comid" value="$ecomid"
         ><input type="text" name="who" size="10"
-        ><input type="text" name="comment" size="60"
-        ><input type="submit" name="Comment" value="Comment"></form>);
+        ><br><textarea name="comment" cols="60" rows="1" class="tsukkomi"
+	></textarea><br
+	><input type="submit" name="Comment" value="Comment"></form>);
     }
     $buf . '</div></div>';
 }
@@ -1163,7 +1167,7 @@ sub plugin_pagename{
     }elsif( exists $::form{keyword} ){
         &enc('Seek: '.$::form{keyword});
     }else{
-        &enc( exists $::form{p} ? $::form{p} : 'FrontPage' );
+        &enc( exists $::form{p} ? $::form{p} : $::config{FrontPage} );
     }
 }
 
