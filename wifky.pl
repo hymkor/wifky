@@ -5,9 +5,9 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.1_1 ($Date: 2006/07/29 00:15:07 $)';
+$::version  = '1.1.2_0 ($Date: 2006/07/29 06:09:23 $)';
 %::form     = ();
-$::me       = $::postme = 'http://'.$ENV{HTTP_HOST}.$ENV{SCRIPT_NAME};
+$::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 
@@ -1147,14 +1147,22 @@ sub plugin_comment{
         close(FP);
     }
     unless( exists $opt{f} ){
-        $buf .= qq(<form action="$::postme" method="post"
-        ><input type="hidden" name="p" value="$etitle"
-        ><input type="hidden" name="a" value="comment"
-        ><input type="hidden" name="comid" value="$ecomid"
-        ><input type="text" name="who" size="10"
-        ><br><textarea name="comment" cols="60" rows="1" class="tsukkomi"
-	></textarea><br
-	><input type="submit" name="Comment" value="Comment"></form>);
+        $buf .= <<HTML
+<form action="$::postme" method="post" class="comment">
+<input type="hidden" name="p" value="$etitle">
+<input type="hidden" name="a" value="comment">
+<input type="hidden" name="comid" value="$ecomid">
+<div class="field name">
+<input type="text" name="who" size="10" class="field">
+</div>
+<div class="textarea">
+<textarea name="comment" cols="60" rows="1" class="field"></textarea>
+</div>
+<div class="button">
+<input type="submit" name="Comment" value="Comment">
+</div>
+</form>
+HTML
     }
     $buf . '</div></div>';
 }
