@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.2_0 ($Date: 2006/07/29 06:09:23 $)';
+$::version  = '1.1.2_0 ($Date: 2006/07/29 12:00:56 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -174,7 +174,7 @@ sub init_globals{
               name=>'lonely' , type=>'checkbox' },
             { desc=>'target value for external link.',name=>'target'},
             { desc=>'pagename or url for CSS' , name=>'CSS' , size=>40 },
-	    { desc=>'pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
+            { desc=>'pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
         ],
         ' Section Marks' => [
             { desc=>'section mark', name=>'sectionmark', size=>3 } ,
