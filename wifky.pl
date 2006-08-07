@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.2_0 ($Date: 2006/07/29 12:00:56 $)';
+$::version  = '1.1.2_0 ($Date: 2006/08/08 02:00:05 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -575,7 +575,7 @@ sub load_config{
 sub save_config{
     my @settings;
     while( my ($key,$val)=each %::config ){
-        push( @settings , "#$key\t$val" );
+        $val and push( @settings , '#'.$key."\t".&yen($val) );
     }
     &write_file( 'index.cgi' , join("\n", @settings) );
 }
@@ -670,6 +670,12 @@ sub action_tools{
                 &putenc('%s <input type="password" name="%s">
                         (retype)<input type="password" name="%s_"><br>'
                     , $i->{desc} , $i->{name} , $i->{name}
+                );
+	    }elsif( $i->{type} eq 'textarea' ){
+                &putenc(
+                    '%s<br><textarea name="%s">%s</textarea>'
+                    , $i->{desc} , $i->{name}
+                    , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
                 );
             }else{ # text
                 &putenc(
