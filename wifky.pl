@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.2_0 ($Date: 2006/08/08 02:40:26 $)';
+$::version  = '1.1.2_0 ($Date: 2006/08/08 02:41:14 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -671,23 +671,23 @@ sub action_tools{
                         (retype)<input type="password" name="%s_"><br>'
                     , $i->{desc} , $i->{name} , $i->{name}
                 );
-	    }elsif( $i->{type} eq 'textarea' ){
+            }elsif( $i->{type} eq 'textarea' ){
                 &putenc(
                     '%s<br><textarea name="%s">%s</textarea>'
                     , $i->{desc} , $i->{name}
                     , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
                 );
-	    }elsif( $i->{type} eq 'radio' ){
-		&putenc('%s',$i->{desc});
-		foreach my $p (@{$i->{option}}){
-		    &putenc('<br><input type="radio" name="%s" value="%s"%s>%s'
-			, $i->{name}
-			, $p->[0] 
-			, ( defined($main::config{$i->{name}}) && 
-			    $main::config{$i->{name}} eq $p->[0]
-			  ? ' checked' : '' )
-			, $p->[1] );
-		}
+            }elsif( $i->{type} eq 'radio' ){
+                &putenc('%s',$i->{desc});
+                foreach my $p (@{$i->{option}}){
+                    &putenc('<br><input type="radio" name="%s" value="%s"%s>%s'
+                        , $i->{name}
+                        , $p->[0] 
+                        , ( defined($main::config{$i->{name}}) && 
+                            $main::config{$i->{name}} eq $p->[0]
+                          ? ' checked' : '' )
+                        , $p->[1] );
+                }
             }else{ # text
                 &putenc(
                     '%s <input type="text" name="%s" value="%s" size="%s"><br>'
