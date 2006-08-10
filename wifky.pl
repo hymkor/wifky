@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.2_0 ($Date: 2006/08/08 02:41:14 $)';
+$::version  = '1.1.3_0 ($Date: 2006/08/10 15:19:22 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -673,8 +673,10 @@ sub action_tools{
                 );
             }elsif( $i->{type} eq 'textarea' ){
                 &putenc(
-                    '%s<br><textarea name="%s">%s</textarea>'
+                    '%s<br><textarea name="%s" cols="%s" rows="%s">%s</textarea>'
                     , $i->{desc} , $i->{name}
+		    , ($i->{cols} || 40 )
+		    , ($i->{rows} ||  4 )
                     , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
                 );
             }elsif( $i->{type} eq 'radio' ){
