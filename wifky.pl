@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.3_0 ($Date: 2006/08/12 05:22:26 $)';
+$::version  = '1.1.3_0 ($Date: 2006/08/12 05:28:04 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -447,7 +447,7 @@ sub print_header{
         <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
         <html lang="ja"><head>',$::charset);
     &puts( @::html_header );
-    &putenc('<title>%s</title>\n<style type="text/css"><!--',$label);
+    &putenc('<title>%s</title><style type="text/css"><!--',$label);
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
         if( my $css =&read_object($p) ){
             $css =~ s/[<>&]//g;
@@ -455,7 +455,7 @@ sub print_header{
             &puts( $css );
         }
     }
-    &puts('--></style>\n</head>');
+    &puts('--></style></head>');
     &puts( exists $::form{p} && &is_frozen($::form{p})
                 ? '<body class="frozen">' : '<body>' );
     &puts( @::body_header );
