@@ -1,11 +1,11 @@
 #!/usr/local/bin/perl
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.3_0 ($Date: 2006/08/10 15:19:22 $)';
+$::version  = '1.1.3_0 ($Date: 2006/08/12 01:44:19 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -675,8 +675,8 @@ sub action_tools{
                 &putenc(
                     '%s<br><textarea name="%s" cols="%s" rows="%s">%s</textarea>'
                     , $i->{desc} , $i->{name}
-		    , ($i->{cols} || 40 )
-		    , ($i->{rows} ||  4 )
+                    , ($i->{cols} || 40 )
+                    , ($i->{rows} ||  4 )
                     , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
                 );
             }elsif( $i->{type} eq 'radio' ){
@@ -1018,11 +1018,11 @@ sub verbatim{
 }
 
 sub inner_link{
-    my $symbol = shift;
-    my $title  = &denc( shift );
+    my ($symbol,$title,$sharp) = ($_[0] , split(/(?=#[pf][0-9mt])/,$_[1]) );
+    $title = &denc($title);
 
     if( &object_exists($title) ){
-        &anchor( $symbol , { p=>$title } );
+        &anchor( $symbol , { p=>$title } , undef , $sharp);
     }else{
         qq(<blink>${symbol}?</blink>);
     }
