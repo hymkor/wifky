@@ -1,11 +1,11 @@
 #!/usr/local/bin/perl
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.3_0 ($Date: 2006/08/12 01:44:19 $)';
+$::version  = '1.1.3_0 ($Date: 2006/08/12 05:22:26 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -173,7 +173,8 @@ sub init_globals{
             { desc=>'forbid any one but administrator creating a new page.' ,
               name=>'lonely' , type=>'checkbox' },
             { desc=>'target value for external link.',name=>'target'},
-            { desc=>'pagename or url for CSS' , name=>'CSS' , size=>40 },
+            { desc=>'pagename(s) for CSS (1-line for 1-page)' ,
+              name=>'CSS' , type=>'textarea' , rows=>1 },
             { desc=>'pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
         ],
         ' Section Marks' => [
@@ -446,19 +447,15 @@ sub print_header{
         <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
         <html lang="ja"><head>',$::charset);
     &puts( @::html_header );
-    &putenc('<title>%s</title>',$label);
-    my $cssn=$::config{CSS};
-    if( $cssn =~ /^http:/ || $cssn =~ /^\./ ){ ### URL for CSS
-        &putenc('<link rel="stylesheet" type="text/css" href="%s">',$cssn);
-    }else{ ### PAGE for CSS
-        my $css =&read_object($cssn);
-        if( $css ){
+    &putenc('<title>%s</title>\n<style type="text/css"><!--',$label);
+    foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
+        if( my $css =&read_object($p) ){
             $css =~ s/[<>&]//g;
             $css =~ s|/\*.*?\*/||gs;
-            &puts(qq(<style type="text/css"><!--\n${css}\n--></style>));
+            &puts( $css );
         }
     }
-    &puts('</head>');
+    &puts('--></style>\n</head>');
     &puts( exists $::form{p} && &is_frozen($::form{p})
                 ? '<body class="frozen">' : '<body>' );
     &puts( @::body_header );
@@ -673,16 +670,16 @@ sub action_tools{
                 );
             }elsif( $i->{type} eq 'textarea' ){
                 &putenc(
-                    '%s<br><textarea name="%s" cols="%s" rows="%s">%s</textarea>'
+                    '%s<br><textarea name="%s" cols="%s" rows="%s">%s</textarea><br>'
                     , $i->{desc} , $i->{name}
                     , ($i->{cols} || 40 )
                     , ($i->{rows} ||  4 )
                     , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
                 );
             }elsif( $i->{type} eq 'radio' ){
-                &putenc('%s',$i->{desc});
+                &putenc('%s<br>',$i->{desc});
                 foreach my $p (@{$i->{option}}){
-                    &putenc('<br><input type="radio" name="%s" value="%s"%s>%s'
+                    &putenc('<input type="radio" name="%s" value="%s"%s>%s<br>'
                         , $i->{name}
                         , $p->[0] 
                         , ( defined($main::config{$i->{name}}) && 
