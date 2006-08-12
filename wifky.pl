@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.3_0 ($Date: 2006/08/12 05:28:04 $)';
+$::version  = '1.1.3_0 ($Date: 2006/08/13 02:07:49 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -1292,7 +1292,9 @@ sub midashi{
         my $cls  = ('sub' x $depth).'section' ;
 
         $text =~ s/^\+/${tag}. /;
-        $text = &anchor( &enc($::config{"${cls}mark"})
+        $text = &anchor( '<span class="sanchor">' .
+                         &enc($::config{"${cls}mark"}) .
+                         '</span>' 
                   , { p     => $session->{title} }
                   , { class => "${cls}mark sanchor" }
                   , "#p${tag}"
