@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.3_0 ($Date: 2006/08/13 02:07:49 $)';
+$::version  = '1.1.3_0 ($Date: 2006/08/13 10:11:03 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -130,7 +130,7 @@ sub init_globals{
         <link rel="index" href="$::me?a=index">)
     );
 
-    @::body_header = <DATA>;
+    @::body_header = ();
 
     @::menubar = (
         &anchor( $::config{FrontPage} , undef  ) ,
@@ -1163,20 +1163,22 @@ sub plugin_comment{
     }
     unless( exists $opt{f} ){
         $buf .= <<HTML
+<div class="form">
 <form action="$::postme" method="post" class="comment">
 <input type="hidden" name="p" value="$etitle">
 <input type="hidden" name="a" value="comment">
 <input type="hidden" name="comid" value="$ecomid">
 <div class="field name">
 <input type="text" name="who" size="10" class="field">
-</div>
+</div><!-- div.field name -->
 <div class="textarea">
 <textarea name="comment" cols="60" rows="1" class="field"></textarea>
-</div>
+</div><!-- div.textarea -->
 <div class="button">
 <input type="submit" name="Comment" value="Comment">
-</div>
+</div><!-- div.button -->
 </form>
+</div><!-- div.form -->
 HTML
     }
     $buf . '</div></div>';
@@ -1453,5 +1455,3 @@ sub block_normal{
     }
     1;
 }
-__END__
-<!-- Generated with wifky (c) 2005-2006 HAYAMA_Kaoru. -->
