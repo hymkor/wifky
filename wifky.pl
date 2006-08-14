@@ -4,8 +4,7 @@
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
-$::charset  = 'EUC-JP';
-$::version  = '1.1.3_0 ($Date: 2006/08/13 10:11:03 $)';
+$::version  = '1.1.3_0 ($Date: 2006/08/14 17:37:01 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -67,7 +66,8 @@ sub init_globals{
 
     $::target = ( $::config{target}
                 ? sprintf(' target="%s"',$::config{target}) : '' );
-    $::config{CSS} ||= 'CSS';
+    $::config{CSS}       ||= 'CSS';
+    $::config{charset}   ||= 'EUC-JP';
     $::config{FrontPage} ||= 'FrontPage';
 
     %::inline_plugin = (
@@ -119,11 +119,11 @@ sub init_globals{
         'new'           => \&action_new ,
     );
 
-    @::http_header = ( "Content-type: text/html; charset=$::charset" );
+    @::http_header = ( "Content-type: text/html; charset=$::config{charset}" );
 
     @::html_header = (
       qq(<meta http-equiv="Content-Type"
-        content="text/html; charset=$::charset">
+        content="text/html; charset=$::config{charset}">
         <meta http-equiv="Content-Style-Type" content="text/css">
         <meta name="generator" content="wifky.pl $::version">
         <link rel="start" href="$::me">
@@ -173,6 +173,8 @@ sub init_globals{
             { desc=>'forbid any one but administrator creating a new page.' ,
               name=>'lonely' , type=>'checkbox' },
             { desc=>'target value for external link.',name=>'target'},
+            { desc=>'document charactor set (cannot convert existing documents)',
+              name=>'charset' } ,
             { desc=>'pagename(s) for CSS (1-line for 1-page)' ,
               name=>'CSS' , type=>'textarea' , rows=>1 },
             { desc=>'pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
@@ -445,7 +447,7 @@ sub print_header{
     &puts( @::http_header , '' );
     &putenc('<?xml version="1.0" encoding="%s"?>
         <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-        <html lang="ja"><head>',$::charset);
+        <html lang="ja"><head>',$::config{charset});
     &puts( @::html_header );
     &putenc('<title>%s</title><style type="text/css"><!--',$label);
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
