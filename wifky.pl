@@ -4,7 +4,7 @@
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
-$::version  = '1.1.3_0 ($Date: 2006/08/14 17:37:01 $)';
+$::version  = '1.1.4_0 ($Date: 2006/08/17 18:17:46 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -130,7 +130,7 @@ sub init_globals{
         <link rel="index" href="$::me?a=index">)
     );
 
-    @::body_header = ();
+    @::body_header = ( $::config{body_header}||'' );
 
     @::menubar = (
         &anchor( $::config{FrontPage} , undef  ) ,
@@ -167,22 +167,24 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'the sitename', name=>'sitename', size=>40 },
-            { desc=>'enable link to file://...', name=>'locallink' ,
+            { desc=>'The sitename', name=>'sitename', size=>40 },
+            { desc=>'Enable link to file://...', name=>'locallink' ,
               type=>'checkbox' },
-            { desc=>'forbid any one but administrator creating a new page.' ,
+            { desc=>'Forbid any one but administrator creating a new page.' ,
               name=>'lonely' , type=>'checkbox' },
-            { desc=>'target value for external link.',name=>'target'},
-            { desc=>'document charactor set (cannot convert existing documents)',
+            { desc=>'Target value for external link.',name=>'target'},
+            { desc=>'Document charactor set (Warning! cannot convert existing documents)',
               name=>'charset' } ,
-            { desc=>'pagename(s) for CSS (1-line for 1-page)' ,
+            { desc=>'Pagename(s) for CSS (1-line for 1-page)' ,
               name=>'CSS' , type=>'textarea' , rows=>1 },
-            { desc=>'pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
+            { desc=>'Pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
+            { desc=>'HTML-Code after <body>' , 
+              name=>'body_header' , type=>'textarea' , rows=>1 },
         ],
         ' Section Marks' => [
-            { desc=>'section mark', name=>'sectionmark', size=>3 } ,
-            { desc=>'subsection mark' , name=>'subsectionmark' , size=>3 } ,
-            { desc=>'subsubsection mark' , name=>'subsubsectionmark' , size=>3 }
+            { desc=>'Section mark', name=>'sectionmark', size=>3 } ,
+            { desc=>'Subsection mark' , name=>'subsectionmark' , size=>3 } ,
+            { desc=>'Subsubsection mark' , name=>'subsubsectionmark' , size=>3 }
         ]
     );
 
