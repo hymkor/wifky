@@ -4,7 +4,8 @@
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
-$::version  = '1.1.4_0 ($Date: 2006/08/19 05:32:22 $)';
+$::charset  = 'EUC-JP';
+$::version  = '1.1.4_0 ($Date: 2006/08/19 05:45:35 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -66,8 +67,7 @@ sub init_globals{
 
     $::target = ( $::config{target}
                 ? sprintf(' target="%s"',$::config{target}) : '' );
-    $::config{CSS}       ||= 'CSS';
-    $::config{charset}   ||= 'EUC-JP';
+    $::config{CSS} ||= 'CSS';
     $::config{FrontPage} ||= 'FrontPage';
 
     %::inline_plugin = (
@@ -119,11 +119,11 @@ sub init_globals{
         'new'           => \&action_new ,
     );
 
-    @::http_header = ( "Content-type: text/html; charset=$::config{charset}" );
+    @::http_header = ( "Content-type: text/html; charset=$::charset" );
 
     @::html_header = (
       qq(<meta http-equiv="Content-Type"
-        content="text/html; charset=$::config{charset}">
+        content="text/html; charset=$::charset">
         <meta http-equiv="Content-Style-Type" content="text/css">
         <meta name="generator" content="wifky.pl $::version">
         <link rel="start" href="$::me">
@@ -381,7 +381,7 @@ sub print_form{
           enctype="multipart/form-data" method="post"
           accept-charset="%s" ><input type="hidden" name="stamp" value="%s"
         ><input type="hidden" name="p" value="%s"><br>'
-        , $::postme , $::config{charset} , $stamp , $title );
+        , $::postme , $::charset , $stamp , $title );
     &puts('<textarea cols="80" rows="20" name="honbun">'.$html.
             '</textarea><br>');
 
@@ -444,7 +444,7 @@ sub print_header{
     &puts( @::http_header , '' );
     &putenc('<?xml version="1.0" encoding="%s"?>
         <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-        <html lang="ja"><head>',$::config{charset});
+        <html lang="ja"><head>',$::charset);
     &puts( @::html_header );
     &putenc('<title>%s</title><style type="text/css"><!--',$label);
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
@@ -559,7 +559,7 @@ sub action_new{
         <p><input type="text" name="p" size="40">
         <input type="hidden" name="a" value="edt">
         <input type="submit" value="Create"></p></form>)
-        , $::postme , $::config{charset} );
+        , $::postme , $::charset );
     &print_footer;
 }
 
