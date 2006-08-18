@@ -4,7 +4,7 @@
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
-$::version  = '1.1.4_0 ($Date: 2006/08/18 15:05:15 $)';
+$::version  = '1.1.4_0 ($Date: 2006/08/19 05:32:22 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -130,7 +130,7 @@ sub init_globals{
         <link rel="index" href="$::me?a=index">)
     );
 
-    @::body_header = ( $::config{body_header}||'' );
+    @::body_header = ();
 
     @::menubar = (
         &anchor( $::config{FrontPage} , undef  ) ,
@@ -176,8 +176,6 @@ sub init_globals{
             { desc=>'Pagename(s) for CSS (1-line for 1-page)' ,
               name=>'CSS' , type=>'textarea' , rows=>1 },
             { desc=>'Pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
-            { desc=>'HTML-Code after <body>' , 
-              name=>'body_header' , type=>'textarea' , rows=>1 },
         ],
         ' Section Marks' => [
             { desc=>'Section mark', name=>'sectionmark', size=>3 } ,
@@ -185,12 +183,6 @@ sub init_globals{
             { desc=>'Subsubsection mark' , name=>'subsubsectionmark' , size=>3 }
         ]
     );
-    unless( $::config{crypt} ){
-        $::preferences{'  Initial Options' } = [
-            { desc=>'Document charactor set (Cannot convert existing documents)',
-              name=>'charset' }
-        ];
-    }
 
     %::inline_syntax_plugin = (
         '100_innerlink1' => \&preprocess_innerlink1 ,
@@ -385,12 +377,11 @@ sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
 sub print_form{
     my ($title,$html,$stamp) = @_;
 
-    &putenc('<div class="update"
-        ><form name="editform" action="%s" 
-         enctype="multipart/form-data" method="post"
-        ><input type="hidden" name="stamp" value="%s"
+    &putenc('<div class="update"><form name="editform" action="%s"
+          enctype="multipart/form-data" method="post"
+          accept-charset="%s" ><input type="hidden" name="stamp" value="%s"
         ><input type="hidden" name="p" value="%s"><br>'
-        , $::postme,$stamp,$title );
+        , $::postme , $::config{charset} , $stamp , $title );
     &puts('<textarea cols="80" rows="20" name="honbun">'.$html.
             '</textarea><br>');
 
@@ -563,11 +554,12 @@ sub write_file{
 
 sub action_new{
     &print_header( divclass=>'max' );
-    &puts(qq(<h1>Create Page</h1>
-        <form action="$::postme" method="post">
+    &putenc(qq(<h1>Create Page</h1>
+        <form action="%s" method="post" accept-charset="%s">
         <p><input type="text" name="p" size="40">
         <input type="hidden" name="a" value="edt">
-        <input type="submit" value="Create"></p></form>));
+        <input type="submit" value="Create"></p></form>)
+        , $::postme , $::config{charset} );
     &print_footer;
 }
 
