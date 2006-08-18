@@ -4,7 +4,7 @@
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
-$::version  = '1.1.4_0 ($Date: 2006/08/17 18:17:46 $)';
+$::version  = '1.1.4_0 ($Date: 2006/08/18 15:05:15 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -173,8 +173,6 @@ sub init_globals{
             { desc=>'Forbid any one but administrator creating a new page.' ,
               name=>'lonely' , type=>'checkbox' },
             { desc=>'Target value for external link.',name=>'target'},
-            { desc=>'Document charactor set (Warning! cannot convert existing documents)',
-              name=>'charset' } ,
             { desc=>'Pagename(s) for CSS (1-line for 1-page)' ,
               name=>'CSS' , type=>'textarea' , rows=>1 },
             { desc=>'Pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
@@ -187,6 +185,12 @@ sub init_globals{
             { desc=>'Subsubsection mark' , name=>'subsubsectionmark' , size=>3 }
         ]
     );
+    unless( $::config{crypt} ){
+        $::preferences{'  Initial Options' } = [
+            { desc=>'Document charactor set (Cannot convert existing documents)',
+              name=>'charset' }
+        ];
+    }
 
     %::inline_syntax_plugin = (
         '100_innerlink1' => \&preprocess_innerlink1 ,
