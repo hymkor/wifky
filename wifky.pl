@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.4_0 ($Date: 2006/08/19 05:45:35 $)';
+$::version  = '1.1.4_0 ($Date: 2006/08/20 13:03:34 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -449,6 +449,7 @@ sub print_header{
     &putenc('<title>%s</title><style type="text/css"><!--',$label);
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
         if( my $css =&read_object($p) ){
+            $css =~ s/\<\<\{([^\}]+)\}/&myurl( { p=>$p , f=>$1 } )/ge;
             $css =~ s/[<>&]//g;
             $css =~ s|/\*.*?\*/||gs;
             &puts( $css );
