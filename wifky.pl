@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.4_0 ($Date: 2006/08/20 13:03:34 $)';
+$::version  = '1.1.4_0 ($Date: 2006/08/26 01:58:47 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -130,7 +130,7 @@ sub init_globals{
         <link rel="index" href="$::me?a=index">)
     );
 
-    @::body_header = ();
+    @::body_header = ( $::config{body_header}||'' );
 
     @::menubar = (
         &anchor( $::config{FrontPage} , undef  ) ,
@@ -174,8 +174,10 @@ sub init_globals{
               name=>'lonely' , type=>'checkbox' },
             { desc=>'Target value for external link.',name=>'target'},
             { desc=>'Pagename(s) for CSS (1-line for 1-page)' ,
-              name=>'CSS' , type=>'textarea' , rows=>1 },
+              name=>'CSS' , type=>'textarea' , rows=>2 },
             { desc=>'Pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
+            { desc=>'HTML-Code after <body> (for banner)' ,
+              name=>'body_header' , type=>'textarea' , rows=>2 },
         ],
         ' Section Marks' => [
             { desc=>'Section mark', name=>'sectionmark', size=>3 } ,
