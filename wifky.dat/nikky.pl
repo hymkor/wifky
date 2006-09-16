@@ -2,13 +2,8 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.18.0 ($Date: 2006/09/16 12:26:41 $)';
-my $nextday;
-my $prevday;
-my $nextmonth;
-my $prevmonth;
-my $startday;
-my $endday;
+my $version='0.18.0 ($Date: 2006/09/16 16:35:53 $)';
+my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
 
@@ -468,49 +463,34 @@ sub set_nextprev{
         push(@main::html_header,qq(<link rel="next" href="${nextday}">));
     }
     push(@main::menubar,&nextday);
-    if( $prevmonth ){
-        $prevmonth = &main::title2url(&main::fname2title($prevmonth));
-    }
-    unshift(@main::menubar,&prevmonth);
-    if( $nextmonth ){
-        $nextmonth= &main::title2url(&main::fname2title($nextmonth));
-    }
-    push(@main::menubar,&nextmonth);
-}
 
-sub prevday{
-    my $symbol = $_[1] || &main::enc($main::config{nikky_symbolprevdaylink} || '<');
-    $prevday ? qq(<a href="${prevday}">${symbol}</a>) 
-             : qq(<span class="noprevday">$symbol</span>) ;
-}
+    $prevmonth &&= &main::title2url(&main::fname2title($prevmonth));
+    $nextmonth &&= &main::title2url(&main::fname2title($nextmonth));
 
-sub nextday{
-    my $symbol = $_[1] || &main::enc($main::config{nikky_symbolnextdaylink} || '>');
-    $nextday ? qq(<a href="${nextday}">${symbol}</a>) 
-             : qq(<span class="nonextday">$symbol</span>) ;
-}
-
-sub prevmonth{
-    my $symbol = $_[1] || &main::enc($main::config{nikky_symbolprevmonthlink} || '<< ');
-    $prevmonth ? qq(<a href="${prevmonth}">${symbol}</a>) 
-               : qq(<span class="noprevmonth">$symbol</span>) ;
-}
-
-sub nextmonth{
-    my $symbol = $_[1] || &main::enc($main::config{nikky_symbolnextmonthlink} || ' >>');
-    $nextmonth ? qq(<a href="${nextmonth}">${symbol}</a>) 
-               : qq(<span class="nonextmonth">$symbol</span>) ;
-}
-
-sub set_startend {
+    ### Startday
     my ($day) = &main::ls_core( { number=>1 }, '(????.??.??)*' );
     $startday = &main::title2url( $day->{title} );
-    unshift( @main::menubar, &startday );
 
-    ($day) = &main::ls_core( { r=>1, number=>1 }, '(????.??.??)*' );
-    $endday = &main::title2url( $day->{title} );
-    push( @main::menubar, &endday );
+    ### Endday
+    my ($day) = &main::ls_core( { r=>1, number=>1 }, '(????.??.??)*' );
+    $endday   = &main::title2url( $day->{title} );
 }
+
+sub date_anchor{
+    my ($xxxxday,$date_url,$default_mark,$symbol)=@_;
+    my $symbol ||= &main::enc($main::config{"nikky_symbol${xxxxday}link"}||$default_mark);
+    !$symbol ? ''
+    : $date_url 
+    ? qq(<a href="${date_url}">${symbol}</a>) 
+    : qq(<span class="no${xxxxday}">$symbol</span>) ;
+}
+
+sub prevday  { &date_anchor('prevday'  ,$prevday   ,'<' , $_[1]); }
+sub nextday  { &date_anchor('nextday'  ,$nextday   ,'>' , $_[1]); }
+sub prevmonth{ &date_anchor('prevmonth',$prevmonth ,'<<', $_[1]); }
+sub nextmonth{ &date_anchor('nextmonth',$nextmonth ,'>>', $_[1]); }
+sub startday { &date_anchor('startday' ,$startday  ,'|' , $_[1]); }
+sub endday   { &date_anchor('endday'   ,$endday    ,'|' , $_[1]); }
 
 sub action_newdiary{
     my @tm = localtime;
@@ -528,18 +508,6 @@ sub action_newdiary{
         ><input type="submit"></p></form>'
         , $main::me , $default_title );
     &main::print_footer;
-}
-
-sub startday{
-    my $symbol = $_[1] || &main::enc($main::config{nikky_symbolstartdaylink} || '|<');
-    $startday ? qq(<a href="${startday}">${symbol}</a>) 
-             : qq(<span class="nostartday">$symbol</span>) ;
-}
-
-sub endday{
-    my $symbol = $_[1] || &main::enc($main::config{nikky_symbolenddaylink} || '>|');
-    $endday ? qq(<a href="${endday}">${symbol}</a>) 
-             : qq(<span class="noendday">$symbol</span>) ;
 }
 
 sub query_wday { ### query week day.
@@ -603,40 +571,39 @@ sub calender{
         my $d=substr($_->{title},9,2); $d =~ s/^0//; ($d,$_);
     } &main::ls_core( {} , sprintf('(%04d.%02d.??)*',$y,$m));
 
-    my $month_title = &main::is('nikky_calendertype')
-            ? (qw(Dummy January Feburary March April May June
-                July August September October November December) )[$m]
-                : sprintf('%02d',$m);
+    my $title;
+    if( &main::is('nikky_calendertype') ){
+        $title = sprintf('%s %d' ,
+                    (qw(January Feburary March April May June
+                        July August September October November December)
+                    )[$m-1] , $y );
+    }else{
+        $title = sprintf('%d/%d',$y,$m);
+    }
 
     if( defined($mode) && $mode eq 'f' ) {
         my $buffer = sprintf(
-            '<div class="calender_flat"><span class="calender_header">%s%s%s %d/%s/</span>'
+            '<div class="calender_flat"><span class="calender_header">%s%s %s/</span>'
             , &startday()
             , $main::inline_plugin{prevmonth}->($session)
-            , $main::inline_plugin{prevday}->($session)
-            , $y
-            , $month_title 
+            , $title 
         );
         foreach my $d (1..$max_mdays){
             &put_1day('span',$y,$m,$d,$wday,$today,\%thismonth,\$buffer);
             $wday = ($wday + 1) % 7;
         }
-        $buffer . sprintf( '<span class="calender_footer">%s%s%s</span></div>'
-            , $main::inline_plugin{nextday}->($session)
+        $buffer . sprintf( '<span class="calender_footer">%s%s</span></div>'
             , $main::inline_plugin{nextmonth}->($session)
             , &endday()
         );
     }else{
         my $buffer = sprintf(
-            '<table class="calender"><caption>%s%s%s %d %s %s%s%s</caption><tr nowrap>%s'
-            , &startday
+            '<table class="calender"><caption>%s%s %s %s%s</caption><tr nowrap>%s'
+            , &startday()
             , $main::inline_plugin{prevmonth}->($session)
-            , $main::inline_plugin{prevday}->($session)
-            , $y
-            , $month_title
-            , $main::inline_plugin{nextday}->($session)
+            , $title
             , $main::inline_plugin{nextmonth}->($session)
-            , &endday
+            , &endday()
             , '<td></td>'x $wday
         );
         foreach my $d (1..$max_mdays){
@@ -655,7 +622,5 @@ sub stamp_format{
     sprintf("%s, %02d %s %04d %s GMT",
         (split(/\s+/,gmtime( $_[0] )))[0,2,1,4,3]);
 }
-
-&set_startend;
 
 1;
