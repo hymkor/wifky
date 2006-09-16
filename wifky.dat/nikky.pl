@@ -2,11 +2,13 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.17.0 ($Date: 2006/07/01 19:11:36 $)';
+my $version='0.18.0 ($Date: 2006/09/16 12:26:41 $)';
 my $nextday;
 my $prevday;
 my $nextmonth;
 my $prevmonth;
+my $startday;
+my $endday;
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
 
@@ -53,14 +55,25 @@ $main::preferences{'Plugin: nikky.pl'}= [
     , name=>'nikky_days', size=>1 },
     { desc=>'1-section to 1-rss-item'      
     , name=>'nikky_rssitemsize' , type=>'checkbox' } ,
+    { desc=>'RSS description' 
+    , name=>'nikky_rss_description' , size=>30 } ,
+    { desc=>'insert hh:mm into title'      
+    , name=>'nikky_insert_hhmm' , type=>'checkbox' } ,
+
+    { desc=>'Symbol of start day link'  
+    , name=>'nikky_symbolstartdaylink' , size=>2 },
+    { desc=>'Symbol of previous month link'
+    , name=>'nikky_symbolprevmonthlink', size=>2 },
+
     { desc=>'Symbol of previous day link'  
     , name=>'nikky_symbolprevdaylink', size=>2 },
     { desc=>'Symbol of next day link'      
     , name=>'nikky_symbolnextdaylink', size=>2 },
-    { desc=>'Symbol of previous month link'
-    , name=>'nikky_symbolprevmonthlink', size=>2 },
     { desc=>'Symbol of next month link'    
     , name=>'nikky_symbolnextmonthlink', size=>2 },
+    { desc=>'Symbol of end day link'      
+    , name=>'nikky_symbolenddaylink' , size=>2 } ,
+
     { desc=>'Print month with English'     
     , name=>'nikky_calendertype' , type=>'checkbox' },
 ];
@@ -204,31 +217,20 @@ sub referer{
 };
 
 sub action_rss{
-    my $URL=$main::me=
-        sprintf('http://%s%s', $ENV{'HTTP_HOST'} , $ENV{'SCRIPT_NAME'} );
-    my $RSS="$URL?a=rss";
+    my $URL=$main::me='http://'.$ENV{'HTTP_HOST'}.$ENV{'SCRIPT_NAME'};
     my $articles=5;
     $main::inline_plugin{comment} = sub { '' };
 
     %::enclist = (
-        'lp'       => '&#40;' ,
-        'rp'       => '&#41;' ,
-        'lb'       => '&#91;' ,
-        'rb'       => '&#93;' ,
-        'll'       => '&#40;&#40;' ,
-        'rr'       => '&#41;&#41;' ,
-        'vl'       => '&#124;' ,
+        'lp' => '&#40;' ,
+        'rp' => '&#41;' ,
+        'lb' => '&#91;' ,
+        'rb' => '&#93;' ,
+        'll' => '&#40;&#40;' ,
+        'rr' => '&#41;&#41;' ,
+        'vl' => '&#124;' ,
     );
-    my $sitename=$main::config{sitename};
-
-    ### read page list ###
-    my @pagelist = map(
-        { fname=>$_ , title=> &main::fname2title($_) }
-        , &main::list_page()
-    );
-    @pagelist = sort{ $a->{title} cmp $b->{title} }
-        grep( $_->{title} =~ /^\(\d\d\d\d\.\d\d\.\d\d\)/ , @pagelist );
-    splice(@pagelist,0,-$articles);
+    my @pagelist = &main::ls_core( { r=>1 , number=>$articles } , '(????.??.??)*' );
 
     my $last_modified=0;
     foreach my $p (@pagelist){
@@ -256,22 +258,30 @@ sub action_rss{
         $p->{attachment} = $attachment;
     }
 
-    print  "Content-Type: application/rss+xml; charset=EUC-JP\n";
-    printf "Last-Modified: %s\n\n",&stamp_format($last_modified);
+    printf <<FORMAT
+Content-Type: application/rss+xml; charset=%s
+Last-Modified: %s
 
-    print qq(<?xml version="1.0" encoding="EUC-JP" ?>
+<?xml version="1.0" encoding="%s" ?>
 <rdf:RDF
   xmlns="http://purl.org/rss/1.0/"
   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
   xmlns:dc="http://purl.org/dc/elements/1.1/"
   xml:lang="ja">
- <channel rdf:about="${RSS}">
-  <title>${sitename}</title>
-  <link>${URL}</link>
-  <description>${sitename}</description>
-  <items>
-   <rdf:Seq>
-);
+<channel rdf:about="%s?a=rss">
+<title>%s</title>
+<link>%s</link>
+<description>%s</description>
+<items>
+<rdf:Seq>
+FORMAT
+    , $main::charset
+    , &stamp_format($last_modified)
+    , $main::charset
+    , $URL
+    , &main::enc($main::config{sitename})
+    , $URL
+    , &main::enc($main::config{nikky_rss_description}) ;
 
     ### read title list ###
     my @topics;
@@ -366,24 +376,28 @@ sub action_rss{
 
     ### write description ###
     foreach my $t (@topics){
-        printf qq(<item rdf:about="%s">\n),$t->{url} ;
-        printf "<title>%s</title>\n"
-                , &main::enc($t->{title}) ;
-        printf qq(<link>%s</link>\n),$t->{url} ;
+        my @tm=gmtime($t->{timestamp});
+        printf <<FORMAT
+<item rdf:about="%s">
+<title>%s</title>
+<link>%s</link>
+<lastBuildDate>%s</lastBuildDate>
+<pubDate>%s</pubDate>
+<author>%s</author>
+<dc:creator>%s</dc:creator>
+<dc:date>%04d-%02d-%02dT%02d:%02d:%02d+00:00</dc:date>
+FORMAT
+            , $t->{url}
+            , &main::enc($t->{title})
+            , $t->{url}
+            , &stamp_format( $t->{timestamp} )
+            , &stamp_format( $t->{timestamp} )
+            , &main::enc($main::config{'nikky_author'})
+            , &main::enc($main::config{'nikky_author'})
+            , $tm[5]+1900,$tm[4]+1,@tm[3,2,1,0] ;
         for(my $s=$t->{title} ; $s =~ /\[([^\]]+)\]/ ; $s=$' ){
             print "<category>$1</category>\n";
         }
-        printf "<lastBuildDate>%s</lastBuildDate>\n"
-                , &stamp_format( $t->{timestamp} );
-        printf "<pubDate>%s</pubDate>\n"
-                , &stamp_format( $t->{timestamp} );
-        printf "<author>%s</author>\n"
-                , $main::config{'nikky_author'} || $sitename;
-        printf "<dc:creator>%s</dc:creator>\n"
-                , $main::config{'nikky_author'} || $sitename;
-        my @tm=gmtime($t->{timestamp});
-        printf "<dc:date>%04d-%02d-%02dT%02d:%02d:%02d+00:00</dc:date>\n"
-                , $tm[5]+1900,$tm[4]+1,@tm[3,2,1,0] ;
         local $main::print='';
         print  '<description><![CDATA[';
         &main::syntax_engine(
@@ -430,8 +444,8 @@ sub set_nextprev{
     my $cur=&main::title2fname($p);
     my $month_first=&main::title2fname( substr($p,0,9).'01)' );
     my $month_end=&main::title2fname( substr($p,0,9).'31)\xFF' );
-    foreach my $t ( &main::list_page() ){
-        next if $t !~ /^822303/;
+
+    foreach my $t ( grep( /^822303/ , &main::list_page() ) ){
         if( $t lt $cur && ( !defined($prevday) || $t gt $prevday ) ){
             $prevday = $t;
         }elsif( $t gt $cur && ( !defined($nextday) || $t lt $nextday ) ){
@@ -488,34 +502,55 @@ sub nextmonth{
                : qq(<span class="nonextmonth">$symbol</span>) ;
 }
 
+sub set_startend {
+    my ($day) = &main::ls_core( { number=>1 }, '(????.??.??)*' );
+    $startday = &main::title2url( $day->{title} );
+    unshift( @main::menubar, &startday );
+
+    ($day) = &main::ls_core( { r=>1, number=>1 }, '(????.??.??)*' );
+    $endday = &main::title2url( $day->{title} );
+    push( @main::menubar, &endday );
+}
+
 sub action_newdiary{
     my @tm = localtime;
     &main::print_header( divclass=>'max' );
-    &main::putenc(qq(<form action="%s" method="post"
+    my $default_title=sprintf('(%04d.%02d.%02d)' ,
+         $tm[5]+1900,$tm[4]+1,$tm[3] );
+    if( &main::is('nikky_insert_hhmm') ){
+        $default_title .= sprintf(' %02d:%02d',$tm[2],$tm[1]);
+    }
+
+    &main::putenc('<form action="%s" method="post"
         ><h1>Create Page</h1><p
         ><input type="hidden" name="a" value="edt"
-        ><input type="text" name="p" value="(%04d.%02d.%02d)" size="40"
-        ><input type="submit"></p></form>)
-        , $main::me , $tm[5]+1900,$tm[4]+1,$tm[3] );
+        ><input type="text" name="p" value="%s" size="40"
+        ><input type="submit"></p></form>'
+        , $main::me , $default_title );
     &main::print_footer;
 }
 
-sub calender{
-    my ($y,$m,$today);
-    if( defined($main::form{p}) &&
-        $main::form{p} =~ /^\((\d\d\d\d)\.(\d\d)\.(\d\d)\)/ ){
-        ($y,$m,$today)=($1,$2,$3);
-    }elsif( defined($main::form{date}) && 
-        $main::form{date} =~ /^(\d\d\d\d)(\d\d)(\d\d)$/ ){
-        ($y,$m,$today)=($1,$2,$3);
-    }else{
-        ($y,$m,$today)=(localtime)[5,4,3];
-        $y += 1900 ; ++$m; $today = sprintf('%02d',$today);
-    }
+sub startday{
+    my $symbol = $_[1] || &main::enc($main::config{nikky_symbolstartdaylink} || '|<');
+    $startday ? qq(<a href="${startday}">${symbol}</a>) 
+             : qq(<span class="nostartday">$symbol</span>) ;
+}
+
+sub endday{
+    my $symbol = $_[1] || &main::enc($main::config{nikky_symbolenddaylink} || '>|');
+    $endday ? qq(<a href="${endday}">${symbol}</a>) 
+             : qq(<span class="noendday">$symbol</span>) ;
+}
+
+sub query_wday { ### query week day.
+    my ($y,$m) = @_;
     my ($zy,$zm)=( $m<=2 ? ($y-1,12+$m) : ($y,$m) );
 
-    my $wday=(   $zy + int($zy/4) - int($zy/100) + int($zy/400)
-                + int((13*$zm+ 8)/5)+1)%7;
+    ( $zy + int($zy/4) - int($zy/100) + int($zy/400) + int((13*$zm+ 8)/5)+1)%7;
+}
+
+sub query_days_in_month{
+    my ($y,$m) = @_;
     my @mdays = (0,31,
           $y % 400 == 0 ? 29
         : $y % 100 == 0 ? 28
@@ -523,49 +558,104 @@ sub calender{
         : 28 ,
     ,31,30,31,30   ,   31,31,30,31,30,31);
 
-    my $r=&main::title2fname(sprintf('(%04d.%02d.',$y,$m));
-    my %thismonth= map(
-        (substr($_,9,2),$_) ,
-        map(  &main::fname2title($_)
-            , grep(substr($_,0,18) eq $r , &main::list_page() )
-        )
-    );
-
-    my $buffer = sprintf(
-        '<table class="calender"><caption>%s%s %d %s %s%s</caption><tr>%s'
-        , &prevmonth
-        , &prevday
-        , $y
-        ,   &main::is('nikky_calendertype')
-          ? (qw(Dummy January Feburary March April May June
-                July August September October November December) )[$m]
-          : (qw(00 01 02 03 04 05 06 07 08 09 10 11 12) )[$m]
-        , &nextday
-        , &nextmonth
-        , '<td>'x($wday%7)
-    );
-    for(my $d=1;$d<=$mdays[$m];++$d){
-        $buffer .= "</tr>\n<tr>" if $wday == 0 && $d > 1;
-        my $title = sprintf('(%04d.%02d.%02d)',$y,$m,$d);
-        my $D=sprintf('%02d',$d);
-        $buffer .= sprintf('<td align="right" class="%s%s">' ,
-                ( qw(Sun Mon Tue Wed Thu Fri Sat) )[$wday] ,
-                $today eq $D ? ' Today' : '' );
-
-        if( exists $thismonth{$D} ){
-            $buffer .= sprintf('<a href="%s?date=%04d%02d%02d">%s</a></td>'
-                                , $main::me , $y , $m , $d , $d);
-        }else{
-            $buffer .= qq($d</td>);
-        }
-        $wday = ($wday + 1) % 7;
-    }
-    $buffer . '<td></td>'x((7-$wday)%7) . '</tr></table>';
+    $mdays[ $m ];
 }
+
+sub put_1day{
+    my ($tag,$y,$m,$d,$wday,$today,$thismonth,$buffer)=@_;
+    $$buffer .= sprintf('<%s align="right" class="%s%s">' ,
+            $tag ,
+            ( qw(Sun Mon Tue Wed Thu Fri Sat) )[$wday] ,
+            $today eq $d ? ' Today' : '' );
+
+    if( exists $thismonth->{$d} ){
+        $$buffer .= sprintf('<a href="%s?date=%04d%02d%02d">%s</a>'
+                        , $main::me , $y , $m , $d , $d);
+    }else{
+        $$buffer .= $d;
+    }
+    $$buffer .= "</$tag> ";
+}
+
+sub query_current_month{
+    my @r;
+    if( defined($main::form{p}) &&
+        $main::form{p} =~ /^\((\d\d\d\d)\.(\d\d)\.(\d\d)\)/ ){
+        @r=($1,$2,$3);
+    }elsif( defined($main::form{date}) && 
+        $main::form{date} =~ /^(\d\d\d\d)(\d\d)(\d\d)$/ ){
+        @r=($1,$2,$3);
+    }else{
+        my ($y,$m,$today)=(localtime)[5,4,3];
+        @r=($y + 1900 , $m+1 , $today );
+    }
+    $r[2] =~ s/^0//;
+    @r;
+}
+
+sub calender{
+    my ($session,$mode) = @_;
+    my ($y,$m,$today) = &query_current_month();
+    my $wday = &query_wday($y,$m);
+    my $max_mdays = &query_days_in_month($y,$m);
+
+    my %thismonth = map{ 
+        my $d=substr($_->{title},9,2); $d =~ s/^0//; ($d,$_);
+    } &main::ls_core( {} , sprintf('(%04d.%02d.??)*',$y,$m));
+
+    my $month_title = &main::is('nikky_calendertype')
+            ? (qw(Dummy January Feburary March April May June
+                July August September October November December) )[$m]
+                : sprintf('%02d',$m);
+
+    if( defined($mode) && $mode eq 'f' ) {
+        my $buffer = sprintf(
+            '<div class="calender_flat"><span class="calender_header">%s%s%s %d/%s/</span>'
+            , &startday()
+            , $main::inline_plugin{prevmonth}->($session)
+            , $main::inline_plugin{prevday}->($session)
+            , $y
+            , $month_title 
+        );
+        foreach my $d (1..$max_mdays){
+            &put_1day('span',$y,$m,$d,$wday,$today,\%thismonth,\$buffer);
+            $wday = ($wday + 1) % 7;
+        }
+        $buffer . sprintf( '<span class="calender_footer">%s%s%s</span></div>'
+            , $main::inline_plugin{nextday}->($session)
+            , $main::inline_plugin{nextmonth}->($session)
+            , &endday()
+        );
+    }else{
+        my $buffer = sprintf(
+            '<table class="calender"><caption>%s%s%s %d %s %s%s%s</caption><tr nowrap>%s'
+            , &startday
+            , $main::inline_plugin{prevmonth}->($session)
+            , $main::inline_plugin{prevday}->($session)
+            , $y
+            , $month_title
+            , $main::inline_plugin{nextday}->($session)
+            , $main::inline_plugin{nextmonth}->($session)
+            , &endday
+            , '<td></td>'x $wday
+        );
+        foreach my $d (1..$max_mdays){
+            if( $wday >= 7 ){
+                $buffer .= "</tr>\n<tr nowrap>" ; $wday = 0;
+            }
+            &put_1day('td',$y,$m,$d,$wday,$today,\%thismonth,\$buffer);
+            ++$wday;
+        }
+        $buffer . '<td></td>'x( 7-$wday ) . '</tr></table>';
+    }
+}
+
 
 sub stamp_format{
     sprintf("%s, %02d %s %04d %s GMT",
         (split(/\s+/,gmtime( $_[0] )))[0,2,1,4,3]);
 }
+
+&set_startend;
 
 1;
