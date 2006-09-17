@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.18.0 ($Date: 2006/09/16 16:35:53 $)';
+my $version='0.18.0 ($Date: 2006/09/17 18:42:01 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -125,6 +125,7 @@ sub action_date{
 sub concat_article{
     my $h = ( $main::version ge '1.1' || &main::is('cssstyle') ? 2 : 1 );
     foreach my $p (@_){
+        next unless -f $p->{fname};
         my $pagename=$p->{title};
         &main::puts('<div class="day">');
         &main::putenc('<h%d><a href="%s">%s</a></h%d><div class="body">',
