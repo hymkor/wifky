@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.4_0 ($Date: 2006/08/26 01:58:47 $)';
+$::version  = '1.1.4_0 ($Date: 2006/09/18 14:41:48 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -390,8 +390,8 @@ sub print_form{
     my $fname=&title2fname( $::form{p} );
     &puts('<input type="submit" name="a" value="Preview">');
     if( exists $::form{admin} || &is_frozen() ){
-        &puts('Sign: <input type="password" name="password"
-        ><input type="checkbox" name="to_freeze" value="1"');
+        &print_signarea;
+        &puts('<input type="checkbox" name="to_freeze" value="1"');
         &is_frozen() and &puts('checked');
         &puts(' >freeze <input type="hidden" name="admin" value="admin">');
     }
@@ -400,7 +400,7 @@ sub print_form{
     &puts('<h2>Attachment</h2>
     <p>New:<input type="file" name="butsu" size="48">');
     if( exists $::form{admin} || &is_frozen() ){
-        &puts('Sign:<input type="password" name="qassword">');
+        &print_signarea('qassword');
     }
     &puts('<input type="submit" name="a" value="Upload"></p>');
     
@@ -501,6 +501,10 @@ sub ninsho{
     }
 }
 
+sub print_signarea{
+    &putenc('Sign: <input type="password" name="%s">',$_[0] || 'password');
+}
+
 sub check_frozen{
     if( exists $::form{admin} ){ ### Administrator mode ###
          &ninsho;
@@ -586,9 +590,8 @@ sub action_query_delete{
     &putenc( q( <h1>Remove attachment</h1><p>
                 Remove attachment '%s' of '%s'.<br>)
             , $::form{f} , $::form{p} );
-    &is_frozen() and &puts( q(Administrator's Sign:
-            <input type="password" name="password"><br>) );
-    &putenc('Are you sure ? <br>
+    &is_frozen() and &print_signarea();
+    &putenc('<div>Are you sure ? </div>
         <input type="submit" name="yes" value="Yes">
         <input type="submit" name="no" value="No">
         <input type="hidden" name="a" value="del">
@@ -690,6 +693,10 @@ sub action_tools{
                           ? ' checked' : '' )
                         , $p->[1] );
                 }
+            }elsif( $i->{type} eq 'a' ){
+                &putenc('<a href="%s">%s</a><br>',$i->{href},$i->{desc} );
+            }elsif( $i->{type} eq 'rem' ){
+                &putenc('%s<br>',$i->{desc} );
             }else{ # text
                 &putenc(
                     '%s <input type="text" name="%s" value="%s" size="%s"><br>'
@@ -701,9 +708,9 @@ sub action_tools{
         }
         &puts('</p></div></div>');
     }
-    &puts('Sign: <input type="password" name="password"
-        ><input type="hidden" name="a" value="preferences"
-        ><input type="submit" value="Submit"></form></div></div>');
+    &print_signarea();
+    &puts('<input type="hidden" name="a" value="preferences">',
+          '<input type="submit" value="Submit"></form></div></div>');
 
     &print_footer;
 }
@@ -892,11 +899,10 @@ sub action_edit{
             <p><form action="%s" method="post">
             <input type="hidden"  name="a" value="ren">
             <input type="hidden"  name="p" value="%s">
-            Title: <input type="text" name="newtitle" value="%s" size="80">
-            <br>Sign: <input type="password" name="password">
-            <br><input type="submit" name="ren" value="Submit">
-            </form></p>
-        ' , $::postme , $::form{p} , $::form{p} );
+            Title: <input type="text" name="newtitle" value="%s" size="80">'
+            , $::postme , $::form{p} , $::form{p} );
+        &print_signarea();
+        &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
     }
     &end_day();
     &print_footer;
@@ -964,9 +970,9 @@ sub object_exists{
 
 sub list_attachment{
     &cache_update();
-    map(  &fname2title(substr($_,2))
-        , grep(defined($_) && /^__/,
-               @{ $::dir_cache{&title2fname( shift ) } } ) );
+    map{ &fname2title(substr($_,2)) }
+        grep{ defined($_) && /^__/ }
+            @{ $::dir_cache{ &title2fname( shift ) } };
 }
 
 sub print_page{
