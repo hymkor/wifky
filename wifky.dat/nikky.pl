@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.18.0 ($Date: 2006/09/17 18:42:01 $)';
+my $version='0.18.1 ($Date: 2006/09/23 05:13:21 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -18,6 +18,8 @@ $main::inline_plugin{prevday}=\&prevday;
 $main::inline_plugin{nextday}=\&nextday;
 $main::inline_plugin{prevmonth}=\&prevmonth;
 $main::inline_plugin{nextmonth}=\&nextmonth;
+$main::inline_plugin{startday}=\&startday;
+$main::inline_plugin{endday}=\&endday;
 $main::inline_plugin{a_nikky} = sub {
     qq(<a href="$main::me?a=nikky">) .  join(' ',@_[1..$#_]) . '</a>';
 };
@@ -169,10 +171,10 @@ sub recentdiary{
     my ($session,$day)=@_;
     my @list=&main::ls_core({ r=>1 , number=>$day } , '(????.??.??)*' );
     if( $#list >= 0 ){
-        "<ul>\n" . join('' , map( sprintf('<li><a href="%s">%s</a></li>',
+        "<ul>\r\n" . join('' , map( sprintf('<li><a href="%s">%s</a></li>',
                                 &main::title2url($_->{title}) ,
                                 &main::enc($_->{title}) ) , @list ))
-        . "</ul>\n";
+        . "</ul>\r\n";
     }else{
         '';
     }
@@ -254,30 +256,21 @@ sub action_rss{
         $p->{attachment} = $attachment;
     }
 
-    printf <<FORMAT
-Content-Type: application/rss+xml; charset=%s
-Last-Modified: %s
-
-<?xml version="1.0" encoding="%s" ?>
-<rdf:RDF
-  xmlns="http://purl.org/rss/1.0/"
-  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-  xmlns:dc="http://purl.org/dc/elements/1.1/"
-  xml:lang="ja">
-<channel rdf:about="%s?a=rss">
-<title>%s</title>
-<link>%s</link>
-<description>%s</description>
-<items>
-<rdf:Seq>
-FORMAT
-    , $main::charset
-    , &stamp_format($last_modified)
-    , $main::charset
-    , $URL
-    , &main::enc($main::config{sitename})
-    , $URL
-    , &main::enc($main::config{nikky_rss_description}) ;
+    printf qq{Content-Type: application/rss+xml; charset=%s\r\n} , $main::charset ;
+    printf qq{Last-Modified: %s\r\n\r\n} , &stamp_format($last_modified);
+    printf qq{<?xml version="1.0" encoding="%s" ?>\r\n} , $main::charset ;
+    print  qq{<rdf:RDF\r\n};
+    print  qq{ xmlns="http://purl.org/rss/1.0/"\r\n};
+    print  qq{ xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"\r\n};
+    print  qq{ xmlns:dc="http://purl.org/dc/elements/1.1/"\r\n};
+    print  qq{ xml:lang="ja">\r\n};
+    printf qq{<channel rdf:about="%s?a=rss">\r\n} , $URL;
+    printf qq{<title>%s</title>\r\n} , &main::enc($main::config{sitename});
+    printf qq{<link>%s</link>\r\n} , $URL;
+    printf qq{<description>%s</description>\r\n}
+            , &main::enc($main::config{nikky_rss_description}) ;
+    printf qq{<items>\r\n};
+    printf qq{<rdf:Seq>\r\n};
 
     ### read title list ###
     my @topics;
@@ -304,7 +297,7 @@ FORMAT
                     $frag =~ /^!!!(.*)$/s )
                 {
                     if( scalar(@{$desc}) > 0 ){
-                        unshift(@topics ,
+                        push(@topics ,
                             $id == 0 ? +{
                                 page  => $p->{title} ,
                                 url   => sprintf('%s?p=%s',$URL,$pageurl),
@@ -331,7 +324,7 @@ FORMAT
                 push(@{$desc}, $frag );
             }
             if( scalar(@{$desc}) > 0 ){
-                unshift(@topics ,
+                push(@topics ,
                     $id == 0 ? +{
                         page  => $p->{title} ,
                         url   => sprintf('%s?p=%s',$URL,$pageurl),
@@ -351,7 +344,7 @@ FORMAT
             }
         }else{
             ### blog-mode ( 1 page to 1 rss-item) ###
-            unshift(@topics , +{
+            push(@topics , +{
                     page  => $p->{title} ,
                     url   => sprintf('%s?p=%s',$URL,$pageurl),
                     title => $p->{title} ,
@@ -366,33 +359,28 @@ FORMAT
     ### write list ###
     print map(qq(<rdf:li rdf:resource=").$_->{url}.qq("/>\n),@topics);
 
-    print "</rdf:Seq>\n";
-    print "</items>\n";
-    print "</channel>\n";
+    print "</rdf:Seq>\r\n";
+    print "</items>\r\n";
+    print "</channel>\r\n";
 
     ### write description ###
     foreach my $t (@topics){
         my @tm=gmtime($t->{timestamp});
-        printf <<FORMAT
-<item rdf:about="%s">
-<title>%s</title>
-<link>%s</link>
-<lastBuildDate>%s</lastBuildDate>
-<pubDate>%s</pubDate>
-<author>%s</author>
-<dc:creator>%s</dc:creator>
-<dc:date>%04d-%02d-%02dT%02d:%02d:%02d+00:00</dc:date>
-FORMAT
-            , $t->{url}
-            , &main::enc($t->{title})
-            , $t->{url}
-            , &stamp_format( $t->{timestamp} )
-            , &stamp_format( $t->{timestamp} )
-            , &main::enc($main::config{'nikky_author'})
-            , &main::enc($main::config{'nikky_author'})
+        printf qq{<item rdf:about="%s">\r\n}, $t->{url};
+        printf qq{<title>%s</title>\r\n} , &main::enc($t->{title});
+        printf qq{<link>%s</link>\r\n} , $t->{url};
+        printf qq{<lastBuildDate>%s</lastBuildDate>\r\n}
+            ,&stamp_format( $t->{timestamp} );
+        printf qq{<pubDate>%s</pubDate>\r\n}
+            , &stamp_format( $t->{timestamp} );
+        printf qq{<author>%s</author>\r\n}
+            , &main::enc($main::config{'nikky_author'});
+        printf qq{<dc:creator>%s</dc:creator>\r\n}
+            , &main::enc($main::config{'nikky_author'});
+        printf qq{<dc:date>%04d-%02d-%02dT%02d:%02d:%02d+00:00</dc:date>\r\n}
             , $tm[5]+1900,$tm[4]+1,@tm[3,2,1,0] ;
         for(my $s=$t->{title} ; $s =~ /\[([^\]]+)\]/ ; $s=$' ){
-            print "<category>$1</category>\n";
+            print "<category>$1</category>\r\n";
         }
         local $main::print='';
         print  '<description><![CDATA[';
@@ -401,9 +389,9 @@ FORMAT
             { title => $t->{title} , attachment => $t->{attachment} }
         );
         &main::flush;
-        print  "]]></description>\n</item>\n";
+        print  "]]></description>\r\n</item>\r\n";
     }
-    print "</rdf:RDF>\n";
+    print "</rdf:RDF>\r\n";
     exit(0);
 };
 
@@ -473,13 +461,13 @@ sub set_nextprev{
     $startday = &main::title2url( $day->{title} );
 
     ### Endday
-    my ($day) = &main::ls_core( { r=>1, number=>1 }, '(????.??.??)*' );
+    ($day) = &main::ls_core( { r=>1, number=>1 }, '(????.??.??)*' );
     $endday   = &main::title2url( $day->{title} );
 }
 
 sub date_anchor{
     my ($xxxxday,$date_url,$default_mark,$symbol)=@_;
-    my $symbol ||= &main::enc($main::config{"nikky_symbol${xxxxday}link"}||$default_mark);
+    $symbol ||= &main::enc($main::config{"nikky_symbol${xxxxday}link"}||$default_mark);
     !$symbol ? ''
     : $date_url 
     ? qq(<a href="${date_url}">${symbol}</a>) 
