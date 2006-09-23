@@ -2,7 +2,7 @@ package nikky;
 
 # use strict; use warnings;
 
-my $version='0.18.1 ($Date: 2006/09/23 05:13:21 $)';
+my $version='0.18.1 ($Date: 2006/09/23 15:53:21 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -43,7 +43,7 @@ if( &main::is('nikky_front') &&
     $main::form{a} = 'nikky';
 }
 
-$main::preferences{'Plugin: nikky.pl'}= [
+$main::preferences{"Plugin: nikky.pl $version"}= [
     { desc=>'Author'                   
     , name=>'nikky_author' , size=>20 },
     { desc=>'Print diary as FrontPage'    
