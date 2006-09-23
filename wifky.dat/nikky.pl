@@ -1,8 +1,8 @@
-package nikky;
+package wifky::nikky;
 
 # use strict; use warnings;
 
-my $version='0.18.1 ($Date: 2006/09/23 15:53:21 $)';
+my $version='0.18.1 ($Date: 2006/09/23 16:05:38 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -41,6 +41,10 @@ if( &main::is('nikky_front') &&
     !exists $main::form{a} && !exists $main::form{p} )
 {
     $main::form{a} = 'nikky';
+}
+
+if( $main::form{a} eq 'date' || $main::form{a} eq 'nikky' ){
+    @main::menubar = grep( $_ !~ /Edit/ , @main::menubar );
 }
 
 $main::preferences{"Plugin: nikky.pl $version"}= [
