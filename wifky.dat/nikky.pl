@@ -2,7 +2,7 @@ package wifky::nikky;
 
 # use strict; use warnings;
 
-my $version='0.18.1 ($Date: 2006/09/23 16:05:38 $)';
+my $version='0.18.1 ($Date: 2006/09/24 15:56:08 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -27,7 +27,7 @@ $main::inline_plugin{nikky_comment} = sub {
     $main::form{p} =~ /^\(\d\d\d\d\.\d\d.\d\d\)/ ? &main::plugin_comment(@_) : '';
 };
 $main::inline_plugin{nikky_referer} = sub {
-    $main::form{p} =~ /^\(\d\d\d\d\.\d\d.\d\d\)/ ? &nikky::referer(@_) : '';
+    $main::form{p} =~ /^\(\d\d\d\d\.\d\d.\d\d\)/ ? &wifky::nikky::referer(@_) : '';
 };
 
 $main::action_plugin{rss} = \&action_rss ;
