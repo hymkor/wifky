@@ -1,8 +1,8 @@
 package wifky::nikky;
 
-# use strict; use warnings;
+use strict; use warnings;
 
-my $version='0.18.1 ($Date: 2006/09/24 15:56:08 $)';
+my $version='0.19 ($Date: 2006/09/29 15:36:33 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -555,8 +555,20 @@ sub query_current_month{
 }
 
 sub calender{
-    my ($session,$mode) = @_;
+    my $session=shift;
     my ($y,$m,$today) = &query_current_month();
+    my $mode;
+    while( defined(my $argv = shift) ){
+        if( $argv =~ /^\d\d$/ ){
+            $m = $argv;
+            $today = 0; # never match number
+        }elsif( $argv =~ /^\d\d\d\d$/ ){
+            $y = $argv;
+            $today = 0; # never match number
+        }else{
+            $mode = $argv;
+        }
+    }
     my $wday = &query_wday($y,$m);
     my $max_mdays = &query_days_in_month($y,$m);
 
