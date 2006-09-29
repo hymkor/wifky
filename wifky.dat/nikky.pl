@@ -1,8 +1,8 @@
 package wifky::nikky;
 
-use strict; use warnings;
+# use strict; use warnings;
 
-my $version='0.19 ($Date: 2006/09/29 16:23:30 $)';
+my $version='0.19 ($Date: 2006/09/29 16:33:05 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
