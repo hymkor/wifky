@@ -2,7 +2,7 @@ package wifky::nikky;
 
 use strict; use warnings;
 
-my $version='0.19 ($Date: 2006/09/29 15:36:33 $)';
+my $version='0.19 ($Date: 2006/09/29 16:23:30 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -98,7 +98,7 @@ sub nikky_core{
     my @list=&main::ls_core( { r=>1 } , '(????.??.??)*' );
     my @tm=localtime(time+24*60*60);
     my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
-    @list = grep( $_->{title} lt $tomorrow , @list );
+    @list = grep( $_->{title} lt $tomorrow && -f $_->{fname} , @list );
     splice(@list,$days) if $#list > $days;
     splice(@list,10) if $#list > 10;
     &concat_article( @list );
@@ -236,6 +236,7 @@ sub action_rss{
 
     my $last_modified=0;
     foreach my $p (@pagelist){
+        next unless -f $p->{fname};
         my $tm=(stat($p->{fname}))[9];
         $last_modified < $tm and $last_modified = $tm;
         $p->{timestamp} = $tm;
