@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.5_0 ($Date: 2006/10/08 14:57:35 $)';
+$::version  = '1.1.5_0 ($Date: 2006/10/09 05:10:19 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -101,10 +101,10 @@ sub init_globals{
     );
 
     %::action_plugin = (
-        'index'         => sub{ &do_index('recent','rindex','-l');  },
-        'rindex'        => sub{ &do_index('recent','index' ,'-l','-r'); },
-        'older'         => sub{ &do_index('recent','index' ,'-l','-t'); },
-        'recent'        => sub{ &do_index('older' ,'index' ,'-l','-t','-r');},
+        'index'         => sub{ &do_index('recent','rindex','-a','-l');  },
+        'rindex'        => sub{ &do_index('recent','index' ,'-a','-l','-r'); },
+        'older'         => sub{ &do_index('recent','index' ,'-a','-l','-t'); },
+        'recent'        => sub{ &do_index('older' ,'index' ,'-a','-l','-t','-r');},
         '?'             => \&action_seek ,
         'edt'           => \&action_edit ,
         'pwd'           => \&action_passwd ,
@@ -1139,10 +1139,18 @@ sub ls_core{
         $pat =~ s/\?/../g;
         $pat =~ s/\*/.*/g;
         $pat = '^' . $pat . '$';
-        push(@list, map({ fname  => $_ ,
-                          title  => &fname2title($_) ,
-                          mtime  => &mtime($_)
-                        } , grep($_ =~ $pat, &list_page() ) ) );
+        push(@list, map{
+             +{ fname  => $_ ,
+               title  => &fname2title($_) ,
+               mtime  => &mtime($_)
+              }
+            }grep{
+                  exists $opt->{a} 
+                ? ($_ =~ $pat )
+                : ($_ =~ $pat && !/^e2/ && -f $_ )
+            }
+            &list_page()
+        );
     }
     if( exists $opt->{t} ){
         @list = sort{ $a->{mtime} cmp $b->{mtime} } @list;
