@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.4_0 ($Date: 2006/09/18 14:41:48 $)';
+$::version  = '1.1.5_0 ($Date: 2006/10/08 14:57:35 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -97,6 +97,7 @@ sub init_globals{
         'v'        => sub{ '&' . ($#_ >= 1 ? $_[1] : 'amp') . ';' },
         'bq'       => sub{ '&#96;' },
         'null'     => sub{ '' } ,
+        'outline'  => \&plugin_outline ,
     );
 
     %::action_plugin = (
@@ -210,7 +211,10 @@ sub init_globals{
         '900_seperator'  => \&block_separator ,
         '990_normal'     => \&block_normal ,
     );
-    @::footer_plugin = ( \&plugin_footnote_flush );
+    @::footer_plugin    = ( \&plugin_footnote_flush );
+    @::atodekaku_plugin = ( \&atodekaku_outline );
+
+    @::outline = ();
 }
 
 sub read_multimedia{
@@ -269,6 +273,7 @@ sub putenc{
 }
 
 sub flush{
+    grep( $_->( \$main::print ) , @::atodekaku_plugin );
     $::print =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
     print $::print;
 }
@@ -390,7 +395,7 @@ sub print_form{
     my $fname=&title2fname( $::form{p} );
     &puts('<input type="submit" name="a" value="Preview">');
     if( exists $::form{admin} || &is_frozen() ){
-        &print_signarea;
+        &print_signarea();
         &puts('<input type="checkbox" name="to_freeze" value="1"');
         &is_frozen() and &puts('checked');
         &puts(' >freeze <input type="hidden" name="admin" value="admin">');
@@ -981,6 +986,10 @@ sub print_page{
     my $html =( exists $args{html} ? $args{html} : &enc( &read_object($title)) );
     return 0 unless $html;
 
+    push(@main::outline,
+        { depth => -1 , text  => $title , title => $title , sharp => '' }
+    );
+
     my %attachment;
     foreach my $attach ( &list_attachment($title) ){
         my $e_attach = &enc( $attach );
@@ -1084,6 +1093,39 @@ sub plugin_footnote_flush{
     }
     &puts(qq(</div><!--footnote-->));
     delete $session->{footnotes};
+}
+
+sub plugin_outline{
+    "\x1B(outline)";
+}
+
+sub atodekaku_outline{
+    my ($print)=@_;
+    my $depth=-2;
+    my $ss='';
+    foreach my $p( @::outline ){
+        next if $p->{title} eq 'Header' || 
+                $p->{title} eq 'Footer' || 
+                $p->{title} eq 'Sidebar' ;
+
+        my $diff=$p->{depth} - $depth;
+        if( $diff > 0 ){
+            $ss .= '<ul><li>' x $diff ;
+        }else{
+            $diff < 0    and $ss .= "</li></ul>\n" x -$diff;
+            $depth >= 0  and $ss .= "</li>\n" ;
+            $ss .= '<li>';
+        }
+        $ss .= &anchor( 
+            $p->{text} ,
+            { p=>$p->{title} } ,
+            undef ,
+            $p->{sharp} );
+        $depth=$p->{depth};
+    }
+    $ss .= '</li></ul>' x ($depth-2);
+
+    $$print =~ s/\x1B\(outline\)/$ss/g;
 }
 
 sub ls_core{
@@ -1301,6 +1343,15 @@ sub midashi{
         my $tag = join('.',@{$section}[0...$depth]);
         my $h    = $depth+ 3 ;
         my $cls  = ('sub' x $depth).'section' ;
+
+        push( @main::outline ,
+                {
+                  depth => $depth ,
+                  text  => $text ,
+                  title => $session->{title} ,
+                  sharp => "#p$tag"
+                }
+        );
 
         $text =~ s/^\+/${tag}. /;
         $text = &anchor( '<span class="sanchor">' .
