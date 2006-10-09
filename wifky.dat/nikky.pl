@@ -2,7 +2,7 @@ package wifky::nikky;
 
 # use strict; use warnings;
 
-my $version='0.19 ($Date: 2006/09/29 16:33:05 $)';
+my $version='0.19 ($Date: 2006/10/09 13:34:04 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -388,10 +388,11 @@ sub action_rss{
             print "<category>$1</category>\r\n";
         }
         local $main::print='';
+        local $main::form{p}=$t->{page};
         print  '<description><![CDATA[';
         &main::syntax_engine(
             join("\n\n",@{$t->{desc}}) ,
-            { title => $t->{title} , attachment => $t->{attachment} }
+            { title => $t->{page} , attachment => $t->{attachment} }
         );
         &main::flush;
         print  "]]></description>\r\n</item>\r\n";
