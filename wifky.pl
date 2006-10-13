@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.5_0 ($Date: 2006/10/09 05:10:19 $)';
+$::version  = '1.1.5_0 ($Date: 2006/10/13 17:39:40 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -101,10 +101,10 @@ sub init_globals{
     );
 
     %::action_plugin = (
-        'index'         => sub{ &do_index('recent','rindex','-a','-l');  },
-        'rindex'        => sub{ &do_index('recent','index' ,'-a','-l','-r'); },
-        'older'         => sub{ &do_index('recent','index' ,'-a','-l','-t'); },
-        'recent'        => sub{ &do_index('older' ,'index' ,'-a','-l','-t','-r');},
+        'index'         => sub{ &do_index('recent','rindex','-i','-a','-l');  },
+        'rindex'        => sub{ &do_index('recent','index' ,'-i','-a','-l','-r'); },
+        'older'         => sub{ &do_index('recent','index' ,'-i','-a','-l','-t'); },
+        'recent'        => sub{ &do_index('older' ,'index' ,'-i','-a','-l','-t','-r');},
         '?'             => \&action_seek ,
         'edt'           => \&action_edit ,
         'pwd'           => \&action_passwd ,
@@ -1141,8 +1141,8 @@ sub ls_core{
         $pat = '^' . $pat . '$';
         push(@list, map{
              +{ fname  => $_ ,
-               title  => &fname2title($_) ,
-               mtime  => &mtime($_)
+                title  => &fname2title($_) ,
+                mtime  => &mtime($_)
               }
             }grep{
                   exists $opt->{a} 
@@ -1187,6 +1187,8 @@ sub ls{
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
         exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
+        exists $opt{i} and $buf .= '<tt>['.scalar(@{$::dir_cache{ $p->{fname} }}).'] </tt>';
+
         $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
         $buf .= "</li>\r\n";
     }
