@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.5_0 ($Date: 2006/10/13 17:39:40 $)';
+$::version  = '1.1.5_1 ($Date: 2006/10/13 18:39:22 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -1123,7 +1123,7 @@ sub atodekaku_outline{
             $p->{sharp} );
         $depth=$p->{depth};
     }
-    $ss .= '</li></ul>' x ($depth-2);
+    $ss .= '</li></ul>' x ($depth+2);
 
     $$print =~ s/\x1B\(outline\)/$ss/g;
 }
@@ -1187,7 +1187,7 @@ sub ls{
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
         exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
-        exists $opt{i} and $buf .= '<tt>['.scalar(@{$::dir_cache{ $p->{fname} }}).'] </tt>';
+        exists $opt{i} and $buf .= '<tt>'.scalar(@{$::dir_cache{ $p->{fname} }}).' </tt>';
 
         $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
         $buf .= "</li>\r\n";
