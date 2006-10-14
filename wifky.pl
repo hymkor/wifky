@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.5_1 ($Date: 2006/10/13 18:39:22 $)';
+$::version  = '1.1.5_2 ($Date: 2006/10/15 08:40:56 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -212,7 +212,7 @@ sub init_globals{
         '990_normal'     => \&block_normal ,
     );
     @::footer_plugin    = ( \&plugin_footnote_flush );
-    @::atodekaku_plugin = ( \&atodekaku_outline );
+    @::atodekaku_plugin = ( \&atodekaku_outline , \&unverb );
 
     @::outline = ();
 }
@@ -274,7 +274,6 @@ sub putenc{
 
 sub flush{
     grep( $_->( \$main::print ) , @::atodekaku_plugin );
-    $::print =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
     print $::print;
 }
 
@@ -618,15 +617,17 @@ sub action_commit{
         return;
     }
     eval{
-        &check_frozen;
-        &check_conflict;
+        &check_frozen();
+        &check_conflict();
     };
     if( $@ ){
+        rmdir $lock;
         &do_preview( &errmsg($@) );
     }else{
-        &do_submit;
+        eval{ &do_submit(); };
+        rmdir $lock;
+        $@ and die($@);
     }
-    rmdir $lock;
 }
 
 sub action_preview{
@@ -1022,6 +1023,16 @@ sub print_page{
 sub verb{
     "\a".unpack('h*',$_[0])."\a";
 }
+sub unverb{
+    ${$_[0]} =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
+}
+sub strip_tag{
+    my $text=shift;
+    &unverb( \$text );
+    $text =~ s/\r?\n/ /g;
+    $text =~ s/\<[^\>]*\>//g;
+    $text;
+}
 
 sub verbatim{
     my $html=shift;
@@ -1064,12 +1075,8 @@ sub plugin_footnote{
     my $footnotetext=$session->{argv};
     push(@{$session->{footnotes}}, $footnotetext );
 
-    $footnotetext =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
-    $footnotetext =~ s/\r?\n/ /g;
-    $footnotetext =~ s/\<[^\>]*\>//g;
-
     my $i=$#{$session->{footnotes}} + 1;
-    my %attr=( title=>$footnotetext );
+    my %attr=( title=>&strip_tag($footnotetext)  );
     $session->{index} and $attr{name}="fm${i}";
     '<sup>' . 
     &anchor("*${i}", { p=> $::form{p} } , \%attr , "#ft${i}" ) .
@@ -1357,7 +1364,7 @@ sub midashi{
         push( @main::outline ,
                 {
                   depth => $depth ,
-                  text  => $text ,
+                  text  => &strip_tag($text) ,
                   title => $session->{title} ,
                   sharp => "#p$tag"
                 }
