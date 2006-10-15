@@ -2,7 +2,7 @@ package wifky::nikky;
 
 # use strict; use warnings;
 
-my $version='0.19 ($Date: 2006/10/09 13:34:04 $)';
+my $version='0.19+ ($Date: 2006/10/15 10:25:39 $)';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -77,17 +77,22 @@ $main::preferences{"Plugin: nikky.pl $version"}= [
 
     { desc=>'Print month with English'     
     , name=>'nikky_calendertype' , type=>'checkbox' },
+
+    { desc=>"URL displayed instead of $main::me?a=rss" ,
+    , name=>'nikky_display_rssurl'    , size=>30 },
 ];
 
-
 ### RSS Feed ###
+
+my $rssurl = ($main::config{'nikky_display_rssurl'} || "$main::me?a=rss");
+
 push( @main::html_header ,
     qq(<link rel="alternate" type="application/rss+xml"
-        title="RSS" href="$main::me?a=rss">) );
+        title="RSS" href="$rssurl">) );
 
 unshift( @main::copyright ,
-    qq(Powered by nikky.pl ${version}
-    <a href="$main::me?a=rss" style="border-width:1px;border-color:white;border-style:solid;font-size:small;font-weight:bold;text-decoration:none;background-color:darkorange;color:white;font-style:normal">RSS</a><br>)
+    qq(<div>Powered by nikky.pl ${version}
+    <a href="$rssurl" class="rssurl">[RSS]</a></div>)
 );
 
 ### Next/Prev bar ###
