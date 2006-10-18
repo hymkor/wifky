@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.5_2 ($Date: 2006/10/15 08:40:56 $)';
+$::version  = '1.1.5_2 ($Date: 2006/10/18 17:29:42 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -323,16 +323,19 @@ sub deyen{
     $s ;
 }
 
+sub mtimeraw{
+    my ($fn)=@_; $::mtime_cache{$fn} || (-f $fn ? ( stat($fn) )[9] : 0);
+}
+
 sub mtime{
-    my $fn=shift;
-    unless( exists $::mtime_cache{$fn} ){
-        my @stat=stat($fn) 
-            or return ($::mtime_cache{$fn}='0000/00/00 00:00:00');
-        my @tm=localtime($stat[9]);
-        $::mtime_cache{ $fn } = sprintf('%04d/%02d/%02d %02d:%02d:%02d'
-            , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0]);
-    }
-    $::mtime_cache{$fn};
+    &ymdhms( &mtimeraw(@_) );
+}
+
+sub ymdhms{
+    my $tm=$_[0] or return '0000/00/00 00:00:00';
+    my @tm=localtime( $tm );
+    sprintf('%04d/%02d/%02d %02d:%02d:%02d'
+        , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0])
 }
 
 sub cacheoff{
@@ -398,6 +401,9 @@ sub print_form{
         &puts('<input type="checkbox" name="to_freeze" value="1"');
         &is_frozen() and &puts('checked');
         &puts(' >freeze <input type="hidden" name="admin" value="admin">');
+        if( &mtimeraw($fname) ){
+            &puts('<input type="checkbox" name="sage" value="1">sage');
+        }
     }
     &puts('<input type="submit" name="a" value="Commit">');
 
@@ -517,7 +523,7 @@ sub check_frozen{
     }
 }
 sub check_conflict{
-    my $stamp_time = &title2mtime($::form{p});
+    my $stamp_time = &mtimeraw(&title2fname($::form{p}));
     my $begin_time = $::form{stamp};
     if( $begin_time ne $stamp_time ){
         die( "!Someone else modified this page on ${stamp_time}".
@@ -550,7 +556,7 @@ sub write_file{
     if( length( ref($body) ? $$body : $body ) <= 0 &&
         scalar( grep(index($_,"${fname}__")==0 , &directory())) == 0 )
     {
-        unlink $fname;
+        unlink($fname) or rmdir($fname);
         &cacheoff;
         0;
     }else{
@@ -585,7 +591,10 @@ sub save_config{
     while( my ($key,$val)=each %::config ){
         $val and push( @settings , '#'.$key."\t".&yen($val) );
     }
+    my $lock=&title2fname('..LOCK..');
+    mkdir($lock,0777) or die("!Disk full or file writing conflict (lockfile=$lock)!");
     &write_file( 'index.cgi' , join("\n", @settings) );
+    rmdir($lock);
 }
 
 sub action_query_delete{
@@ -613,7 +622,7 @@ sub action_query_delete{
 sub action_commit{
     my $lock=&title2fname($::form{p},'LOCK');
     if( ! mkdir($lock,0777) ){
-        &do_preview( &errmsg("!File writing conflict (lockfile=$lock)!") );
+        &do_preview( &errmsg("!Disk full or file writing conflict (lockfile=$lock)!") );
         return;
     }
     eval{
@@ -858,7 +867,8 @@ sub do_submit{
 
     defined($::hook_submit) and $::hook_submit->(\$title , \$::form{honbun});
     if( &write_object( $title , \$::form{honbun} ) ){
-        ( $::form{to_freeze} eq '1' ) and chmod 0444,$fn;
+        $::form{to_freeze} and chmod 0444,$fn;
+        $::form{sage} and utime($::form{stamp},$::form{stamp},$fn);
         &transfer_page;
     }else{
         &transfer_url($::me);
@@ -898,7 +908,8 @@ sub action_edit{
     my $title = $::form{p};
     &print_header(divclass=>'max',title=>'Edit');
     &begin_day("Edit: $title");
-    &print_form( $title , &enc(&read_object( $title )), &title2mtime($title) );
+    my $fn=&title2fname($title);
+    &print_form( $title , &enc(&read_file($fn)), &mtimeraw($fn) );
 
     if( &object_exists($::form{p}) && exists $::form{admin} ){
         &putenc('<h2>Rename</h2>
@@ -1345,6 +1356,11 @@ sub preprocess{
     $text;
 }
 
+sub headline{
+    my ($body,$n,$id)=@_;
+    &puts("<h$n" . ($id ? qq( id="$id") : '') . ">$body</h$n>" );
+}
+
 sub midashi{
     my ($depth,$text,$session)=(@_);
     $text = &preprocess($text,$session);
@@ -1384,11 +1400,7 @@ sub midashi{
         }else{
             &puts(qq(<div class="x${cls}">));
         }
-        if( $session->{index} ){
-            &puts( qq(<h$h id="p$tag">$text</h$h>) );
-        }else{
-            &puts( qq(<h$h>$text</h$h>) );
-        }
+        &headline($text,$h,( $session->{index} ? "p$tag" : undef ) );
         if( $session->{main} ){
             &puts(qq(<div class="${cls}body x${cls}body">));
         }else{
