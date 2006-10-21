@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.5_2 ($Date: 2006/10/18 17:29:42 $)';
+$::version  = '1.1.5_2 ($Date: 2006/10/21 10:30:36 $)';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -1055,8 +1055,13 @@ sub verbatim{
 }
 
 sub inner_link{
-    my ($symbol,$title,$sharp) = ($_[0] , split(/(?=#[pf][0-9mt])/,$_[1]) );
-    $title = &denc($title);
+    my ($session,$symbol,$title,$sharp)
+        = ($_[0], $_[1] , split(/(?=#[pf][0-9mt])/,$_[2]) );
+    if( $title =~ /^#/ ){
+        ($title,$sharp)=($session->{title},$title);
+    }else{
+        $title = &denc($title);
+    }
 
     if( &object_exists($title) ){
         &anchor( $symbol , { p=>$title } , undef , $sharp);
@@ -1295,12 +1300,14 @@ sub cr2br{
 }
 
 sub preprocess_innerlink1{ ### >>{ ... } ###
-    ${$_[0]} =~ s|&gt;&gt;\{([^\}]+)\}|&inner_link($1,$1)|ge;
+    my ($text,$session)=@_;
+    $$text =~ s|&gt;&gt;\{([^\}]+)\}|&inner_link($session,$1,$1)|ge;
 }
 
 sub preprocess_innerlink2{ ### [[ ... | ... ] ###
+    my ($text,$session)=@_;
     ${$_[0]} =~ s!\[\[(?:([^\|\]]+)\|)?(.+?)\]\]!
-        &inner_link(defined($1)?$1:$2,$2)!ge;
+        &inner_link($session,defined($1)?$1:$2,$2)!ge;
 }
 
 sub preprocess_outerlink1{ ### http://...{ ... } style ###
