@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.6_0 ($Date: 2006/10/21 15:37:01 $)';
+$::version  = '1.1.6_1';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -162,6 +162,8 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
+            { desc=>'script-revision '.$::version.' $Date: 2006/11/28 02:16:40 $' ,
+              type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
               type=>'checkbox' },
@@ -518,8 +520,7 @@ sub check_frozen{
 }
 sub check_conflict{
     my $stamp_time = &mtimeraw(&title2fname($::form{p}));
-    my $begin_time = $::form{stamp};
-    if( $begin_time ne $stamp_time ){
+    if( $stamp_time > 0 && (my $begin_time = $::form{stamp}) ne $stamp_time ){
         die( "!Someone else modified this page on ${stamp_time}".
              " after you began to edit on ${begin_time}!"  );
     }
