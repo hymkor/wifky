@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2006/12/04 14:12:47 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2006/12/04 15:27:28 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -320,7 +320,7 @@ sub deyen{
 }
 
 sub mtimeraw{
-    my ($fn)=@_; $::mtime_cache{$fn} || (-f $fn ? ( stat($fn) )[9] : 0);
+    my ($fn)=@_; $::mtime_cache{$fn} ||= (-f $fn ? ( stat($fn) )[9] : 0);
 }
 
 sub mtime{
@@ -1163,6 +1163,7 @@ sub ls_core{
         push(@list, map{
              +{ fname  => $_ ,
                 title  => &fname2title($_) ,
+                mtimeraw => &mtimeraw($_) ,
                 mtime  => &mtime($_)
               }
             }grep{
