@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2006/11/28 02:16:40 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2006/12/04 14:12:47 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -1077,7 +1077,8 @@ sub plugin_menubar{
 sub plugin_search{
     sprintf( '<div class="search_form"><form class="search" action="%s">
         <input class="search" type="text" name="keyword" size="20" value="%s">
-        <input class="search" type="submit" name="a" value="?">
+        <input type="hidden" name="a" value="?">
+        <input class="search" type="submit" value="?">
         </form></div>' ,
         $::me ,
         &enc(exists $::form{keyword} ? $::form{keyword} : '' ));
