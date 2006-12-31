@@ -2,7 +2,7 @@ package wifky::nikky;
 
 # use strict; use warnings;
 
-my $version='0.19+ ($Date: 2006/10/15 10:25:39 $)';
+my $version='0.20';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%main::ss ? $main::ss{terminator} : 'terminator');
 my $ss_copyright =(%main::ss ? $main::ss{copyright}  : 'copyright footer');
@@ -37,45 +37,46 @@ $main::action_plugin{date} = \&action_date;
 
 exists $main::form{date} and $main::form{a}='date';
 
-if( &main::is('nikky_front') && 
+if( &main::is('nikky_front') &&
     !exists $main::form{a} && !exists $main::form{p} )
 {
     $main::form{a} = 'nikky';
 }
 
 if( $main::form{a} eq 'date' || $main::form{a} eq 'nikky' ){
-    @main::menubar = grep( $_ !~ /Edit/ , @main::menubar );
+    delete $main::menubar{'300_Edit'};
+    delete $main::menubar{'400_Edit(Admin)'};
 }
 
 $main::preferences{"Plugin: nikky.pl $version"}= [
-    { desc=>'Author'                   
+    { desc=>'Author'
     , name=>'nikky_author' , size=>20 },
-    { desc=>'Print diary as FrontPage'    
+    { desc=>'Print diary as FrontPage'
     , name=>'nikky_front' , type=>'checkbox'} ,
-    { desc=>'Days of top diary'            
+    { desc=>'Days of top diary'
     , name=>'nikky_days', size=>1 },
-    { desc=>'1-section to 1-rss-item'      
+    { desc=>'1-section to 1-rss-item'
     , name=>'nikky_rssitemsize' , type=>'checkbox' } ,
-    { desc=>'RSS description' 
+    { desc=>'RSS description'
     , name=>'nikky_rss_description' , size=>30 } ,
-    { desc=>'insert hh:mm into title'      
+    { desc=>'insert hh:mm into title'
     , name=>'nikky_insert_hhmm' , type=>'checkbox' } ,
 
-    { desc=>'Symbol of start day link'  
+    { desc=>'Symbol of start day link'
     , name=>'nikky_symbolstartdaylink' , size=>2 },
     { desc=>'Symbol of previous month link'
     , name=>'nikky_symbolprevmonthlink', size=>2 },
 
-    { desc=>'Symbol of previous day link'  
+    { desc=>'Symbol of previous day link'
     , name=>'nikky_symbolprevdaylink', size=>2 },
-    { desc=>'Symbol of next day link'      
+    { desc=>'Symbol of next day link'
     , name=>'nikky_symbolnextdaylink', size=>2 },
-    { desc=>'Symbol of next month link'    
+    { desc=>'Symbol of next month link'
     , name=>'nikky_symbolnextmonthlink', size=>2 },
-    { desc=>'Symbol of end day link'      
+    { desc=>'Symbol of end day link'
     , name=>'nikky_symbolenddaylink' , size=>2 } ,
 
-    { desc=>'Print month with English'     
+    { desc=>'Print month with English'
     , name=>'nikky_calendertype' , type=>'checkbox' },
 
     { desc=>"URL displayed instead of $main::me?a=rss" ,
@@ -361,7 +362,7 @@ sub action_rss{
                     timestamp => $p->{timestamp},
                     desc  => [ $text ] ,
                     attachment => $p->{attachment} ,
-                } 
+                }
             );
         }
     }
@@ -457,12 +458,20 @@ sub set_nextprev{
         $prevday = &main::title2url(&main::fname2title($prevday));
         push(@main::html_header,qq(<link rel="prev" href="${prevday}">));
     }
-    unshift(@main::menubar,&prevday);
+    if( defined(%main::menubar) ){
+        $main::menubar{'050_prevday'} = &prevday();
+    }else{
+        unshift(@main::menubar,&prevday);
+    }
     if( $nextday ){
         $nextday= &main::title2url(&main::fname2title($nextday));
         push(@main::html_header,qq(<link rel="next" href="${nextday}">));
     }
-    push(@main::menubar,&nextday);
+    if( defined(%main::menubar) ){
+        $main::menubar{'950_nextday'} = &nextday();
+    }else{
+        push(@main::menubar,&nextday);
+    }
 
     $prevmonth &&= &main::title2url(&main::fname2title($prevmonth));
     $nextmonth &&= &main::title2url(&main::fname2title($nextmonth));
@@ -480,8 +489,8 @@ sub date_anchor{
     my ($xxxxday,$date_url,$default_mark,$symbol)=@_;
     $symbol ||= &main::enc($main::config{"nikky_symbol${xxxxday}link"}||$default_mark);
     !$symbol ? ''
-    : $date_url 
-    ? qq(<a href="${date_url}">${symbol}</a>) 
+    : $date_url
+    ? qq(<a href="${date_url}">${symbol}</a>)
     : qq(<span class="no${xxxxday}">$symbol</span>) ;
 }
 
@@ -550,7 +559,7 @@ sub query_current_month{
     if( defined($main::form{p}) &&
         $main::form{p} =~ /^\((\d\d\d\d)\.(\d\d)\.(\d\d)\)/ ){
         @r=($1,$2,$3);
-    }elsif( defined($main::form{date}) && 
+    }elsif( defined($main::form{date}) &&
         $main::form{date} =~ /^(\d\d\d\d)(\d\d)(\d\d)$/ ){
         @r=($1,$2,$3);
     }else{
@@ -579,7 +588,7 @@ sub calender{
     my $wday = &query_wday($y,$m);
     my $max_mdays = &query_days_in_month($y,$m);
 
-    my %thismonth = map{ 
+    my %thismonth = map{
         my $d=substr($_->{title},9,2); $d =~ s/^0//; ($d,$_);
     } &main::ls_core( {} , sprintf('(%04d.%02d.??)*',$y,$m));
 
@@ -598,7 +607,7 @@ sub calender{
             '<div class="calender_flat"><span class="calender_header">%s%s %s/</span>'
             , &startday()
             , $main::inline_plugin{prevmonth}->($session)
-            , $title 
+            , $title
         );
         foreach my $d (1..$max_mdays){
             &put_1day('span',$y,$m,$d,$wday,$today,\%thismonth,\$buffer);
