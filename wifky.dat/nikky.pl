@@ -2,7 +2,7 @@ package wifky::nikky;
 
 # use strict; use warnings;
 
-my $version='0.20';
+my $version='0.21';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
 my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
@@ -48,7 +48,7 @@ if( $::form{a} eq 'date' || $::form{a} eq 'nikky' ){
     delete $::menubar{'400_Edit(Admin)'};
 }
 
-$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2006/12/31 12:53:43 $'}= [
+$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/01/27 13:06:09 $'}= [
     { desc=>'Author'
     , name=>'nikky_author' , size=>20 },
     { desc=>'Print diary as FrontPage'
@@ -59,8 +59,6 @@ $::preferences{'Plugin: nikky.pl '.$version.' $Date: 2006/12/31 12:53:43 $'}= [
     , name=>'nikky_rssitemsize' , type=>'checkbox' } ,
     { desc=>'RSS description'
     , name=>'nikky_rss_description' , size=>30 } ,
-    { desc=>'insert hh:mm into title'
-    , name=>'nikky_insert_hhmm' , type=>'checkbox' } ,
 
     { desc=>'Symbol of start day link'
     , name=>'nikky_symbolstartdaylink' , size=>2 },
@@ -225,20 +223,9 @@ sub referer{
 };
 
 sub action_rss{
-    my $URL=$::me='http://'.$ENV{'HTTP_HOST'}.$ENV{'SCRIPT_NAME'};
-    my $articles=5;
+    $::me='http://'.$ENV{'HTTP_HOST'}.$ENV{'SCRIPT_NAME'};
     $::inline_plugin{comment} = sub { '' };
-
-    %::enclist = (
-        'lp' => '&#40;' ,
-        'rp' => '&#41;' ,
-        'lb' => '&#91;' ,
-        'rb' => '&#93;' ,
-        'll' => '&#40;&#40;' ,
-        'rr' => '&#41;&#41;' ,
-        'vl' => '&#124;' ,
-    );
-    my @pagelist = &::ls_core( { r=>1 , number=>$articles } , '(????.??.??)*' );
+    my @pagelist = &::ls_core( { r=>1 , number=>3 } , '(????.??.??)*' );
 
     my $last_modified=0;
     foreach my $p (@pagelist){
@@ -275,11 +262,10 @@ sub action_rss{
     print  qq{ xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"\r\n};
     print  qq{ xmlns:dc="http://purl.org/dc/elements/1.1/"\r\n};
     print  qq{ xml:lang="ja">\r\n};
-    printf qq{<channel rdf:about="%s?a=rss">\r\n} , $URL;
-    printf qq{<title>%s</title>\r\n} , &::enc($::config{sitename});
-    printf qq{<link>%s</link>\r\n} , $URL;
-    printf qq{<description>%s</description>\r\n}
-            , &::enc($::config{nikky_rss_description}) ;
+    printf qq{<channel rdf:about="%s?a=rss">\r\n} , $::me;
+    &printag( title       => $::config{sitename} ,
+              link        => $::me,
+              description => $::config{nikky_rss_description} );
     printf qq{<items>\r\n};
     printf qq{<rdf:Seq>\r\n};
 
@@ -287,18 +273,22 @@ sub action_rss{
     my @topics;
     foreach my $p (@pagelist){
         my $text = &::enc( &::read_object($p->{title}) );
-
         $text =~ s!^\s*\&lt;pre&gt;(.*?\n)\s*\&lt;/pre&gt;|^\s*8\&lt;(.*?\n)\s*\&gt;8|`(.)`(.*?)`\3`!
                       defined($4)
                     ? &::verb('<tt class="pre">'.&::cr2br($4).'</tt>')
                     : "\n\n<pre>".&::verb($1||$2)."</pre>\n\n"
                 !gesm;
-        local $/="\n\n";
 
-        my $title=undef;
         my $pageurl = &::percent($p->{title});
         my $id=0;
-        my $desc=[];
+        my %item = (
+            page  => $p->{title} ,
+            url   => sprintf('%s?p=%s',$::me,$pageurl),
+            title => $p->{title} ,
+            timestamp => $p->{timestamp},
+            desc  => [] ,
+            attachment => $p->{attachment} ,
+        );
 
         if( &::is('nikky_rssitemsize') ){
             ### 1 section to 1 rssitem ###
@@ -307,63 +297,21 @@ sub action_rss{
                 if( $frag =~ /^\s*&lt;&lt;(?!&lt;)(.*)&gt;&gt;\s*$/s ||
                     $frag =~ /^!!!(.*)$/s )
                 {
-                    if( scalar(@{$desc}) > 0 ){
-                        push(@topics ,
-                            $id == 0 ? +{
-                                page  => $p->{title} ,
-                                url   => sprintf('%s?p=%s',$URL,$pageurl),
-                                title => $p->{title} ,
-                                timestamp => $p->{timestamp},
-                                desc  => $desc ,
-                                attachment => $p->{attachment} ,
-                            } : +{
-                                page  => $p->{title} ,
-                                url   => sprintf('%s?p=%s#p%d',$URL,$pageurl,$id),
-                                title => $title ,
-                                timestamp => $p->{timestamp},
-                                desc  => $desc ,
-                                attachment => $p->{attachment} ,
-                            }
-                        );
-                    }
-                    ++$id;
-                    $title = &::preprocess($1,{ attachment=>{} } );
-                    $title =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
-                    $title =~ s/\<[^\>]*\>\s*//g;
-                    $desc = [];
+                    push(@topics , { %item } ) if @{$item{desc}};
+
+                    $item{url} = sprintf('%s?p=%s#p%d',$::me,$pageurl,++$id) ;
+                    $item{desc} = [];
+                    $item{title} = &::preprocess($1,{ attachment=>{} } );
+                    $item{title} =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
+                    $item{title} =~ s/\<[^\>]*\>\s*//g;
                 }
-                push(@{$desc}, $frag );
+                push(@{$item{desc}}, $frag );
             }
-            if( scalar(@{$desc}) > 0 ){
-                push(@topics ,
-                    $id == 0 ? +{
-                        page  => $p->{title} ,
-                        url   => sprintf('%s?p=%s',$URL,$pageurl),
-                        title => $p->{title} ,
-                        timestamp => $p->{timestamp},
-                        desc  => $desc ,
-                        attachment => $p->{attachment} ,
-                    } : +{
-                        page  => $p->{title} ,
-                        url   => sprintf('%s?p=%s#p%d',$URL,$pageurl,$id),
-                        title => $title ,
-                        timestamp => $p->{timestamp},
-                        desc  => $desc ,
-                        attachment => $p->{attachment} ,
-                    }
-                );
-            }
+            push(@topics , { %item } ) if @{$item{desc}};
         }else{
             ### blog-mode ( 1 page to 1 rss-item) ###
-            push(@topics , +{
-                    page  => $p->{title} ,
-                    url   => sprintf('%s?p=%s',$URL,$pageurl),
-                    title => $p->{title} ,
-                    timestamp => $p->{timestamp},
-                    desc  => [ $text ] ,
-                    attachment => $p->{attachment} ,
-                }
-            );
+            $item{desc} = [ $text ] ;
+            push(@topics , { %item } );
         }
     }
 
@@ -378,19 +326,15 @@ sub action_rss{
     foreach my $t (@topics){
         my @tm=gmtime($t->{timestamp});
         printf qq{<item rdf:about="%s">\r\n}, $t->{url};
-        printf qq{<title>%s</title>\r\n} , &::enc($t->{title});
-        printf qq{<link>%s</link>\r\n} , $t->{url};
-        printf qq{<lastBuildDate>%s</lastBuildDate>\r\n}
-            ,&stamp_format( $t->{timestamp} );
-        printf qq{<pubDate>%s</pubDate>\r\n}
-            , &stamp_format( $t->{timestamp} );
-        printf qq{<author>%s</author>\r\n}
-            , &::enc($::config{'nikky_author'});
-        printf qq{<dc:creator>%s</dc:creator>\r\n}
-            , &::enc($::config{'nikky_author'});
-        printf qq{<dc:date>%04d-%02d-%02dT%02d:%02d:%02d+00:00</dc:date>\r\n}
-            , $tm[5]+1900,$tm[4]+1,@tm[3,2,1,0] ;
-        for(my $s=$t->{title} ; $s =~ /\[([^\]]+)\]/ ; $s=$' ){
+        &printag( title         => $t->{title} ,
+                  link          => $t->{url} ,
+                  lastBuildDate => &stamp_format( $t->{timestamp} ),
+                  pubDate       => &stamp_format( $t->{timestamp} ) ,
+                  author        => $::config{'nikky_author'} ,
+                  'dc:creator'  => $::config{'nikky_author'} ,
+                  'dc:date'     => sprintf('%04d-%02d-%02dT%02d:%02d:%02d+00:00' ,
+                                , $tm[5]+1900,$tm[4]+1,@tm[3,2,1,0] ) );
+        while( $t->{title} =~ /\[([^\]]+)\]/g ){
             print "<category>$1</category>\r\n";
         }
         local $::print='';
@@ -406,6 +350,12 @@ sub action_rss{
     print "</rdf:RDF>\r\n";
     exit(0);
 };
+sub printag{
+    my %tags=(@_);
+    while( my ($tag,$val)=each %tags){
+        printf "<%s>%s</%s>\r\n",$tag,&::enc($val),$tag;
+    }
+}
 
 sub quote1{
     my ($session,$a,$f)=@_;
@@ -506,9 +456,6 @@ sub action_newdiary{
     &::print_header( divclass=>'max' );
     my $default_title=sprintf('(%04d.%02d.%02d)' ,
          $tm[5]+1900,$tm[4]+1,$tm[3] );
-    if( &::is('nikky_insert_hhmm') ){
-        $default_title .= sprintf(' %02d:%02d',$tm[2],$tm[1]);
-    }
 
     &::putenc('<form action="%s" method="post"
         ><h1>Create Page</h1><p
