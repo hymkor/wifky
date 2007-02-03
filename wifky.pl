@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/02/03 21:05:08 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/02/04 07:02:00 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -248,7 +248,7 @@ sub read_form{
     if( exists $ENV{REQUEST_METHOD} && $ENV{REQUEST_METHOD} eq 'POST' ){
         $ENV{CONTENT_LENGTH} > 1024*1024 and die('Too large form data');
         read(STDIN, $query_string, $ENV{CONTENT_LENGTH});
-        if( $query_string =~ /\A(-------.*?)\r?\n/ ){
+        if( $query_string =~ /\A(--.*?)\r?\n/ ){
             &read_multimedia($query_string,$1,$form);
             return;
         }
