@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.6_1';
+$::version  = '1.1.7_0';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2006/12/04 15:27:28 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/02/03 21:05:08 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -182,7 +182,6 @@ sub init_globals{
             { desc=>'Subsubsection mark' , name=>'subsubsectionmark' , size=>3 }
         ]
     );
-
     %::inline_syntax_plugin = (
         '100_innerlink1' => \&preprocess_innerlink1 ,
         '200_innerlink2' => \&preprocess_innerlink2 ,
@@ -194,7 +193,6 @@ sub init_globals{
         '800_plugin'     => \&preprocess_plugin ,
         '900_rawurl'     => \&preprocess_rawurl ,
     );
-
     %::block_syntax_plugin = (
         '100_list'       => \&block_listing   ,
         '200_definition' => \&block_definition ,
@@ -207,8 +205,16 @@ sub init_globals{
         '900_seperator'  => \&block_separator ,
         '990_normal'     => \&block_normal ,
     );
-    @::footer_plugin    = ( \&plugin_footnote_flush );
-    @::atodekaku_plugin = ( \&atodekaku_outline , \&unverb );
+    %::call_syntax_plugin = (
+        '100_verbatim'       => \&call_verbatim ,
+        '500_block_syntax'   => \&call_block ,
+        '800_close_sections' => \&call_close_sections ,
+        '900_footer'         => \&call_footnote ,
+    );
+    %::final_plugin = (
+        '500_outline'  => \&final_outline ,
+        '900_verbatim' => \&unverb ,
+    );
 
     @::outline = ();
 }
@@ -269,7 +275,7 @@ sub putenc{
 }
 
 sub flush{
-    grep( $_->( \$main::print ) , @::atodekaku_plugin );
+    grep( $::final_plugin{$_}->( \$::print ) , sort keys %::final_plugin );
     print $::print;
 }
 
@@ -464,8 +470,7 @@ sub print_header{
         }
     }
     &puts('--></style></head>');
-    &puts( exists $::form{p} && &is_frozen($::form{p})
-                ? '<body class="frozen">' : '<body>' );
+    &puts( &is_frozen() ? '<body class="frozen">' : '<body>' );
     &puts( @::body_header );
     &putenc('<div class="%s">' , $divclass );
 
@@ -492,7 +497,10 @@ sub print_copyright{
 }
 
 sub is_frozen{
-    if( -r &title2fname(exists $::form{p} ? $::form{p} : $::config{FrontPage})){
+    if( -r &title2fname(  $#_>=0            ? $_[0]
+                        : exists $::form{p} ? $::form{p} 
+                        : $::config{FrontPage}))
+    {
         ! -w _;
     }else{
         &is('lonely');
@@ -1040,13 +1048,13 @@ sub strip_tag{
     $text;
 }
 
-sub verbatim{
-    my $html=shift;
-    $$html =~ s!^\s*\&lt;pre&gt;(.*?\n)\s*\&lt;/pre&gt;|^\s*8\&lt;(.*?\n)\s*\&gt;8|`(.)`(.*?)`\3`!
-                  defined($4)
-                ? &verb('<tt class="pre">'.&cr2br($4).'</tt>')
-                : "\n\n<pre>".&verb(defined($1) ? $1 : $2)."</pre>\n\n"
-            !gesm;
+sub call_verbatim{
+    ${$_[0]} =~
+    s!^\s*\&lt;pre&gt;(.*?\n)\s*\&lt;/pre&gt;|^\s*8\&lt;(.*?\n)\s*\&gt;8|`(.)`(.*?)`\3`!
+    defined($4)
+    ? &verb('<tt class="pre">'.&cr2br($4).'</tt>')
+    : "\n\n<pre>".&verb(defined($1) ? $1 : $2)."</pre>\n\n"
+    !gesm;
 }
 
 sub inner_link{
@@ -1097,8 +1105,8 @@ sub plugin_footnote{
     '</sup>' ;
 }
 
-sub plugin_footnote_flush{
-    my $session = shift;
+sub call_footnote{
+    my (undef,$session) = shift;
     my $footnotes = $session->{footnotes};
     return unless $footnotes;
 
@@ -1120,7 +1128,7 @@ sub plugin_outline{
     "\x1B(outline)";
 }
 
-sub atodekaku_outline{
+sub final_outline{
     my ($print)=@_;
     my $depth=-2;
     my $ss='';
@@ -1416,20 +1424,23 @@ sub midashi{
 }
 
 sub syntax_engine{
-    my ($html,$session) = @_;
-    &default_syntax_engine( ref($html) ? $html : \$html , $session );
-    foreach my $proc (@main::footer_plugin){ $proc->( $session ); }
+    my ($ref2html,$session) = ( ref($_[0]) ? $_[0] : \$_[0] , $_[1] );
+    foreach my $p ( sort keys %::call_syntax_plugin ){
+        $::call_syntax_plugin{$p}->( $ref2html , $session );
+    }
 }
 
-sub default_syntax_engine{
-    my ($ref2html,$session) = @_;
-    &verbatim( $ref2html );
-
+sub call_block{
+    my ($ref2html,$session)=@_;
     foreach my $fragment( split(/\r?\n\r?\n/,$$ref2html) ){
         foreach my $p (sort keys %::block_syntax_plugin){
             $::block_syntax_plugin{$p}->($fragment,$session) and last;
         }
     }
+}
+
+sub call_close_sections{
+    my ($ref2html,$session)=@_;
     exists $session->{section} and
         grep( $_ && &puts('</div></div>'),@{$session->{section}} );
 }
