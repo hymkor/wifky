@@ -48,7 +48,7 @@ if( $::form{a} eq 'date' || $::form{a} eq 'nikky' ){
     delete $::menubar{'400_Edit(Admin)'};
 }
 
-$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/01/27 13:06:09 $'}= [
+$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/02/10 21:01:48 $'}= [
     { desc=>'Author'
     , name=>'nikky_author' , size=>20 },
     { desc=>'Print diary as FrontPage'
@@ -77,7 +77,7 @@ $::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/01/27 13:06:09 $'}= [
     { desc=>'Print month with English'
     , name=>'nikky_calendertype' , type=>'checkbox' },
 
-    { desc=>"URL displayed instead of $::me?a=rss" ,
+    { desc=>'Displayed RSS Feed URL' ,
     , name=>'nikky_display_rssurl'    , size=>30 },
 ];
 
@@ -213,7 +213,7 @@ sub referer{
             $::referer_written = 1;
         }
     }
-    if( $#lines >= 0 ){
+    if( @lines ){
         '<div class="referer"><ul class="referer">' .
         join("\r\n",reverse sort map('<li>'.&::enc($_).'</li>',@lines) ) .
         '</ul></div>';
@@ -260,11 +260,12 @@ sub action_rss{
     print  qq{<rdf:RDF\r\n};
     print  qq{ xmlns="http://purl.org/rss/1.0/"\r\n};
     print  qq{ xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"\r\n};
+    print  qq{ xmlns:content="http://purl.org/rss/1.0/modules/content/"\r\n};
     print  qq{ xmlns:dc="http://purl.org/dc/elements/1.1/"\r\n};
     print  qq{ xml:lang="ja">\r\n};
     printf qq{<channel rdf:about="%s?a=rss">\r\n} , $::me;
     &printag( title       => $::config{sitename} ,
-              link        => $::me,
+              link        => $::me ,
               description => $::config{nikky_rss_description} );
     printf qq{<items>\r\n};
     printf qq{<rdf:Seq>\r\n};
@@ -330,22 +331,24 @@ sub action_rss{
                   link          => $t->{url} ,
                   lastBuildDate => &stamp_format( $t->{timestamp} ),
                   pubDate       => &stamp_format( $t->{timestamp} ) ,
-                  author        => $::config{'nikky_author'} ,
-                  'dc:creator'  => $::config{'nikky_author'} ,
+                  author        => $::config{nikky_author} ,
+                  'dc:creator'  => $::config{nikky_author} ,
                   'dc:date'     => sprintf('%04d-%02d-%02dT%02d:%02d:%02d+00:00' ,
                                 , $tm[5]+1900,$tm[4]+1,@tm[3,2,1,0] ) );
         while( $t->{title} =~ /\[([^\]]+)\]/g ){
             print "<category>$1</category>\r\n";
         }
-        local $::print='';
         local $::form{p}=$t->{page};
-        print  '<description><![CDATA[';
+        local $::print='';
         &::syntax_engine(
             join("\n\n",@{$t->{desc}}) ,
             { title => $t->{page} , attachment => $t->{attachment} }
         );
+        print  '<description><![CDATA[';
         &::flush;
-        print  "]]></description>\r\n</item>\r\n";
+        print  "]]></description>\r\n<content:encoded><![CDATA[";
+        &::flush;
+        print  "]]></content:encoded>\r\n</item>\r\n";
     }
     print "</rdf:RDF>\r\n";
     exit(0);
@@ -354,28 +357,6 @@ sub printag{
     my %tags=(@_);
     while( my ($tag,$val)=each %tags){
         printf "<%s>%s</%s>\r\n",$tag,&::enc($val),$tag;
-    }
-}
-
-sub quote1{
-    my ($session,$a,$f)=@_;
-    my @params;
-    while( $#{$a} >= 0 && (my $t=shift(@{$a})) ne ')' ){
-        push(@params, $t eq '(' ?  &quote1($session,$a) : $t);
-    }
-    my $name=shift(@params);
-    $f || ( exists $::inline_plugin{$name}
-            ? &{$::inline_plugin{$name}}($session,@params)
-            : 'Plugin Not Found!' );
-}
-
-sub quote{
-    my ($session,$a,$f)=@_;
-    my $t=shift(@{$a});
-    if( $t && $t eq '(' ){
-        quote1($session,$a,$f)
-    }else{
-        $f || $t;
     }
 }
 
