@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
@@ -160,7 +160,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/02/11 01:29:53 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/02/17 04:20:00 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -516,7 +516,7 @@ sub print_copyright{
 
 sub is_frozen{
     if( -r &title2fname(  $#_>=0            ? $_[0]
-                        : exists $::form{p} ? $::form{p} 
+                        : exists $::form{p} ? $::form{p}
                         : $::config{FrontPage}))
     {
         ! -w _;
@@ -836,9 +836,7 @@ sub action_comment{
     my $comment = $::form{comment};
 
     if( length($comment) > 0 ){
-        utime( time , time , &title2fname($title) ) <= 0
-            and die("unable to comment to unexistant page.");
-        &cacheoff;
+        -r &title2fname($title) or die("unable to comment to unexistant page.");
         my $fname  = &title2fname($title,"comment.${comid}");
         open(FP,">>${fname}") or die("Can not open $fname for append");
             my @tm=localtime;
@@ -1175,6 +1173,20 @@ sub final_outline{
     $$print =~ s/\x1B\(outline\)/$ss/g;
 }
 
+sub contents_stamp{
+    my $fname=shift;
+    my $maxstamp=&mtimeraw($fname);
+    foreach my $attach( @{ $::dir_cache{ $fname } } ){
+        if( defined($attach) &&
+            $attach =~ /^__/ &&
+            &mtimeraw($fname.$attach) > $maxstamp )
+        {
+            $maxstamp = &mtimeraw($fname.$attach);
+        }
+    }
+    $maxstamp;
+}
+
 sub ls_core{
     my $opt = shift;
     my @list;
@@ -1186,11 +1198,13 @@ sub ls_core{
         $pat =~ s/\?/../g;
         $pat =~ s/\*/.*/g;
         $pat = '^' . $pat . '$';
+
         push(@list, map{
-             +{ fname  => $_ ,
-                title  => &fname2title($_) ,
+             +{ fname    => $_ ,
+                title    => &fname2title($_) ,
                 mtimeraw => &mtimeraw($_) ,
-                mtime  => &mtime($_)
+                mtime    => &mtime($_) ,
+                maxstamp => &contents_stamp($_)
               }
             }grep{
                   exists $opt->{a}
@@ -1201,7 +1215,7 @@ sub ls_core{
         );
     }
     if( exists $opt->{t} ){
-        @list = sort{ $a->{mtime} cmp $b->{mtime} } @list;
+        @list = sort{ $a->{maxstamp} cmp $b->{maxstamp} } @list;
     }else{
         @list = sort{ $a->{title} cmp $b->{title} } @list;
     }
@@ -1234,7 +1248,7 @@ sub ls{
 
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
-        exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
+        exists $opt{l} and $buf .= '<tt>'.&ymdhms($p->{maxstamp}).' </tt>';
         exists $opt{i} and $buf .= '<tt>'.scalar(@{$::dir_cache{ $p->{fname} }}).' </tt>';
 
         $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
