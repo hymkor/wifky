@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
@@ -160,7 +160,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/02/17 10:54:49 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/02/17 11:13:08 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -449,7 +449,7 @@ sub print_form{
           enctype="multipart/form-data" method="post"
           accept-charset="%s" ><input type="hidden" name="stamp" value="%s"
         ><input type="hidden" name="p" value="%s"><br>'
-        , $::postme , $::charset , $stamp , $title );
+        , $::postme , $::charset , &yen(&read_object($::form{p})) , $title );
     grep( $::form_list{$_}->($html), sort keys %::form_list );
     &puts('</form></div>');
 }
@@ -545,10 +545,10 @@ sub check_frozen{
     }
 }
 sub check_conflict{
-    my $stamp_time = &mtimeraw(&title2fname($::form{p}));
-    if( $stamp_time > 0 && (my $begin_time = $::form{stamp}) ne $stamp_time ){
-        die( "!Someone else modified this page on ${stamp_time}".
-             " after you began to edit on ${begin_time}!"  );
+    my $current_source = &read_object($::form{p});
+    my $before_source  = &deyen($::form{stamp});
+    if( $current_source ne $before_source ){
+        die( "!Someone else modified this page after you began to edit."  );
     }
 }
 
