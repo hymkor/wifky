@@ -160,7 +160,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/02/17 11:13:08 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/02/17 15:48:15 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -393,7 +393,8 @@ sub attach2url{ &myurl( { p=>$_[0] , f=>$_[1]} );}
 sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
 
 sub form_textarea{
-    &puts('<textarea cols="80" rows="20" name="honbun">'.$_[0].'</textarea><br>');
+    &putenc('<textarea cols="80" rows="20" name="honbun">%s</textarea><br>'
+            , ${$_[0]} );
 }
 sub form_preview_button{
     &puts('<input type="submit" name="a" value="Preview">');
@@ -443,14 +444,14 @@ sub form_attachment{
 }
 
 sub print_form{
-    my ($title,$html,$stamp) = @_;
+    my ($title,$newsrc,$orgsrc) = @_;
 
     &putenc('<div class="update"><form name="editform" action="%s"
           enctype="multipart/form-data" method="post"
-          accept-charset="%s" ><input type="hidden" name="stamp" value="%s"
+          accept-charset="%s" ><input type="hidden" name="orgsrc" value="%s"
         ><input type="hidden" name="p" value="%s"><br>'
-        , $::postme , $::charset , &yen(&read_object($::form{p})) , $title );
-    grep( $::form_list{$_}->($html), sort keys %::form_list );
+        , $::postme , $::charset , &yen($$orgsrc) , $title );
+    grep( $::form_list{$_}->($newsrc), sort keys %::form_list );
     &puts('</form></div>');
 }
 
@@ -546,7 +547,7 @@ sub check_frozen{
 }
 sub check_conflict{
     my $current_source = &read_object($::form{p});
-    my $before_source  = &deyen($::form{stamp});
+    my $before_source  = &deyen($::form{orgsrc});
     if( $current_source ne $before_source ){
         die( "!Someone else modified this page after you began to edit."  );
     }
@@ -626,17 +627,14 @@ sub action_query_delete{
             , $::form{f} , $::form{p} );
     &is_frozen() and &print_signarea();
     &putenc('<div>Are you sure ? </div>
-        <input type="submit" name="yes" value="Yes">
-        <input type="submit" name="no" value="No">
-        <input type="hidden" name="a" value="del">
-        <input type="hidden" name="p" value="%s">
-        <input type="hidden" name="f" value="%s">
-        <input type="hidden" name="stamp" value="%s">
-        <input type="hidden" name="encrlf" value="YES">'
-            , $::form{p} , $::form{f} , $::form{stamp} );
-    &putenc( '<input type="hidden" name="honbun" value="%s"></p></form>',
-                &yen($::form{honbun}) );
-
+        <input type="submit" name="yes"    value="Yes">
+        <input type="submit" name="no"     value="No">
+        <input type="hidden" name="a"      value="del">
+        <input type="hidden" name="p"      value="%s">
+        <input type="hidden" name="f"      value="%s">
+        <input type="hidden" name="orgsrc" value="%s">
+        <input type="hidden" name="yensrc" value="%s"></p></form>',
+            , $::form{p} , $::form{f} , $::form{orgsrc} , &yen($::form{honbun}) );
     &print_footer;
 }
 
@@ -883,14 +881,15 @@ sub action_upload{
 sub do_submit{
     my $title=$::form{p};
     my $fn=&title2fname($title);
+    my $sagetime=&mtimeraw($fn);
 
     &is_frozen() and chmod(0644,$fn);
 
     defined($::hook_submit) and $::hook_submit->(\$title , \$::form{honbun});
-    if( &write_object( $title , \$::form{honbun} ) ){
-        $::form{to_freeze} and chmod 0444,$fn;
-        $::form{sage} and utime($::form{stamp},$::form{stamp},$fn);
-        &transfer_page;
+    if( &write_file( $fn , \$::form{honbun} ) ){
+        chmod 0444,$fn if $::form{to_freeze};
+        utime($sagetime,$sagetime,$fn) if $::form{sage};
+        &transfer_page();
     }else{
         &transfer_url($::me);
     }
@@ -913,15 +912,15 @@ sub transfer_page{
 sub do_preview{
     my $e_message = shift;
     my $title = $::form{p};
-    my $html  = &enc($::form{honbun});
-    exists $::form{encrlf} && $::form{encrlf} eq 'YES' and $html=&deyen($html);
+    $::form{honbun} = &deyen($::form{yensrc}) if exists $::form{yensrc};
+    $::form{orgsrc} = &deyen($::form{orgsrc} ||'');
 
     &print_header(divclass=>'max',title=>'Edit');
     defined($e_message) and &puts(qq(<div class="warning">${e_message}</div>));
     &begin_day("Preview: $title");
-        &print_page( title=>$title , html=>$html , index=>1 , main=>1 );
+        &print_page( title=>$title , source=>\$::form{honbun} , index=>1 , main=>1 );
     &end_day();
-    &print_form( $title , $html , $::form{stamp} );
+    &print_form( $title , \$::form{honbun} , \$::form{orgsrc} );
     &print_footer;
 }
 
@@ -930,7 +929,8 @@ sub action_edit{
     &print_header(divclass=>'max',title=>'Edit');
     &begin_day("Edit: $title");
     my $fn=&title2fname($title);
-    &print_form( $title , &enc(&read_file($fn)), &mtimeraw($fn) );
+    my $source=&read_file($fn);
+    &print_form( $title , \$source , \$source );
 
     if( &object_exists($::form{p}) && exists $::form{admin} ){
         &putenc('<h2>Rename</h2>
@@ -1016,7 +1016,7 @@ sub list_attachment{
 sub print_page{
     my %args=( @_ );
     my $title=$args{title};
-    my $html =( exists $args{html} ? $args{html} : &enc( &read_object($title)) );
+    my $html =&enc( exists $args{source} ? ${$args{source}} : &read_object($title));
     return 0 unless $html;
 
     push(@main::outline,
