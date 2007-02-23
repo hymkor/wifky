@@ -11,48 +11,50 @@ $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 
-binmode(STDOUT);
-binmode(STDIN);
+if( $0 eq __FILE__ ){
+    binmode(STDOUT);
+    binmode(STDIN);
 
-eval{
-    local $SIG{ALRM} = sub { die("Time out"); };
-    eval{ alarm 60; };
+    eval{
+        local $SIG{ALRM} = sub { die("Time out"); };
+        eval{ alarm 60; };
 
-    &read_form;
-    &change_directory;
-    foreach my $pl (sort grep(/\.plg$/,&directory) ){
-        do $pl; $@ and die($@);
-    }
-    &load_config;
-    &init_globals;
-    foreach my $pl (sort grep(/\.pl$/,&directory) ){
-        do $pl; $@ and die($@);
-    }
-
-    if( exists $::form{a} && exists $::action_plugin{$::form{a}} ){
-        $::action_plugin{ $::form{a} }->();
-    }elsif( exists $::form{p} ){ # page view
-        if( exists $::form{f} ){ # output attachment
-            &action_cat;
-        }else{ # output page itself.
-            &action_view($::form{p});
+        &read_form;
+        &change_directory;
+        foreach my $pl (sort grep(/\.plg$/,&directory) ){
+            do $pl; $@ and die($@);
         }
-    }elsif( &object_exists($::config{FrontPage}) ){
-        &action_view($::config{FrontPage});
-    }else{
-        &do_index('recent','rindex','-l');
+        &load_config;
+        &init_globals;
+        foreach my $pl (sort grep(/\.pl$/,&directory) ){
+            do $pl; $@ and die($@);
+        }
+
+        if( exists $::form{a} && exists $::action_plugin{$::form{a}} ){
+            $::action_plugin{ $::form{a} }->();
+        }elsif( exists $::form{p} ){ # page view
+            if( exists $::form{f} ){ # output attachment
+                &action_cat;
+            }else{ # output page itself.
+                &action_view($::form{p});
+            }
+        }elsif( &object_exists($::config{FrontPage}) ){
+            &action_view($::config{FrontPage});
+        }else{
+            &do_index('recent','rindex','-l');
+        }
+        &flush;
+        eval{ alarm 0; };
+    };
+    if( $@ ){
+        print "Content-Type: text/html;\n\n<html><body>\n",
+              &errmsg($@),"\n</body></html>\n";
     }
-    &flush;
-    eval{ alarm 0; };
-};
-if( $@ ){
-    print "Content-Type: text/html;\n\n<html><body>\n",
-          &errmsg($@),"\n</body></html>\n";
+    exit(0);
 }
-exit(0);
 
 sub change_directory{
-    my $pagedir = $0 ; $pagedir =~ s/\.\w+$/.dat/;
+    my $pagedir = __FILE__ ; $pagedir =~ s/\.\w+$/.dat/;
     unless( chdir $pagedir ){
         mkdir($pagedir,0755);
         chdir $pagedir or die("can not access $pagedir.");
@@ -160,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/02/17 15:48:15 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/02/23 17:22:17 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
