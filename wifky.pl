@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/02/23 17:22:17 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/03/06 15:34:36 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -519,7 +519,7 @@ sub print_copyright{
 
 sub is_frozen{
     if( -r &title2fname(  $#_>=0            ? $_[0]
-                        : exists $::form{p} ? $::form{p} 
+                        : exists $::form{p} ? $::form{p}
                         : $::config{FrontPage}))
     {
         ! -w _;
