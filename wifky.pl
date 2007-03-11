@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.7_0';
+$::version  = '1.1.8_0';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -54,7 +54,7 @@ if( $0 eq __FILE__ ){
 }
 
 sub change_directory{
-    my $pagedir = __FILE__ ; $pagedir =~ s/\.\w+$/.dat/;
+    my $pagedir = __FILE__ ; $pagedir =~ s/\.\w+((\.\w+)*)$/.dat$1/;
     unless( chdir $pagedir ){
         mkdir($pagedir,0755);
         chdir $pagedir or die("can not access $pagedir.");
@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/03/06 15:34:36 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/03/12 02:18:05 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
