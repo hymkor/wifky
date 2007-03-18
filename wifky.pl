@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.8_0';
+$::version  = '1.1.7_1';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/03/12 02:18:05 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/03/18 16:11:04 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -1126,7 +1126,7 @@ sub plugin_footnote{
 }
 
 sub call_footnote{
-    my (undef,$session) = shift;
+    my (undef,$session) = @_;
     my $footnotes = $session->{footnotes};
     return unless $footnotes;
 
