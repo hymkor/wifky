@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.7_1';
+$::version  = '1.1.8_0';
 %::form     = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/03/18 16:11:04 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/03/26 15:45:35 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -212,6 +212,7 @@ sub init_globals{
         '900_footer'         => \&call_footnote ,
     );
     %::final_plugin = (
+        '010_header'   => \&flush_header ,
         '500_outline'  => \&final_outline ,
         '900_verbatim' => \&unverb ,
     );
@@ -468,20 +469,25 @@ sub default_header{ ### No page named 'Header'
     &puts('</div>');
 }
 
+sub flush_header{
+    print join("\r\n",@::http_header);
+    print qq(\r\n\r\n<?xml version="1.0" encoding="$::charset"?>);
+    print qq(\r\n<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">);
+    print qq(\r\n<html lang="ja"><head>\r\n);
+    print join("\r\n",@::html_header),"\r\n";
+}
+
 sub print_header{
     my %arg=(@_);
     my $label = $::config{sitename};
-    exists $::form{p}  and $label .= ' - ' . $::form{p};
-    exists $arg{title} and $label .= '(' . $arg{title} . ')';
+    $label .= ' - '.$::form{p} if exists $::form{p};
+    $label .= '('.$arg{title}.')' if exists $arg{title};
+    push(@::html_header,"<title>$label</title>");
+
     my $require_menubar = !(exists $arg{menubar} && $arg{menubar} eq 'no');
     my $divclass = ($arg{divclass} || 'main');
 
-    &puts( @::http_header , '' );
-    &putenc('<?xml version="1.0" encoding="%s"?>
-        <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-        <html lang="ja"><head>',$::charset);
-    &puts( @::html_header );
-    &putenc('<title>%s</title><style type="text/css"><!--',$label);
+    &puts('<style type="text/css"><!--');
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
         if( my $css =&read_object($p) ){
             $css =~ s/\<\<\{([^\}]+)\}/&myurl( { p=>$p , f=>$1 } )/ge;
