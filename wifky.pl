@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/03/26 15:45:35 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/03/26 18:29:05 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -1417,7 +1417,7 @@ sub midashi{
         my $h    = $depth+ 3 ;
         my $cls  = ('sub' x $depth).'section' ;
 
-        push( @main::outline ,
+        push( @::outline ,
                 {
                   depth => $depth ,
                   text  => &strip_tag($text) ,
@@ -1431,7 +1431,7 @@ sub midashi{
                          &enc($::config{"${cls}mark"}) .
                          '</span>'
                   , { p     => $session->{title} }
-                  , { class => "${cls}mark sanchor" }
+                  , { class => "${cls}mark sanchor" , name=>"p${tag}" }
                   , "#p${tag}"
                   ) . qq(<span class="${cls}title">$text</span>) ;
 
