@@ -162,7 +162,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/03/26 18:29:05 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/03/26 18:37:52 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -905,12 +905,17 @@ sub do_submit{
 
 sub transfer_url{
     my $url=(shift || $::me);
-    &puts('Content-type: text/html','');
-    &puts(qq(<html><head><title>Moving...</title
-        ><meta http-equiv="refresh" content="1;URL=${url}"
-        ></head><body
-        ><a href="${url}">Wait or Click Here</a
-        ></body></html>));
+    print "Content-type: text/html\r\n\r\n";
+    print <<"BODY";
+<html>
+<head>
+<title>Moving...</title>
+<meta http-equiv="refresh" content="1;URL=${url}">
+</head>
+<body><a href="${url}">Wait or Click Here</a></body>
+</html>
+BODY
+    exit(0);
 }
 
 sub transfer_page{
