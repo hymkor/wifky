@@ -43,6 +43,7 @@ if( $0 eq __FILE__ ){
         }else{
             &do_index('recent','rindex','-l');
         }
+        &flush_header;
         &flush;
         eval{ alarm 0; };
     };
@@ -162,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/03/26 18:37:52 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/03/31 05:14:06 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -212,7 +213,6 @@ sub init_globals{
         '900_footer'         => \&call_footnote ,
     );
     %::final_plugin = (
-        '010_header'   => \&flush_header ,
         '500_outline'  => \&final_outline ,
         '900_verbatim' => \&unverb ,
     );
@@ -634,6 +634,7 @@ sub action_query_delete{
                 Remove attachment '%s' of '%s'.<br>)
             , $::form{f} , $::form{p} );
     &is_frozen() and &print_signarea();
+    exists $::form{admin} and &puts('<input type="hidden" name="admin" value="admin">');
     &putenc('<div>Are you sure ? </div>
         <input type="submit" name="yes"    value="Yes">
         <input type="submit" name="no"     value="No">
@@ -662,7 +663,7 @@ sub action_commit{
     }else{
         eval{ &do_submit(); };
         rmdir $lock;
-        $@ and die($@);
+        die($@) if $@;
     }
 }
 
@@ -1436,7 +1437,7 @@ sub midashi{
                          &enc($::config{"${cls}mark"}) .
                          '</span>'
                   , { p     => $session->{title} }
-                  , { class => "${cls}mark sanchor" , name=>"p${tag}" }
+                  , { class => "${cls}mark sanchor" }
                   , "#p${tag}"
                   ) . qq(<span class="${cls}title">$text</span>) ;
 
