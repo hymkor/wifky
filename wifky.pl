@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/03/31 05:14:06 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/04/01 16:05:04 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -621,10 +621,7 @@ sub save_config{
     while( my ($key,$val)=each %::config ){
         $val and push( @settings , '#'.$key."\t".&yen($val) );
     }
-    my $lock=&title2fname('..LOCK..');
-    mkdir($lock,0777) or die("!Disk full or file writing conflict (lockfile=$lock)!");
-    &write_file( 'index.cgi' , join("\n", @settings) );
-    rmdir($lock);
+    &lockdo( sub{ &write_file( 'index.cgi' , join("\n", @settings) ) } );
 }
 
 sub action_query_delete{
@@ -648,23 +645,12 @@ sub action_query_delete{
 }
 
 sub action_commit{
-    my $lock=&title2fname($::form{p},'LOCK');
-    if( ! mkdir($lock,0777) ){
-        &do_preview( &errmsg("!Disk full or file writing conflict (lockfile=$lock)!") );
-        return;
-    }
     eval{
         &check_frozen();
         &check_conflict();
+        &do_submit();
     };
-    if( $@ ){
-        rmdir $lock;
-        &do_preview( &errmsg($@) );
-    }else{
-        eval{ &do_submit(); };
-        rmdir $lock;
-        die($@) if $@;
-    }
+    &do_preview( &errmsg($@) ) if $@;
 }
 
 sub action_preview{
@@ -887,6 +873,19 @@ sub action_upload{
     &do_preview;
 }
 
+sub lockdo{
+    my $code=shift;
+    my $lock=&title2fname($::form{p},'LOCK');
+    mkdir($lock,0777) or die("!Disk full or file writing conflict (lockfile=$lock)!");
+    my $rc=undef;
+    eval{ $rc=$code->(@_) };
+    my $err=$@;
+    rmdir $lock;
+    die($err) if $err;
+    $rc;
+}
+
+
 sub do_submit{
     my $title=$::form{p};
     my $fn=&title2fname($title);
@@ -895,7 +894,7 @@ sub do_submit{
     &is_frozen() and chmod(0644,$fn);
 
     defined($::hook_submit) and $::hook_submit->(\$title , \$::form{honbun});
-    if( &write_file( $fn , \$::form{honbun} ) ){
+    if( &lockdo( sub{ &write_file( $fn , \$::form{honbun} ) } ) ){
         chmod 0444,$fn if $::form{to_freeze};
         utime($sagetime,$sagetime,$fn) if $::form{sage};
         &transfer_page();
