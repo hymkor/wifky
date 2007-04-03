@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/04/01 16:05:04 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/04/03 14:07:11 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -875,10 +875,11 @@ sub action_upload{
 
 sub lockdo{
     my $code=shift;
-    my $lock=&title2fname($::form{p},'LOCK');
+    push(@_,'LOCK');
+    my $lock=&title2fname(@_);
     mkdir($lock,0777) or die("!Disk full or file writing conflict (lockfile=$lock)!");
     my $rc=undef;
-    eval{ $rc=$code->(@_) };
+    eval{ $rc=$code->() };
     my $err=$@;
     rmdir $lock;
     die($err) if $err;
@@ -894,7 +895,7 @@ sub do_submit{
     &is_frozen() and chmod(0644,$fn);
 
     defined($::hook_submit) and $::hook_submit->(\$title , \$::form{honbun});
-    if( &lockdo( sub{ &write_file( $fn , \$::form{honbun} ) } ) ){
+    if( &lockdo( sub{ &write_file( $fn , \$::form{honbun} ) },$::form{p} )){
         chmod 0444,$fn if $::form{to_freeze};
         utime($sagetime,$sagetime,$fn) if $::form{sage};
         &transfer_page();
