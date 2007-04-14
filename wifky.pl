@@ -22,12 +22,12 @@ if( $0 eq __FILE__ ){
         &read_form;
         &change_directory;
         foreach my $pl (sort grep(/\.plg$/,&directory) ){
-            do $pl; $@ and die($@);
+            do $pl; die($@) if $@;
         }
         &load_config;
         &init_globals;
         foreach my $pl (sort grep(/\.pl$/,&directory) ){
-            do $pl; $@ and die($@);
+            do $pl; die($@) if $@;
         }
 
         if( exists $::form{a} && exists $::action_plugin{$::form{a}} ){
@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/04/03 14:07:11 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/04/14 13:15:22 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -1001,8 +1001,9 @@ sub cache_update{
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
             push( @::dir_cache , $fn );
-            $fn =~ /^((?:[0-9a-f][0-9a-f])+)(__(?:[0-9a-f][0-9a-f])+)?$/
-                and push( @{$::dir_cache{$1}} , $2 );
+            if( $fn =~ /^((?:[0-9a-f][0-9a-f])+)(__(?:[0-9a-f][0-9a-f])+)?$/ ){
+                push( @{$::dir_cache{$1}} , $2 );
+            }
         }
         closedir(DIR);
     }
@@ -1037,19 +1038,7 @@ sub print_page{
         { depth => -1 , text  => $title , title => $title , sharp => '' }
     );
 
-    my %attachment;
-    foreach my $attach ( &list_attachment($title) ){
-        my $e_attach = &enc( $attach );
-        my $url=&myurl( { p=>$title , f=>$attach } );
-        $attachment{ $e_attach } = {
-            name => $attach ,
-            url  => $url ,
-            tag  => $attach =~ /\.(png|gif|jpg|jpeg)$/i
-                    ? &img($e_attach,{ p=>$title , f=>$attach } )
-                    : &anchor($e_attach,{ p=>$title , f=>$attach } ,
-                                  ,{ title=>$e_attach } )
-        };
-    }
+    my %attachment=map{ &enc($_)=>1 } &list_attachment($title);
     my %session=(
         title      => $title ,
         attachment => \%attachment ,
@@ -1359,12 +1348,25 @@ sub preprocess_outerlink2{ ### [...|http://...] style ###
         &verb(sprintf('<a href="%s"%s>',$2,$::target)).$1.'</a>'!goe;
 }
 
+sub attach2tag{
+    my ($session,$nm,$label)=@_;
+    my ($p,$f)=($session->{title},&denc($nm));
+    $label ||= $nm;
+
+    if( exists $session->{attachment}->{$nm} ){
+        if( $nm =~ /\.png$/i || $nm =~ /\.gif$/i  || $nm =~ /\.jpe?g$/i ){
+            &img(   $label ,{ p=>$p , f=>$f } );
+        }else{
+            &anchor($label ,{ p=>$p , f=>$f } , { title=>$label } )
+        }
+    }else{
+        "<blink>$nm</blink>";
+    }
+}
+
+
 sub preprocess_attachment{
-    my ($text,$session)=@_;
-    my $attachment = $session->{attachment};
-    ${$_[0]} =~ s|&lt;&lt;\{([^\}]+)\}|
-        exists $attachment->{$1}
-        ? $session->{attachment}->{$1}->{tag} : "<blink>$&</blink>"|ge;
+    ${$_[0]} =~ s|&lt;&lt;\{([^\}]+)\}(?:\{([^\}]+)\})?|&attach2tag($_[1],$1,$2)|ge;
 }
 
 sub preprecess_htmltag{
@@ -1378,6 +1380,7 @@ sub preprocess_decorations{
     $$text =~ s|&#39;&#39;&#39;(.*?)&#39;&#39;&#39;|<strong>$1</strong>|gs;
     $$text =~ s|&#39;&#39;(.*?)&#39;&#39;|<em>$1</em>|gs;
     $$text =~ s|__(.*?)__|<u>$1</u>|gs;
+    $$text =~ s|==(.*?)=={(.*?)}|<del>$1</del><ins>$2</ins>|gs;
     $$text =~ s|==(.*?)==|<strike>$1</strike>|gs;
     $$text =~ s|``(.*?)``|'<tt class="pre">'.&cr2br($1).'</tt>'|ges;
 }
