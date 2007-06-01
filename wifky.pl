@@ -6,10 +6,11 @@ $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
 $::version  = '1.1.8_0';
-%::form     = ();
+%::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
+%::flag     = ();
 
 if( $0 eq __FILE__ ){
     binmode(STDOUT);
@@ -163,7 +164,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/04/14 13:15:22 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/06/02 07:50:41 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -233,20 +234,15 @@ sub read_multimedia{
     my @blocks = split("\r\n${cutter}","\r\n$query_string");
     foreach my $block (@blocks){
         $block =~ s/\A\r?\n//;
-
         my ($header,$body) = split(/\r?\n\r?\n/,$block,2);
-        my ($type,$name,$fname) = ( '' , 'notitle' , 'attach.bin' );
+        next unless defined($header) &&
+            $header =~ /^Content-Disposition:\s+form-data;\s+name=\"(\w+)\"/i;
 
-        if( $header =~ /^Content-Disposition:\s+form-data;\s+name=\"(\w+)\"/i){
-            $name = $1;
-            $header =~ /filename="([^\"]+)"/
-                and $fname=(split(/[\/\\]/,$1))[-1];
+        my $name = $1;
+        if( $header =~ /filename="([^\"]+)"/ ){
+            &set_form( "$name.filename" , (split(/[\/\\]/,$1))[-1] );
         }
-        ($header =~ /^Content-Type: image\/(\w+)/ ) and $type = $1;
-
-        $::form{ $name } = $body;
-        length($type) > 0 and $::form{ "${name}.type" } = $type;
-        $::form{ "${name}.filename" } = $fname;
+        &set_form( $name , $body );
     }
 }
 
@@ -256,8 +252,12 @@ sub read_simpleform{
         defined($value) or $value = '' ;
         $value =~ s/\+/ /g;
         $value =~ s/%([0-9a-fA-F][0-9a-fA-F])/pack('C', hex($1))/eg;
-        $::form{$name} = $value;
+        &set_form( $name , $value );
     }
+}
+
+sub set_form{
+    push(@{$::forms{$_[0]}} , $::form{$_[0]} = $_[1] );
 }
 
 sub read_form{
@@ -423,10 +423,10 @@ sub form_commit_button{
 }
 
 sub form_attachment{
-    &puts('<h2>Attachment</h2>
-    <p>New:<input type="file" name="butsu" size="48">');
+    &begin_day('Attachment');
+    &puts('<p>New:<input type="file" name="newattachment" size="48">');
     if( exists $::form{admin} || &is_frozen() ){
-        &print_signarea('qassword');
+        &print_signarea();
     }
     &puts('<input type="submit" name="a" value="Upload"></p>');
     my @attachments=&list_attachment( $::form{p} ) or return;
@@ -444,6 +444,7 @@ sub form_attachment{
     }
     &puts('</p><input type="submit" name="a" value="Delete">
         <input type="submit" name="dummybotton" value="Download">');
+    &end_day();
 }
 
 sub print_form{
@@ -456,17 +457,6 @@ sub print_form{
         , $::postme , $::charset , &yen($$orgsrc) , $title );
     grep( $::form_list{$_}->($newsrc), sort keys %::form_list );
     &puts('</form></div>');
-}
-
-sub print_menubar_once{
-    $::menubar_printed or &puts( &plugin({},'menubar') );
-}
-
-sub default_header{ ### No page named 'Header'
-    &puts('<div class="header">');
-    $_[0] and &print_menubar_once();
-    &putenc('<h1>%s</h1>',$::config{sitename});
-    &puts('</div>');
 }
 
 sub flush_header{
@@ -484,9 +474,6 @@ sub print_header{
     $label .= '('.$arg{title}.')' if exists $arg{title};
     push(@::html_header,"<title>$label</title>");
 
-    my $require_menubar = !(exists $arg{menubar} && $arg{menubar} eq 'no');
-    my $divclass = ($arg{divclass} || 'main');
-
     &puts('<style type="text/css"><!--');
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
         if( my $css =&read_object($p) ){
@@ -499,29 +486,34 @@ sub print_header{
     &puts('--></style></head>');
     &puts( &is_frozen() ? '<body class="frozen">' : '<body>' );
     &puts( @::body_header );
-    &putenc('<div class="%s">' , $divclass );
-
-    $arg{userheader}
-        and !&print_page( title=>'Header', class=>'header')
-        and &default_header( $require_menubar );
-
-    $require_menubar and &print_menubar_once();
+    if( $arg{userheader} ){
+        &putenc('<div class="%s">' , $arg{divclass}||'main' );
+        &print_page( title=>'Header' , class=>'header' );
+        &puts( &plugin({},'menubar') ) unless $::flag{menubar_printed} ;
+        $::flag{userheader} = 1;
+    }else{
+        &putenc('<div class="%s">' , $arg{divclass}||'max' );
+        &puts('<div class="Header">');
+        &puts( &plugin_menubar(undef) );
+        &putenc( '<h1>%s</h1>' , $arg{title} ) if exists $arg{title};
+        &puts('</div><!--Header-->');
+    }
 }
 
 sub print_footer{
-    &puts('</div><!--main or sidebar-->');
-    &puts('</body></html>');
+    if( $::flag{userheader} ){
+        &puts('<div class="copyright footer">',@::copyright,'</div>') if @::copyright;
+        &puts('</div><!-- main --><div class="sidebar">');
+        &print_page( title=>'Sidebar' );
+    }
+    &puts('</div></body></html>');
 }
 
-sub print_sidebar_and_footer{
-    &puts('</div><!-- main --><div class="sidebar">');
-    &print_page( title=>'Sidebar' );
-    &print_footer;
-}
-
-sub print_copyright{
-    &puts('<div class="copyright footer">',@::copyright,'</div>');
-}
+sub print_sidebar_and_footer{ # for compatible with nikky.pl
+    @::copyright=();
+    &print_footer(); 
+} 
+sub print_copyright{} # for compatible.
 
 sub is_frozen{
     if( -r &title2fname(  $#_>=0            ? $_[0]
@@ -535,20 +527,20 @@ sub is_frozen{
 }
 
 sub ninsho{
-    my $pwd = $::form{password};
-    exists $::form{qassword} and $pwd .= $::form{qassword};
-    if( $::config{crypt} ne '' && crypt($pwd,'wk') ne $::config{crypt} ){
+    if( $::config{crypt} &&
+        !grep(crypt($_,'wk') eq $::config{crypt},@{$::forms{password}}) )
+    {
         die('!Administrator\'s Sign is wrong!');
     }
 }
 
 sub print_signarea{
-    &putenc('Sign: <input type="password" name="%s">',$_[0] || 'password');
+    &puts('Sign: <input type="password" name="password">');
 }
 
 sub check_frozen{
     if( exists $::form{admin} ){ ### Administrator mode ###
-         &ninsho;
+        &ninsho;
     }elsif( &is_frozen() ){ ### User ###
         die( '!This page is frozen.!');
     }
@@ -600,9 +592,8 @@ sub write_file{
 }
 
 sub action_new{
-    &print_header( divclass=>'max' );
-    &putenc(qq(<h1>Create Page</h1>
-        <form action="%s" method="post" accept-charset="%s">
+    &print_header( title=>'Create Page' );
+    &putenc(qq(<form action="%s" method="post" accept-charset="%s">
         <p><input type="text" name="p" size="40">
         <input type="hidden" name="a" value="edt">
         <input type="submit" value="Create"></p></form>)
@@ -625,11 +616,9 @@ sub save_config{
 }
 
 sub action_query_delete{
-    &print_header( divclass=>'max' );
+    &print_header( title=>'Remove attachment' );
     &puts(qq(<form action="$::postme" method="post">));
-    &putenc( q( <h1>Remove attachment</h1><p>
-                Remove attachment '%s' of '%s'.<br>)
-            , $::form{f} , $::form{p} );
+    &putenc( q(<p>Remove attachment '%s' of '%s'.<br>),$::form{f},$::form{p} );
     &is_frozen() and &print_signarea();
     exists $::form{admin} and &puts('<input type="hidden" name="admin" value="admin">');
     &putenc('<div>Are you sure ? </div>
@@ -674,38 +663,37 @@ sub action_passwd{
 }
 
 sub action_tools{
-    &print_header( divclass=>'max' , title=>'Tools' );
-    &putenc('<h1>Tools</h1><div class="day">
-        <h2>Change Administrator\'s Sign</h2
-        ><div class="body"
-        ><form action="%s" method="post"
+    &print_header( title=>'Tools' );
+    &begin_day('Change Administrator\'s Sign');
+    &putenc('<form action="%s" method="post"
         ><p>Old Sign:<input name="password" type="password" size="40"
         ><br>New Sign(1):<input name="p1" type="password" size="40"
         ><br>New Sign(2):<input name="p2" type="password" size="40"
         ><br><input name="a" type="hidden"  value="pwd"
-        ><input type="submit" value="Submit"></p></form
-        ></div></div><div class="day"
-        ><h2>Preferences</h2><div class="body"
-        ><form action="%s" method="post">',$::postme,$::postme);
+        ><input type="submit" value="Submit"></p></form>',$::postme);
+    &end_day();
+    &begin_day('Preferences');
+    &putenc('<form action="%s" method="post">',$::postme);
 
     foreach my $section(sort keys %::preferences){
         &putenc('<div class="section"><h3>%s</h3><div class="sectionbody"><p>'
                     ,$section);
         foreach my $i ( @{$::preferences{$section}} ){
+            $i->{type} ||= 'text';
             if( $i->{type} eq 'checkbox' ){
-                &putenc('<input type="checkbox" name="%s" value="OK"%s> %s<br>'
+                &putenc('<input type="checkbox" name="config__%s" value="1"%s> %s<br>'
                     , $i->{name}
-                    , ( &is($i->{name}) ? 'checked' : '' )
+                    , ( &is($i->{name}) ? ' checked' : '' )
                     , $i->{desc}
                 );
             }elsif( $i->{type} eq 'password' ){
-                &putenc('%s <input type="password" name="%s">
-                        (retype)<input type="password" name="%s_"><br>'
+                &putenc('%s <input type="password" name="config__%s">
+                        (retype)<input type="password" name="verify__%s"><br>'
                     , $i->{desc} , $i->{name} , $i->{name}
                 );
             }elsif( $i->{type} eq 'textarea' ){
                 &putenc(
-                    '%s<br><textarea name="%s" cols="%s" rows="%s">%s</textarea><br>'
+                    '%s<br><textarea name="config__%s" cols="%s" rows="%s">%s</textarea><br>'
                     , $i->{desc} , $i->{name}
                     , ($i->{cols} || 40 )
                     , ($i->{rows} ||  4 )
@@ -714,11 +702,11 @@ sub action_tools{
             }elsif( $i->{type} eq 'radio' ){
                 &putenc('%s<br>',$i->{desc});
                 foreach my $p (@{$i->{option}}){
-                    &putenc('<input type="radio" name="%s" value="%s"%s>%s<br>'
+                    &putenc('<input type="radio" name="config__%s" value="%s"%s>%s<br>'
                         , $i->{name}
                         , $p->[0]
-                        , ( defined($main::config{$i->{name}}) &&
-                            $main::config{$i->{name}} eq $p->[0]
+                        , ( defined($::config{$i->{name}}) &&
+                            $::config{$i->{name}} eq $p->[0]
                           ? ' checked' : '' )
                         , $p->[1] );
                 }
@@ -728,7 +716,7 @@ sub action_tools{
                 &putenc('%s<br>',$i->{desc} );
             }else{ # text
                 &putenc(
-                    '%s <input type="text" name="%s" value="%s" size="%s"><br>'
+                    '%s <input type="text" name="config__%s" value="%s" size="%s"><br>'
                     , $i->{desc} , $i->{name}
                     , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
                     , $i->{size} || 10
@@ -739,26 +727,31 @@ sub action_tools{
     }
     &print_signarea();
     &puts('<input type="hidden" name="a" value="preferences">',
-          '<input type="submit" value="Submit"></form></div></div>');
+          '<input type="submit" value="Submit"></form>');
+    &end_day();
 
     &print_footer;
 }
 
 sub action_preferences{
     &ninsho;
-    foreach my $section ( %::preferences ){
-        foreach my $i (@{$::preferences{$section}} ){
-            if( $i->{type} eq 'checkbox' ){
-                $::config{ $i->{name} } =
-                    ( $::form{ $i->{name} } eq 'OK' ? '1' : '0' );
-            }elsif( $i->{type} eq 'password' ){
-                if( length($::form{$i->{name}}) > 0 ){
-                    $::form{$i->{name}} eq $::form{$i->{name}.'_'}
-                        or die('invalud value for ' . $i->{name} );
-                    $::config{ $i->{name} } = $::form{$i->{name} };
+    foreach my $section (values %::preferences){
+        foreach my $i (@{$section}){
+            next unless exists $i->{name};
+            my $type = $i->{type} || 'text';
+            my $newval= exists $::form{'config__'.$i->{name}}
+                      ? $::form{'config__'.$i->{name}} : '';
+            if( $type eq 'checkbox' ){
+                $::config{ $i->{name} } = ($newval ? 1 : 0);
+            }elsif( $type eq 'password' ){
+                if( length($newval) > 0 ){
+                    if( $newval ne $::form{'verify__'.$i->{name}} ){
+                        die('invalud value for ' . $i->{name} );
+                    }
+                    $::config{ $i->{name} } = $newval;
                 }
             }else{
-                $::config{ $i->{name} } = $::form{ $i->{name} };
+                $::config{ $i->{name} } = $newval;
             }
         }
     }
@@ -808,8 +801,7 @@ sub action_seek{
     }
     &puts('</ul>');
     &end_day();
-    &print_copyright;
-    &print_sidebar_and_footer;
+    &print_footer();
 }
 
 sub action_delete{
@@ -862,14 +854,14 @@ sub do_index{
                 '&nbsp' . &anchor('Page Title' , { a=>$n } ) .
                 '</tt></li>' , &ls(@_) , '</ul>' );
     &end_day();
-    &print_copyright;
-    &print_sidebar_and_footer;
+    &print_footer();
 }
 
 sub action_upload{
     exists $::form{p} or die('not found pagename');
     &check_frozen;
-    &write_object( $::form{p} , $::form{'butsu.filename'} , \$::form{butsu});
+    &write_object( $::form{p} , $::form{'newattachment.filename'} ,
+                               \$::form{'newattachment'} );
     &do_preview;
 }
 
@@ -929,35 +921,36 @@ sub do_preview{
     $::form{honbun} = &deyen($::form{yensrc}) if exists $::form{yensrc};
     $::form{orgsrc} = &deyen($::form{orgsrc} ||'');
 
-    &print_header(divclass=>'max',title=>'Edit');
+    &print_header(title=>'Preview');
     defined($e_message) and &puts(qq(<div class="warning">${e_message}</div>));
-    &begin_day("Preview: $title");
+    &begin_day($title);
         &print_page( title=>$title , source=>\$::form{honbun} , index=>1 , main=>1 );
     &end_day();
     &print_form( $title , \$::form{honbun} , \$::form{orgsrc} );
-    &print_footer;
+    &print_footer();
 }
 
 sub action_edit{
     my $title = $::form{p};
-    &print_header(divclass=>'max',title=>'Edit');
-    &begin_day("Edit: $title");
+    &print_header(title=>'Edit');
+    &begin_day($title);
     my $fn=&title2fname($title);
     my $source=&read_file($fn);
     &print_form( $title , \$source , \$source );
+    &end_day();
 
     if( &object_exists($::form{p}) && exists $::form{admin} ){
-        &putenc('<h2>Rename</h2>
-            <p><form action="%s" method="post">
+        &begin_day('Rename');
+        &putenc('<p><form action="%s" method="post">
             <input type="hidden"  name="a" value="ren">
             <input type="hidden"  name="p" value="%s">
             Title: <input type="text" name="newtitle" value="%s" size="80">'
             , $::postme , $::form{p} , $::form{p} );
         &print_signarea();
         &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
+        &end_day();
     }
-    &end_day();
-    &print_footer;
+    &print_footer();
 }
 
 sub action_view{
@@ -967,8 +960,7 @@ sub action_view{
         &print_page( title=>$::form{p} , index=>1 , main=>1 );
     &end_day();
     &print_page( title=>'Footer' , class=>'terminator' );
-    &print_copyright;
-    &print_sidebar_and_footer;
+    &print_footer();
 }
 
 sub action_cat{
@@ -994,6 +986,7 @@ sub action_cat{
     print  qq(\r\n);
     print <FP>;
     close(FP);
+    exit(0);
 }
 
 sub cache_update{
@@ -1034,7 +1027,7 @@ sub print_page{
     my $html =&enc( exists $args{source} ? ${$args{source}} : &read_object($title));
     return 0 unless $html;
 
-    push(@main::outline,
+    push(@::outline,
         { depth => -1 , text  => $title , title => $title , sharp => '' }
     );
 
@@ -1096,10 +1089,12 @@ sub inner_link{
 
 sub plugin_menubar{
     shift;
-    $::menubar_printed=1;
+    $::flag{menubar_printed}=1;
+    my $i=50;
+    my %bar=(%::menubar , map( (sprintf('%03d_argument',++$i) => $_) , @_));
     '<p class="adminmenu menubar">'. join("\r\n",
         map('<span class="adminmenu">'.$_.'</span>',
-            @_, map( $::menubar{$_} , sort keys %::menubar) , @::menubar )
+            map( $bar{$_} , sort keys %bar) , @::menubar )
     ).'</p>';
 }
 
@@ -1166,11 +1161,7 @@ sub final_outline{
             $depth >= 0  and $ss .= "</li>\n" ;
             $ss .= '<li>';
         }
-        $ss .= &anchor(
-            $p->{text} ,
-            { p=>$p->{title} } ,
-            undef ,
-            $p->{sharp} );
+        $ss .= &anchor( $p->{text}, { p=>$p->{title} }, undef, $p->{sharp} );
         $depth=$p->{depth};
     }
     $ss .= '</li></ul>' x ($depth+2);
