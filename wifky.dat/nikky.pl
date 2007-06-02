@@ -1,8 +1,8 @@
 package wifky::nikky;
 
-# use strict; use warnings;
+use strict; use warnings;
 
-my $version='0.21';
+my $version='0.22';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
 my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
@@ -43,22 +43,27 @@ if( &::is('nikky_front') &&
     $::form{a} = 'nikky';
 }
 
-if( $::form{a} eq 'date' || $::form{a} eq 'nikky' ){
+if( exists $::form{a} && ($::form{a} eq 'date' || $::form{a} eq 'nikky') ){
     delete $::menubar{'300_Edit'};
     delete $::menubar{'400_Edit(Admin)'};
 }
 
-$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/02/10 21:01:48 $'}= [
+$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/06/02 11:16:51 $'}= [
     { desc=>'Author'
     , name=>'nikky_author' , size=>20 },
     { desc=>'Print diary as FrontPage'
     , name=>'nikky_front' , type=>'checkbox'} ,
     { desc=>'Days of top diary'
     , name=>'nikky_days', size=>1 },
-    { desc=>'1-section to 1-rss-item'
+
+    { desc=>'RSS: 1-section to 1-rss-item'
     , name=>'nikky_rssitemsize' , type=>'checkbox' } ,
-    { desc=>'RSS description'
+    { desc=>'RSS: description'
     , name=>'nikky_rss_description' , size=>30 } ,
+    { desc=>'RSS: Output to RSS only the article titled as (YYYY.MM.DD)'
+    , name=>'nikky_output_rss_only_ymd' , type=>'checkbox' },
+    { desc=>'RSS: the number of pages to feed.' 
+    , name=>'nikky_rss_feed_num' , size=>2 } ,
 
     { desc=>'Symbol of start day link'
     , name=>'nikky_symbolstartdaylink' , size=>2 },
@@ -195,23 +200,21 @@ sub referer{
     my $ref=$ENV{'HTTP_REFERER'};
 
     my @lines=split(/\n/,&::read_object(@title));
-    if( $ref && $ref !~ /$::me\?[aq]=/ &&
-        grep(index($ref,$_) >= 0 , @exclude) <= 0 )
+    if( !$wifky::nikky::referer_written &&
+        $ref && $ref !~ /$::me\?[ap]=/ &&
+        !grep(index($ref,$_) >= 0 , @exclude) )
     {
-        my $found=0;
         foreach my $line ( @lines ){
             my ($cnt,$site)=split(/\t/,$line,2);
             if( $site eq $ref ){
-                $found = 1;
+                undef $ref;
                 $line = sprintf("%4d\t%s",$cnt + 1,$site);
                 last;
             }
         }
-        $found or push(@lines,sprintf("%4d\t%s",1,$ref));
-        unless( $::referer_written ){
-            &::write_object(@title,join("\n",reverse sort @lines));
-            $::referer_written = 1;
-        }
+        push(@lines,sprintf("%4d\t%s",1,$ref)) if $ref;
+        &::write_object(@title,join("\n",reverse sort @lines));
+        $wifky::nikky::referer_written = 1;
     }
     if( @lines ){
         '<div class="referer"><ul class="referer">' .
@@ -225,7 +228,13 @@ sub referer{
 sub action_rss{
     $::me='http://'.$ENV{'HTTP_HOST'}.$ENV{'SCRIPT_NAME'};
     $::inline_plugin{comment} = sub { '' };
-    my @pagelist = &::ls_core( { r=>1 , number=>3 } , '(????.??.??)*' );
+    my $feed_num = ($::config{nikky_rss_feed_num} || 3);
+    my @pagelist;
+    if( $::config{nikky_output_rss_only_ymd} ){
+        @pagelist = &::ls_core( { r=>1 , number=>$feed_num } , '(????.??.??)*' );
+    }else{
+        @pagelist = &::ls_core( { r=>1 , t=>1 , number=>$feed_num } );
+    }
 
     my $last_modified=0;
     foreach my $p (@pagelist){
@@ -353,6 +362,7 @@ sub action_rss{
     print "</rdf:RDF>\r\n";
     exit(0);
 };
+
 sub printag{
     my %tags=(@_);
     while( my ($tag,$val)=each %tags){
