@@ -48,7 +48,7 @@ if( exists $::form{a} && ($::form{a} eq 'date' || $::form{a} eq 'nikky') ){
     delete $::menubar{'400_Edit(Admin)'};
 }
 
-$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/06/02 11:16:51 $'}= [
+$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/06/02 14:07:25 $'}= [
     { desc=>'Author'
     , name=>'nikky_author' , size=>20 },
     { desc=>'Print diary as FrontPage'
@@ -60,8 +60,8 @@ $::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/06/02 11:16:51 $'}= [
     , name=>'nikky_rssitemsize' , type=>'checkbox' } ,
     { desc=>'RSS: description'
     , name=>'nikky_rss_description' , size=>30 } ,
-    { desc=>'RSS: Output to RSS only the article titled as (YYYY.MM.DD)'
-    , name=>'nikky_output_rss_only_ymd' , type=>'checkbox' },
+    { desc=>'RSS: Output all articles not only (YYYY.MM.DD)*'
+    , name=>'nikky_output_all_articles' , type=>'checkbox' },
     { desc=>'RSS: the number of pages to feed.' 
     , name=>'nikky_rss_feed_num' , size=>2 } ,
 
@@ -227,13 +227,13 @@ sub referer{
 
 sub action_rss{
     $::me='http://'.$ENV{'HTTP_HOST'}.$ENV{'SCRIPT_NAME'};
-    $::inline_plugin{comment} = sub { '' };
+    $::inline_plugin{comment} = sub { &::plugin_comment(@_,'-f'); };
     my $feed_num = ($::config{nikky_rss_feed_num} || 3);
     my @pagelist;
-    if( $::config{nikky_output_rss_only_ymd} ){
-        @pagelist = &::ls_core( { r=>1 , number=>$feed_num } , '(????.??.??)*' );
-    }else{
+    if( $::config{nikky_output_all_articles} ){
         @pagelist = &::ls_core( { r=>1 , t=>1 , number=>$feed_num } );
+    }else{
+        @pagelist = &::ls_core( { r=>1 , number=>$feed_num } , '(????.??.??)*' );
     }
 
     my $last_modified=0;
@@ -321,6 +321,20 @@ sub action_rss{
         }else{
             ### blog-mode ( 1 page to 1 rss-item) ###
             $item{desc} = [ $text ] ;
+            push(@topics , { %item } );
+        }
+        if( $p->{attachment}->{'comment.0'} ){
+            $item{url} = sprintf('%s?p=%s#c',$::me,$pageurl) ;
+            $item{title} = sprintf('Comment for %s', $p->{title} );
+            $item{desc} = [ 
+                '<dl>' . join("\n",
+                    map{
+                        my ($dt,$who,$text)=
+                            map{ &::enc(&::deyen($_)) } split(/\t/,$_,3);
+                        "<dt>$who ($dt)</dt><dd>$text</dd>";
+                    } split(/\n/,&::read_object($p->{title},'comment.0') )
+                ) . '</dl>'
+            ];
             push(@topics , { %item } );
         }
     }
