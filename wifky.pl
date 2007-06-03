@@ -5,7 +5,7 @@
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.8_0';
+$::version  = '1.1.8_2';
 %::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -44,7 +44,6 @@ if( $0 eq __FILE__ ){
         }else{
             &do_index('recent','rindex','-l');
         }
-        &flush_header;
         &flush;
         eval{ alarm 0; };
     };
@@ -164,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/06/02 08:22:25 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/06/03 17:48:40 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -468,6 +467,7 @@ sub flush_header{
 }
 
 sub print_header{
+    $::final_plugin{'000_header'} = \&flush_header;
     my %arg=(@_);
     my $label = $::config{sitename};
     $label .= ' - '.$::form{p} if exists $::form{p};
