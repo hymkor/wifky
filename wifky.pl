@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/06/03 17:48:40 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/06/30 06:58:23 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -1304,11 +1304,8 @@ sub plugin{
     my ($name,$param)=(split(/\s+/,shift,2),'');
     $session->{argv} = $param;
 
-    if( exists $::inline_plugin{$name} ){
-        $::inline_plugin{$name}->($session,split(/\s+/,$param)) || '';
-    }else{
-        'Plugin not found.';
-    }
+    ($::inline_plugin{$name} || sub{'Plugin not found.'} )
+        ->($session,split(/\s+/,$param)) || '';
 }
 
 sub cr2br{
