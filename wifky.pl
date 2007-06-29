@@ -1,11 +1,11 @@
 #!/usr/local/bin/perl
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.8_2';
+$::version  = '1.1.8_2++';
 %::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/06/30 06:58:23 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/06/30 08:48:53 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -1300,12 +1300,19 @@ sub plugin_pagename{
 }
 
 sub plugin{
-    my $session=shift;
-    my ($name,$param)=(split(/\s+/,shift,2),'');
+    my ($session)=shift;
+    my ($name,$param)=split(/\s+/,shift || '',2);
     $session->{argv} = $param;
+    
+    $param =~ s/&quot;.*?&quot;/"\xFF".unpack('h*',$&)."\xFF"/eg;
+    my @param=split(/\s+/,$param);
+    grep{
+        s|\xFF([^\xFF]*)\xFF|pack('h*',$1)|ge;
+        s|(&quot;)+|'&quot;'x(length($&)/12)|ge;
+    } @param;
 
     ($::inline_plugin{$name} || sub{'Plugin not found.'} )
-        ->($session,split(/\s+/,$param)) || '';
+        ->($session,@param) || '';
 }
 
 sub cr2br{
