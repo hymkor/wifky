@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/06/30 08:48:53 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/07/06 17:36:29 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -1300,15 +1300,16 @@ sub plugin_pagename{
 }
 
 sub plugin{
-    my ($session)=shift;
-    my ($name,$param)=split(/\s+/,shift || '',2);
+    my $session=shift;
+    my ($name,$param)=(split(/\s+/,shift,2),'');
     $session->{argv} = $param;
     
-    $param =~ s/&quot;.*?&quot;/"\xFF".unpack('h*',$&)."\xFF"/eg;
+    $param =~ s/\x02.*?\x02/"\x05".unpack('h*',$&)."\x05"/eg;
     my @param=split(/\s+/,$param);
     grep{
-        s|\xFF([^\xFF]*)\xFF|pack('h*',$1)|ge;
-        s|(&quot;)+|'&quot;'x(length($&)/12)|ge;
+        s|\x05([^\x05]*)\x05|pack('h*',$1)|ge;
+        s|\x02+|"\x02"x(length($&)>>1)|ge;
+        0;
     } @param;
 
     ($::inline_plugin{$name} || sub{'Plugin not found.'} )
@@ -1322,14 +1323,15 @@ sub cr2br{
     $s;
 }
 
-sub preprocess_innerlink1{ ### >>{ ... } ###
+sub preprocess_innerlink1{ ### >>{ ... }{ ... } ###
     my ($text,$session)=@_;
-    $$text =~ s|&gt;&gt;\{([^\}]+)\}|&inner_link($session,$1,$1)|ge;
+    $$text =~ s|&gt;&gt;\{([^\}]+)\}(?:\{([^\}]*)\})?|
+        &inner_link($session,defined($2)?$2:$1,$1)|ge;
 }
 
 sub preprocess_innerlink2{ ### [[ ... | ... ] ###
     my ($text,$session)=@_;
-    ${$_[0]} =~ s!\[\[(?:([^\|\]]+)\|)?(.+?)\]\]!
+    $$text =~ s!\[\[(?:([^\|\]]+)\|)?(.+?)\]\]!
         &inner_link($session,defined($1)?$1:$2,$2)!ge;
 }
 
@@ -1381,7 +1383,14 @@ sub preprocess_decorations{
 }
 
 sub preprocess_plugin{
-    ${$_[0]} =~ s/\(\((.+?)\)\)/&plugin($_[1],$1)/ges;
+    my $text=shift;
+    $$text =~ s/&quot;/\x02/g;
+    $$text =~ s/\(\(/\x03/g;
+    $$text =~ s/\)\)/\x04/g;
+    $$text =~ s/\x03([^\x02-\x04]*?(?:\x02[^\x02]*\x02[^\x02-\x04]*?)*?)\x04/&plugin($_[1],$1)/ges;
+    $$text =~ s/\x04/\)\)/g;
+    $$text =~ s/\x03/\(\(/g;
+    $$text =~ s/\x02/&quot;/g;
 }
 
 sub preprocess_rawurl{
