@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/07/06 17:36:29 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/07/14 02:03:28 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -1383,11 +1383,11 @@ sub preprocess_decorations{
 }
 
 sub preprocess_plugin{
-    my $text=shift;
+    my ($text,$sesion) = @_;
     $$text =~ s/&quot;/\x02/g;
     $$text =~ s/\(\(/\x03/g;
     $$text =~ s/\)\)/\x04/g;
-    $$text =~ s/\x03([^\x02-\x04]*?(?:\x02[^\x02]*\x02[^\x02-\x04]*?)*?)\x04/&plugin($_[1],$1)/ges;
+    $$text =~ s/\x03([^\x02-\x04]*?(?:\x02[^\x02]*\x02[^\x02-\x04]*?)*?)\x04/&plugin($sesion,$1)/ges;
     $$text =~ s/\x04/\)\)/g;
     $$text =~ s/\x03/\(\(/g;
     $$text =~ s/\x02/&quot;/g;
