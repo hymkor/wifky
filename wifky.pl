@@ -5,7 +5,7 @@ use strict; use warnings;
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.8_2++';
+$::version  = '1.1.9_0';
 %::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/07/14 02:03:28 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/08/11 15:08:39 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -488,8 +488,9 @@ sub print_header{
     &puts( @::body_header );
     if( $arg{userheader} ){
         &putenc('<div class="%s">' , $arg{divclass}||'main' );
-        &print_page( title=>'Header' , class=>'header' );
+        my $r=&print_page( title=>'Header' , class=>'header' );
         &puts( &plugin({},'menubar') ) unless $::flag{menubar_printed} ;
+        &putenc('<h1>%s</h1>',$::config{sitename}) if !$r && $::config{sitename};
         $::flag{userheader} = 1;
     }else{
         &putenc('<div class="%s">' , $arg{divclass}||'max' );
