@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/08/11 15:08:39 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/08/11 15:19:09 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -996,7 +996,7 @@ sub cache_update{
         while( my $fn=readdir(DIR) ){
             push( @::dir_cache , $fn );
             if( $fn =~ /^((?:[0-9a-f][0-9a-f])+)(__(?:[0-9a-f][0-9a-f])+)?$/ ){
-                push( @{$::dir_cache{$1}} , $2 );
+                push( @{$::dir_cache{$1}} , $2||'' );
             }
         }
         closedir(DIR);
