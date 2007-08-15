@@ -163,7 +163,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/08/11 15:21:11 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/08/16 06:38:25 $' ,
               type=>'rem' },
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
@@ -1266,6 +1266,7 @@ sub plugin_comment{
         close(FP);
     }
     unless( exists $opt{f} ){
+        my $readonly=(($::form{a}||0)eq'Preview'?' readonly':'');
         $buf .= <<HTML
 <div class="form">
 <form action="$::postme" method="post" class="comment">
@@ -1273,10 +1274,10 @@ sub plugin_comment{
 <input type="hidden" name="a" value="comment">
 <input type="hidden" name="comid" value="$ecomid">
 <div class="field name">
-<input type="text" name="who" size="10" class="field">
+<input type="text" name="who" size="10" class="field"$readonly>
 </div><!-- div.field name -->
 <div class="textarea">
-<textarea name="comment" cols="60" rows="1" class="field"></textarea>
+<textarea name="comment" cols="60" rows="1" class="field"$readonly></textarea>
 </div><!-- div.textarea -->
 <div class="button">
 <input type="submit" name="Comment" value="Comment">
