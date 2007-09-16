@@ -1,11 +1,11 @@
 #!/usr/local/bin/perl
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.1.9_0';
+$::version  = '1.3.0_0';
 %::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -121,6 +121,8 @@ sub init_globals{
         'tools'         => \&action_tools ,
         'preferences'   => \&action_preferences ,
         'new'           => \&action_new ,
+        'signin'        => \&action_signin ,
+        'signout'       => \&action_signout ,
     );
 
     @::http_header = ( "Content-type: text/html; charset=$::charset" );
@@ -138,23 +140,26 @@ sub init_globals{
 
     %::menubar = (
         '100_FrontPage' => &anchor($::config{FrontPage} , undef  ) ,
-        '200_New'       => &anchor('New'                , { a=>'new' } ) ,
-        '500_Tools'     => &anchor('Tools',{a=>'tools'},{ref=>'nofollow'}) ,
         '600_Index'     => &anchor('Index',{a=>'recent'}) ,
     );
+    if( !&is('lonely') || &is_signed() ){
+        $::menubar{'200_New'} = &anchor('New' , { a=>'new' } );
+    }
     @::menubar = ();
+    if( &is_signed() ){
+        $::menubar{'900_SignOut'} = &anchor('SignOut',{a=>'signout'},{ref=>'nofollow'});
+        $::menubar{'500_Tools'} = &anchor('Tools',{a=>'tools'},{ref=>'nofollow'});
+    }else{
+        $::menubar{'900_SignIn'} = &anchor('SignIn',{a=>'signin'},{ref=>'nofollow'});
+    }
 
     ### menubar ###
     unless( exists $::form{a} ){
         my $curpage=exists $::form{p} ? $::form{p} : $::config{FrontPage};
-        unless( &is_frozen() ){
+        if( !&is_frozen() || &is_signed() ){
             $::menubar{'300_Edit'} =
                 &anchor('Edit',{ a=>'edt', p=>$curpage},{rel=>'nofollow'});
         }
-
-        $::menubar{'400_Edit(Admin)'} =
-            &anchor('Edit(Admin)',
-                { a=>'edt', p=>$curpage, admin=>'admin'},{rel=>'nofollow'});
     }
 
     @::copyright = (
@@ -163,8 +168,10 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/08/16 06:38:25 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/09/16 17:02:16 $' ,
               type=>'rem' },
+            { desc=>'Convert CRLF to <br>' ,
+              name=>'autocrlf' , type=>'checkbox' } ,
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
               type=>'checkbox' },
@@ -260,6 +267,9 @@ sub set_form{
 }
 
 sub read_form{
+    foreach my $set (split(/,/,$ENV{'HTTP_COOKIE'}||'') ){
+        $::cookie{$`}=$' if $set =~ /=/ ;
+    }
     if( exists $ENV{REQUEST_METHOD} && $ENV{REQUEST_METHOD} eq 'POST' ){
         $ENV{CONTENT_LENGTH} > 1024*1024 and die('Too large form data');
         my $query_string;
@@ -284,7 +294,7 @@ sub putenc{
 }
 
 sub flush{
-    grep( $::final_plugin{$_}->( \$::print ) , sort keys %::final_plugin );
+    $::final_plugin{$_}->(\$::print) for(sort keys %::final_plugin);
     print $::print;
 }
 
@@ -402,11 +412,9 @@ sub form_preview_button{
     &puts('<input type="submit" name="a" value="Preview">');
 }
 sub form_signarea{
-    exists $::form{admin} or &is_frozen() or return;
+    &is_signed() or &is_frozen() or return;
 
     &puts('<input type="hidden" name="admin" value="admin">');
-
-    &print_signarea();
 
     &puts('<input type="checkbox" name="to_freeze" value="1"');
     &is_frozen() and &puts('checked');
@@ -540,9 +548,7 @@ sub print_signarea{
 }
 
 sub check_frozen{
-    if( exists $::form{admin} ){ ### Administrator mode ###
-        &ninsho;
-    }elsif( &is_frozen() ){ ### User ###
+    if( !is_signed() && &is_frozen() ){
         die( '!This page is frozen.!');
     }
 }
@@ -603,9 +609,85 @@ sub action_new{
 }
 
 sub load_config{
-    rename(&title2fname('','password'),'index.cgi');
     grep( (/^\#?([^\#\!\t ]+)\t(.*)$/ and $::config{$1}=&deyen($2),0)
         , split(/\n/,&read_file('index.cgi') ) );
+}
+
+sub is_signed{
+    if( defined($::signed) ){
+        return $::signed;
+    }
+    # time(TAB)ip(TAB)key
+    grep( (/^\#(\d+)\t([^\t]+)\t(.*)$/ 
+        and $1 > time - 24*60*60
+        and $::ip{$2}=[$3,$1],0)
+        , split(/\n/,&read_file('session.cgi') ) );
+    
+    my $remote_addr=$ENV{REMOTE_ADDR}||0;
+    if( exists $::ip{$remote_addr} &&
+        $::ip{$remote_addr}->[0] eq $::cookie{signkey} )
+    {
+        &update_session();
+        $::signed=1;
+    }else{
+        $::signed=0;
+    }
+}
+
+sub update_session{
+    my $remote_addr = $ENV{REMOTE_ADDR}||0;
+    if( exists $::ip{$remote_addr} && 
+        $::ip{$remote_addr}->[0] eq $::cookie{signkey} )
+    {
+        $::ip{$remote_addr}->[1] = time;
+    }else{
+        my $key=rand();
+        $::ip{$remote_addr} = [ $key , time ];
+        push( @::http_header , "Set-cookie: signkey=$key" );
+    }
+    &save_session();
+}
+sub save_session{
+    &lockdo( sub{ 
+        &write_file( 'session.cgi' , 
+            join("\n",map(sprintf("#%s\t%s\t%s",$::ip{$_}->[1],$_,$::ip{$_}->[0]),
+                 keys %::ip ))
+        ); } , 'session.cgi' 
+    );
+}
+
+sub action_signin{
+    if( $ENV{REQUEST_METHOD} eq 'POST' ){
+        &ninsho;
+        &is_signed();
+        &update_session();
+        &transfer_url($::me);
+    }else{
+        &print_header( title=>'Administrator Signin' );
+        &putenc(qq(<form action="%s" method="POST" accept-charset="%s">
+            <p>Sign: <input type="password" name="password">
+            <input type="hidden" name="a" value="signin">
+            <input type="submit" value="Enter"></p></form>)
+            , $::postme , $::charset );
+        &print_footer;
+    }
+}
+sub action_signout{
+    &is_signed();
+    delete $::ip{$ENV{REMOTE_ADDR}||0};
+    &save_session();
+    &transfer_url($::me);
+}
+
+sub plugin_signin{
+    if( &is_signed() ){
+        qq{<a href="$::me?a=signout">Signout</a>};
+    }else{
+        qq{<form action="$::postme" method="post">
+        <input type="hidden" name="a" value="signin">
+        Sign:<input type="password" name="password">
+        <input type="submit" name="s" value="Signin"></form>}
+    }
 }
 
 sub save_config{
@@ -615,6 +697,7 @@ sub save_config{
     }
     &lockdo( sub{ &write_file( 'index.cgi' , join("\n", @settings) ) } );
 }
+
 
 sub action_query_delete{
     &print_header( title=>'Remove attachment' );
@@ -657,13 +740,15 @@ sub action_preview{
 sub action_passwd{
     my ($p1,$p2) = ( $::form{p1} , $::form{p2} );
     &ninsho;
-    ( $p1 ne $p2 ) and die("!New signs differ from each other!");
-    $::config{crypt} = crypt($p1,"wk");
+    ( $p1 ne $p2 ) and die('!New signs differ from each other!');
+    $::config{crypt} = crypt($p1,'wk');
     &save_config;
     &transfer_url($::me);
 }
 
 sub action_tools{
+    is_signed() or die('!Required authentication!');
+
     &print_header( title=>'Tools' );
     &begin_day('Change Administrator\'s Sign');
     &putenc('<form action="%s" method="post"
@@ -726,7 +811,6 @@ sub action_tools{
         }
         &puts('</p></div></div>');
     }
-    &print_signarea();
     &puts('<input type="hidden" name="a" value="preferences">',
           '<input type="submit" value="Submit"></form>');
     &end_day();
@@ -735,7 +819,7 @@ sub action_tools{
 }
 
 sub action_preferences{
-    &ninsho;
+    is_signed() or die('!Required authentication!');
     foreach my $section (values %::preferences){
         foreach my $i (@{$section}){
             next unless exists $i->{name};
@@ -826,6 +910,7 @@ sub action_comment{
             and die("unable to comment to unexistant page.");
         &cacheoff;
         my $fname  = &title2fname($title,"comment.${comid}");
+        local *FP;
         open(FP,">>${fname}") or die("Can not open $fname for append");
             my @tm=localtime;
             printf FP "%04d/%02d/%02d %02d:%02d:%02d\t%s\t%s\r\n"
@@ -870,7 +955,13 @@ sub lockdo{
     my $code=shift;
     push(@_,'LOCK');
     my $lock=&title2fname(@_);
-    mkdir($lock,0777) or die("!Disk full or file writing conflict (lockfile=$lock)!");
+    my $retry=0;
+    while( mkdir($lock,0777)==0 ){
+        sleep(1);
+        if( ++$retry >= 3 ){
+            die("!Disk full or file writing conflict (lockfile=$lock)!");
+        }
+    }
     my $rc=undef;
     eval{ $rc=$code->() };
     my $err=$@;
@@ -899,7 +990,7 @@ sub do_submit{
 
 sub transfer_url{
     my $url=(shift || $::me);
-    print "Content-type: text/html\r\n\r\n";
+    print join("\r\n",@::http_header),"\r\n\r\n";
     print <<"BODY";
 <html>
 <head>
@@ -917,6 +1008,9 @@ sub transfer_page{
 }
 
 sub do_preview{
+    if( is_frozen() && !is_signed() ){
+        die("Permission denied\.");
+    }
     my $e_message = shift;
     my $title = $::form{p};
     $::form{honbun} = &deyen($::form{yensrc}) if exists $::form{yensrc};
@@ -932,6 +1026,9 @@ sub do_preview{
 }
 
 sub action_edit{
+    if( is_frozen() && !is_signed() ){
+        die("Permission denied\.");
+    }
     my $title = $::form{p};
     &print_header(title=>'Edit');
     &begin_day($title);
@@ -940,14 +1037,13 @@ sub action_edit{
     &print_form( $title , \$source , \$source );
     &end_day();
 
-    if( &object_exists($::form{p}) && exists $::form{admin} ){
+    if( &object_exists($::form{p}) && &is_signed() ){
         &begin_day('Rename');
         &putenc('<p><form action="%s" method="post">
             <input type="hidden"  name="a" value="ren">
             <input type="hidden"  name="p" value="%s">
             Title: <input type="text" name="newtitle" value="%s" size="80">'
             , $::postme , $::form{p} , $::form{p} );
-        &print_signarea();
         &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
         &end_day();
     }
@@ -1303,7 +1399,7 @@ sub plugin_pagename{
 
 sub plugin{
     my $session=shift;
-    my ($name,$param)=(split(/\s+/,shift,2),'');
+    my ($name,$param)=(map{(my $s=$_)=~s/<br>\Z//;$s} split(/\s+/,shift,2),'');
     $session->{argv} = $param;
     
     $param =~ s/\x02.*?\x02/"\x05".unpack('h*',$&)."\x05"/eg;
@@ -1382,6 +1478,7 @@ sub preprocess_decorations{
     $$text =~ s|==(.*?)=={(.*?)}|<del>$1</del><ins>$2</ins>|gs;
     $$text =~ s|==(.*?)==|<strike>$1</strike>|gs;
     $$text =~ s|``(.*?)``|'<tt class="pre">'.&cr2br($1).'</tt>'|ges;
+    $$text =~ s/\n/<br>\n/g if $::config{autocrlf} ;
 }
 
 sub preprocess_plugin{
@@ -1601,4 +1698,49 @@ sub block_normal{
         }
     }
     1;
+}
+
+####
+
+package Wifky::Page;
+sub new{
+    my $class=shift;
+    bless { @_ , attachment=>[] } , $class;
+};
+sub fname{
+    my ($self)=@_;
+    $self->{fname} ||= &::title2fname( $self->{title} );
+}
+sub title{
+    my ($self)=@_;
+    $self->{title} ||= &::fname2title( $self->{fname} );
+}
+sub source{
+    my ($self)=@_;
+    $self->{source} ||= &::read_file( $self->fname() );
+}
+sub encoded{
+    my ($self)=@_;
+    $self->{encoded} ||= &::enc( $self->source() );
+}
+sub mtime{
+    my ($self)=@_;
+    &ymdhms( $self->{mtimeraw} ||= (stat($self->{fname}))[9] )
+}
+sub add_attachment{
+    my $self=shift;
+    push( @{$self->{attachment}} , @_ );
+}
+
+sub list{
+    local *DIR;
+    opendir(DIR,'.') or die('can\'t read work directory.');
+    while( defined(my $fn=readdir(DIR)) ){
+        if( $fn =~ /^((?:[0-9a-f][0-9a-f])+)(__(?:[0-9a-f][0-9a-f])+)?$/ ){
+            my $page=Wifky::Page->new( fname=>$fn );
+            push( @::dir_cache , $page );
+            push( @{$::dir_cache{$1}} , $2||'' );
+        }
+    }
+    closedir(DIR);
 }
