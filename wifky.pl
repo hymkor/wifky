@@ -168,7 +168,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/09/16 17:02:16 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/10/27 13:38:06 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -643,7 +643,8 @@ sub update_session{
     }else{
         my $key=rand();
         $::ip{$remote_addr} = [ $key , time ];
-        push( @::http_header , "Set-cookie: signkey=$key" );
+        push( @::http_header ,
+              "Set-cookie: signkey=$key; path=".($ENV{SCRIPT_NAME}||'') );
     }
     &save_session();
 }
@@ -1128,7 +1129,19 @@ sub print_page{
         { depth => -1 , text  => $title , title => $title , sharp => '' }
     );
 
-    my %attachment=map{ &enc($_)=>1 } &list_attachment($title);
+    my %attachment;
+    foreach my $attach ( &list_attachment($title) ){
+        my $e_attach = &enc( $attach );
+        my $url=&attach2url($title,$attach);
+        $attachment{ $e_attach } = {
+            # for compatible #
+            name => $attach ,
+            url  => $url ,
+            tag  => $attach =~ /\.(png|gif|jpg|jpeg)$/i
+                    ? qq(<img src="${url}" alt="${e_attach}">)
+                    : qq(<a href="${url}" title="${e_attach}">${e_attach}</a>) ,
+        };
+    }
     my %session=(
         title      => $title ,
         attachment => \%attachment ,
