@@ -168,7 +168,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/10/27 13:38:06 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/10/27 14:00:46 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -625,7 +625,7 @@ sub is_signed{
     
     my $remote_addr=$ENV{REMOTE_ADDR}||0;
     if( exists $::ip{$remote_addr} &&
-        $::ip{$remote_addr}->[0] eq $::cookie{signkey} )
+        $::ip{$remote_addr}->[0] eq $::cookie{wifkysession} )
     {
         &update_session();
         $::signed=1;
@@ -637,14 +637,13 @@ sub is_signed{
 sub update_session{
     my $remote_addr = $ENV{REMOTE_ADDR}||0;
     if( exists $::ip{$remote_addr} && 
-        $::ip{$remote_addr}->[0] eq $::cookie{signkey} )
+        $::ip{$remote_addr}->[0] eq $::cookie{wifkysession} )
     {
         $::ip{$remote_addr}->[1] = time;
     }else{
         my $key=rand();
         $::ip{$remote_addr} = [ $key , time ];
-        push( @::http_header ,
-              "Set-cookie: signkey=$key; path=".($ENV{SCRIPT_NAME}||'') );
+        push( @::http_header , "Set-cookie: wifkysession=$key" );
     }
     &save_session();
 }
