@@ -150,7 +150,13 @@ sub init_globals{
         $::menubar{'900_SignOut'} = &anchor('SignOut',{a=>'signout'},{ref=>'nofollow'});
         $::menubar{'500_Tools'} = &anchor('Tools',{a=>'tools'},{ref=>'nofollow'});
     }else{
-        $::menubar{'900_SignIn'} = &anchor('SignIn',{a=>'signin'},{ref=>'nofollow'});
+        my $p={a=>'signin'};
+        if( ($ENV{REQUEST_METHOD}||'') eq 'GET' ){
+            while( my ($key,$val)=each %::form ){
+                $p->{"_$key"} = $val;
+            }
+        }
+        $::menubar{'900_SignIn'} = &anchor('SignIn',$p,{ref=>'nofollow'});
     }
 
     ### menubar ###
@@ -168,7 +174,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/10/27 14:00:46 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/11/11 18:23:08 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -661,14 +667,24 @@ sub action_signin{
         &ninsho;
         &is_signed();
         &update_session();
-        &transfer_url($::me);
+        my $f={};
+        while( my ($key,$val)=each %::form){
+            $f->{ $' } = $val if $key =~ /^_/;
+        }
+        &transfer_url(&myurl($f));
     }else{
         &print_header( title=>'Administrator Signin' );
         &putenc(qq(<form action="%s" method="POST" accept-charset="%s">
             <p>Sign: <input type="password" name="password">
             <input type="hidden" name="a" value="signin">
-            <input type="submit" value="Enter"></p></form>)
+            <input type="submit" value="Enter">)
             , $::postme , $::charset );
+        while( my ($key,$val)=each %::form ){
+            if( $key =~ /^_/ ){
+                &putenc('<input type="hidden" name="%s" value="%s" />', $key , $val );
+            }
+        }
+        &puts('</p></form>');
         &print_footer;
     }
 }
