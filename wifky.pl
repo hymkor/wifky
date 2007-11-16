@@ -72,6 +72,7 @@ sub init_globals{
                 ? sprintf(' target="%s"',$::config{target}) : '' );
     $::config{CSS} ||= 'CSS';
     $::config{FrontPage} ||= 'FrontPage';
+    ( $::session_cookie = ( split(/[\\\/]/,$0) )[-1] ) =~ s/\.\w+$/_session/;
 
     %::inline_plugin = (
         'adminmenu'=> \&plugin_menubar ,
@@ -156,7 +157,8 @@ sub init_globals{
                 $p->{"_$key"} = $val;
             }
         }
-        $::menubar{'900_SignIn'} = &anchor('SignIn',$p,{ref=>'nofollow'});
+        $::menubar{'900_SignIn'} = 
+            &anchor('SignIn',&create_forward_url(a=>'signin'),{ref=>'nofollow'});
     }
 
     ### menubar ###
@@ -174,7 +176,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/11/11 18:23:08 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/11/16 23:06:08 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -631,25 +633,27 @@ sub is_signed{
     
     my $remote_addr=$ENV{REMOTE_ADDR}||0;
     if( exists $::ip{$remote_addr} &&
-        $::ip{$remote_addr}->[0] eq $::cookie{wifkysession} )
+        $::ip{$remote_addr}->[0] eq $::cookie{$::session_cookie} )
     {
-        &update_session();
+        &touch_session();
         $::signed=1;
     }else{
         $::signed=0;
     }
 }
 
-sub update_session{
+sub touch_session{
     my $remote_addr = $ENV{REMOTE_ADDR}||0;
     if( exists $::ip{$remote_addr} && 
-        $::ip{$remote_addr}->[0] eq $::cookie{wifkysession} )
+        $::ip{$remote_addr}->[0] eq $::cookie{$::session_cookie} )
     {
+        ### update current session ###
         $::ip{$remote_addr}->[1] = time;
     }else{
+        ### create new session ###
         my $key=rand();
         $::ip{$remote_addr} = [ $key , time ];
-        push( @::http_header , "Set-cookie: wifkysession=$key" );
+        push( @::http_header , "Set-cookie: $::session_cookie=$key" );
     }
     &save_session();
 }
@@ -662,11 +666,20 @@ sub save_session{
     );
 }
 
+sub create_forward_url{
+    my $p={ @_ };
+    if( ($ENV{REQUEST_METHOD}||'') eq 'GET' ){
+        while( my ($key,$val)=each %::form ){
+            $p->{"_$key"} = $val;
+        }
+    }
+    $p;
+}
+
 sub action_signin{
     if( $ENV{REQUEST_METHOD} eq 'POST' ){
         &ninsho;
-        &is_signed();
-        &update_session();
+        &is_signed() or &touch_session();
         my $f={};
         while( my ($key,$val)=each %::form){
             $f->{ $' } = $val if $key =~ /^_/;
