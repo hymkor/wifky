@@ -155,11 +155,10 @@ sub init_globals{
         my $p={a=>'signin'};
         if( ($ENV{REQUEST_METHOD}||'') eq 'GET' ){
             while( my ($key,$val)=each %::form ){
-                $p->{"_$key"} = $val;
+                $p->{$key} ||= $val ;
             }
         }
-        $::menubar{'900_SignIn'} = 
-            &anchor('SignIn',&create_forward_url(a=>'signin'),{ref=>'nofollow'});
+        $::menubar{'900_SignIn'} = &anchor('SignIn',$p,{ref=>'nofollow'});
     }
 
     ### menubar ###
@@ -176,7 +175,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/11/17 01:57:33 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/11/18 11:49:10 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -676,15 +675,6 @@ sub save_session{
     );
 }
 
-sub create_forward_url{
-    my $p={ @_ };
-    if( ($ENV{REQUEST_METHOD}||'') eq 'GET' ){
-        while( my ($key,$val)=each %::form ){
-            $p->{"_$key"} = $val;
-        }
-    }
-    $p;
-}
 
 sub action_signin{
     &print_header( title=>'Signin form' );
