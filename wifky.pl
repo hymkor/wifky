@@ -113,9 +113,8 @@ sub init_globals{
         'edt'           => \&action_edit ,
         'pwd'           => \&action_passwd ,
         'ren'           => \&action_rename ,
-        'del'           => \&action_delete ,
         'comment'       => \&action_comment ,
-        'Delete'        => \&action_query_delete ,
+        'Delete'        => \&action_delete ,
         'Commit'        => \&action_commit ,
         'Preview'       => \&action_preview ,
         'Upload'        => \&action_upload ,
@@ -123,29 +122,28 @@ sub init_globals{
         'preferences'   => \&action_preferences ,
         'new'           => \&action_new ,
         'signin'        => \&action_signin ,
-        'signinext'     => \&action_signinext ,
         'signout'       => \&action_signout ,
     );
 
     @::http_header = ( "Content-type: text/html; charset=$::charset" );
 
     @::html_header = (
-      qq(<meta http-equiv="Content-Type"
-        content="text/html; charset=$::charset">
-        <meta http-equiv="Content-Style-Type" content="text/css">
-        <meta name="generator" content="wifky.pl $::version">
-        <link rel="start" href="$::me">
-        <link rel="index" href="$::me?a=index">)
+      qq(<meta http-equiv="Content-Type" content="text/html; charset=$::charset">\n<meta http-equiv="Content-Style-Type" content="text/css">\n<meta name="generator" content="wifky.pl $::version">\n<link rel="start" href="$::me">\n<link rel="index" href="$::me?a=index">)
     );
 
-    @::body_header = ( $::config{body_header}||'' );
+    @::body_header = ( 
+        ### qq{<form name="newform" action="$::me" method="post" style="display:none"><input type="hidden" name="p" /><input type="hidden" name="a" value="edt" /></form>} || 
+        ''||$::config{body_header} );
 
     %::menubar = (
         '100_FrontPage' => &anchor($::config{FrontPage} , undef  ) ,
         '600_Index'     => &anchor('Index',{a=>'recent'}) ,
     );
     if( !&is('lonely') || &is_signed() ){
-        $::menubar{'200_New'} = &anchor('New' , { a=>'new' } );
+        $::menubar{'200_New'} 
+            = &anchor('New' , { a=>'new' } 
+         ###, { onClick=> "JavaScript:if(typeof(document.newform.p.value=prompt('New page name'))!='undefined'){document.newform.submit()};return false" }
+        );
     }
     @::menubar = ();
     if( &is_signed() ){
@@ -175,7 +173,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/11/18 11:49:10 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/11/20 08:25:28 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -443,9 +441,6 @@ sub form_commit_button{
 sub form_attachment{
     &begin_day('Attachment');
     &puts('<p>New:<input type="file" name="newattachment_b" size="48">');
-    if( exists $::form{admin} || &is_frozen() ){
-        &print_signarea();
-    }
     &puts('<input type="submit" name="a" value="Upload"></p>');
     my @attachments=&list_attachment( $::form{p} ) or return;
     &puts('<p>');
@@ -460,7 +455,7 @@ sub form_attachment{
         &putenc('(%d bytes, at %s)',(stat $fn)[7],&mtime($fn));
         &puts('<br>');
     }
-    &puts('</p><input type="submit" name="a" value="Delete">
+    &puts('</p><input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">
         <input type="submit" name="dummybotton" value="Download">');
     &end_day();
 }
@@ -696,9 +691,10 @@ sub action_signin{
 }
 
 sub action_signout{
-    &is_signed();
-    delete $::ip{$ENV{REMOTE_ADDR}||0};
-    &save_session();
+    if( &is_signed() ){
+        delete $::ip{$ENV{REMOTE_ADDR}||0};
+        &save_session();
+    }
     &transfer_url($::me);
 }
 
@@ -719,26 +715,6 @@ sub save_config{
         $val and push( @settings , '#'.$key."\t".&yen($val) );
     }
     &lockdo( sub{ &write_file( 'index.cgi' , join("\n", @settings) ) } );
-}
-
-
-sub action_query_delete{
-    &print_header( title=>'Remove attachment' );
-    &puts(qq(<form action="$::postme" method="post">));
-    &putenc( q(<p>Remove attachment '%s' of '%s'.<br>),$::form{f},$::form{p} );
-    &is_frozen() and &print_signarea();
-    exists $::form{admin} and &puts('<input type="hidden" name="admin" value="admin">');
-    &putenc('<div>Are you sure ? </div>
-        <input type="submit" name="yes"    value="Yes">
-        <input type="submit" name="no"     value="No">
-        <input type="hidden" name="a"      value="del">
-        <input type="hidden" name="p"      value="%s">
-        <input type="hidden" name="f"      value="%s">
-        <input type="hidden" name="orgsrc_y" value="%s">
-        <input type="hidden" name="text_y" value="%s"></p></form>',
-            , $::form{p} , $::form{f} 
-            , &yen($::form{orgsrc_t}) , &yen($::form{text_t}) );
-    &print_footer;
 }
 
 sub action_commit{
@@ -762,8 +738,9 @@ sub action_preview{
 }
 
 sub action_passwd{
+    goto &signin unless is_signed();
+
     my ($p1,$p2) = ( $::form{p1} , $::form{p2} );
-    &ninsho;
     ( $p1 ne $p2 ) and die('!New signs differ from each other!');
     $::config{crypt} = crypt($p1,'wk');
     &save_config;
@@ -771,7 +748,7 @@ sub action_passwd{
 }
 
 sub action_tools{
-    is_signed() or die('!Required authentication!');
+    goto &action_signin unless is_signed();
 
     &print_header( title=>'Tools' );
     &begin_day('Change Administrator\'s Sign');
@@ -843,7 +820,8 @@ sub action_tools{
 }
 
 sub action_preferences{
-    is_signed() or die('!Required authentication!');
+    goto &action_signin unless is_signed();
+
     foreach my $section (values %::preferences){
         foreach my $i (@{$section}){
             next unless exists $i->{name};
@@ -869,7 +847,7 @@ sub action_preferences{
 }
 
 sub action_rename{
-    &ninsho;
+    goto &signin unless &is_signed();
 
     my $newtitle = $::form{newtitle};
     my $title    = $::form{p};
@@ -914,12 +892,11 @@ sub action_seek{
 }
 
 sub action_delete{
-    if( exists $::form{yes} ){
-        &is_frozen() and &ninsho;
-        my $fn=&title2fname( $::form{p} , $::form{f} );
-        unlink( $fn ) or rmdir( $fn );
+    goto &action_signin if &is_frozen() && !&is_signed();
+
+    my $fn=&title2fname( $::form{p} , $::form{f} );
+    unlink( $fn ) or rmdir( $fn );
         &cacheoff;
-    }
     &do_preview;
 }
 
@@ -1032,9 +1009,8 @@ sub transfer_page{
 }
 
 sub do_preview{
-    if( is_frozen() && !is_signed() ){
-        return &action_signin();
-    }
+    goto &action_signin if is_frozen() && !&is_signed();
+
     my $e_message = shift;
     my $title = $::form{p};
 
@@ -1048,9 +1024,8 @@ sub do_preview{
 }
 
 sub action_edit{
-    if( is_frozen() && !is_signed() ){
-        goto &action_signin();
-    }
+    goto &action_signin if is_frozen() && !&is_signed();
+
     my $title = $::form{p};
     &print_header(title=>'Edit');
     &begin_day($title);
@@ -1732,49 +1707,4 @@ sub block_normal{
         }
     }
     1;
-}
-
-####
-
-package Wifky::Page;
-sub new{
-    my $class=shift;
-    bless { @_ , attachment=>[] } , $class;
-};
-sub fname{
-    my ($self)=@_;
-    $self->{fname} ||= &::title2fname( $self->{title} );
-}
-sub title{
-    my ($self)=@_;
-    $self->{title} ||= &::fname2title( $self->{fname} );
-}
-sub source{
-    my ($self)=@_;
-    $self->{source} ||= &::read_file( $self->fname() );
-}
-sub encoded{
-    my ($self)=@_;
-    $self->{encoded} ||= &::enc( $self->source() );
-}
-sub mtime{
-    my ($self)=@_;
-    &ymdhms( $self->{mtimeraw} ||= (stat($self->{fname}))[9] )
-}
-sub add_attachment{
-    my $self=shift;
-    push( @{$self->{attachment}} , @_ );
-}
-
-sub list{
-    local *DIR;
-    opendir(DIR,'.') or die('can\'t read work directory.');
-    while( defined(my $fn=readdir(DIR)) ){
-        if( $fn =~ /^((?:[0-9a-f][0-9a-f])+)(__(?:[0-9a-f][0-9a-f])+)?$/ ){
-            my $page=Wifky::Page->new( fname=>$fn );
-            push( @::dir_cache , $page );
-            push( @{$::dir_cache{$1}} , $2||'' );
-        }
-    }
-    closedir(DIR);
 }
