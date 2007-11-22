@@ -173,7 +173,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/11/20 08:25:28 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/11/23 00:21:39 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -324,6 +324,7 @@ sub enc{
     $s =~ tr/\r\a\b//d;
     $s;
 }
+
 sub denc{
     my $s = shift;
     defined($s) or return '';
@@ -661,6 +662,7 @@ sub touch_session{
     }
     &save_session();
 }
+
 sub save_session{
     &lockdo( sub{ 
         &write_file( 'session.cgi' , 
@@ -669,7 +671,6 @@ sub save_session{
         ); } , 'session.cgi' 
     );
 }
-
 
 sub action_signin{
     &print_header( title=>'Signin form' );
@@ -698,21 +699,10 @@ sub action_signout{
     &transfer_url($::me);
 }
 
-sub plugin_signin{
-    if( &is_signed() ){
-        qq{<a href="$::me?a=signout">Signout</a>};
-    }else{
-        qq{<form action="$::postme" method="post">
-        <input type="hidden" name="a" value="signin">
-        Sign:<input type="password" name="password">
-        <input type="submit" name="s" value="Signin"></form>}
-    }
-}
-
 sub save_config{
     my @settings;
     while( my ($key,$val)=each %::config ){
-        $val and push( @settings , '#'.$key."\t".&yen($val) );
+        push( @settings , '#'.$key."\t".&yen($val) ) if $val;
     }
     &lockdo( sub{ &write_file( 'index.cgi' , join("\n", @settings) ) } );
 }
