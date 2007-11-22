@@ -173,7 +173,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/11/23 01:16:36 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/11/23 01:41:52 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -276,7 +276,7 @@ sub set_form{
 }
 
 sub read_form{
-    foreach my $set (split(/,/,$ENV{'HTTP_COOKIE'}||'') ){
+    foreach my $set (split(/[,;]\s*/,$ENV{'HTTP_COOKIE'}||'') ){
         $::cookie{$`}=$' if $set =~ /=/ ;
     }
     if( exists $ENV{REQUEST_METHOD} && $ENV{REQUEST_METHOD} eq 'POST' ){
