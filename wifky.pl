@@ -133,7 +133,7 @@ sub init_globals{
 
     @::body_header = ( 
         ### qq{<form name="newform" action="$::me" method="post" style="display:none"><input type="hidden" name="p" /><input type="hidden" name="a" value="edt" /></form>} || 
-        ''||$::config{body_header} );
+        $::config{body_header}||'' );
 
     %::menubar = (
         '100_FrontPage' => &anchor($::config{FrontPage} , undef  ) ,
@@ -173,7 +173,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/11/23 00:21:39 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/11/23 00:30:04 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
