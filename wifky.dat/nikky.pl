@@ -56,7 +56,7 @@ if( exists $::form{a} && ($::form{a} eq 'date' || $::form{a} eq 'nikky') ){
     delete $::menubar{'400_Edit(Admin)'};
 }
 
-$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/11/24 15:17:53 $'}= [
+$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/11/24 17:26:19 $'}= [
     { desc=>'Author'
     , name=>'nikky_author' , size=>20 },
     { desc=>'Print diary as FrontPage'
@@ -621,6 +621,24 @@ $::inline_plugin{'archives'} = sub {
         next if $ym < $startym;
 
         $html .= sprintf( '<li class="sowp-nikkytools-archives-month"><a href="%s?a=archives;year=%d;month=%d">%s [%d]</a></li>', $::me, $year, $month, &year_and_month($year,$month),$diary{$ym});
+    }
+    $html . '</ul>';
+};
+
+$::inline_plugin{'packedarchives'} = sub {
+    my %diary;
+    for my $fn ( &::list_page() ){
+        if( &::fname2title($fn) =~ /^\((\d+)\.(\d\d)\.\d\d\)/ ){
+            ($diary{ $1 }||={})->{$2}++;
+        }
+    }
+    my $html = '<ul class="sowp-nikkytools-archives">';
+    for my $y ( sort keys %diary ){
+        $html .= '<li class="sowp-nikkytools-archives-month">'.$y;
+        for my $m ( sort keys %{$diary{$y}} ){
+            $html .= sprintf('|<a href="%s?a=archives;year=%d;month=%d" title="%d article(s)">%02d</a>' , $::me , $y , $m , $diary{$y}->{$m} , $m );
+        }
+        $html .= '</li>';
     }
     $html . '</ul>';
 };
