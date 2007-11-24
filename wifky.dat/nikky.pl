@@ -1,3 +1,6 @@
+# nikky.pl - diary plugin for wifky.pl
+# 2006-2007 (c) NoGood/VOYAGER/Hayamadas
+
 package wifky::nikky;
 
 # use strict; use warnings;
@@ -9,7 +12,7 @@ my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
 
 push( @::body_header , qq{<form name="newdiary" action="$::me" method="post" style="display:none"><input type="hidden" name="p" /><input type="hidden" name="a" value="edt" /></form>} );
 
-$::menubar{'200_New'} &&= &::anchor('New',{a=>'new'},{onClick=> "JavaScript:(function(){var T=new Date();if(typeof(document.newdiary.p.value=prompt('Create a new diary','('+(1900+T.getYear())+'.'+(T.getMonth()+1)+'.'+T.getDate()+')'))!='undefined'){document.newdiary.submit()}})();return false" } );
+$::menubar{'200_New'} &&= qq|<a href="$::me?a=new" onClick="JavaScript:(function(){var T=new Date();if(typeof(document.newdiary.p.value=prompt('Create a new diary','('+(1900+T.getYear())+'.'+(T.getMonth()+1)+'.'+T.getDate()+')'))!='undefined'){document.newdiary.submit()}})();return false">New</a>|;
 
 $::inline_plugin{'nikky.pl_version'} = sub{ "nikky.pl $version" };
 $::inline_plugin{lastdiary}=\&lastdiary;
@@ -52,7 +55,7 @@ if( exists $::form{a} && ($::form{a} eq 'date' || $::form{a} eq 'nikky') ){
     delete $::menubar{'400_Edit(Admin)'};
 }
 
-$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/11/24 11:38:15 $'}= [
+$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/11/24 15:02:19 $'}= [
     { desc=>'Author'
     , name=>'nikky_author' , size=>20 },
     { desc=>'Print diary as FrontPage'
@@ -548,15 +551,7 @@ sub calender{
         my $d=substr($_->{title},9,2); $d =~ s/^0//; ($d,$_);
     } &::ls_core( {} , sprintf('(%04d.%02d.??)*',$y,$m));
 
-    my $title;
-    if( &::is('nikky_calendertype') ){
-        $title = sprintf('%s %d' ,
-                    (qw(January Feburary March April May June
-                        July August September October November December)
-                    )[$m-1] , $y );
-    }else{
-        $title = sprintf('%d/%d',$y,$m);
-    }
+    my $title=&year_and_month($y,$m);
 
     if( defined($mode) && $mode eq 'f' ) {
         my $buffer = sprintf(
@@ -599,201 +594,64 @@ sub stamp_format{
         (split(/\s+/,gmtime( $_[0] )))[0,2,1,4,3]);
 }
 
-# =============================================================================
-# sowp.NikkyTools
-# Specification 1, Working Draft 1
-# (C) Copyright, VOYAGER, 2007 Aug. 18th, All Rights Reserved.
-# http://www.geocities.jp/scriptonwikipage/
-# =============================================================================
-
-package sowp_NikkyTools_S1WD01;
-
-# use strict;use warnings;
-
-sub new_Months      { return $_[0] * 12 + $_[1]; }
-sub Months_getYear  { return int( $_[0] / 12 ); }
-sub Months_getMonth { return $_[0] % 12; }
-
-my (@Month_toEnglish) =
-  qw/January February March April May June July August September October November December/;
-
-# =============================================================================
-
 $::inline_plugin{'archives'} = sub {
-    unless ( @_ <= 2 ) {
-        return
-          '<p><blink>archives: Count of parameters must be 0 or 1</blink></p>';
-    }
+    my (undef,$backMonths)=@_;
 
-    my ($backMonths) = undef;
-
-    if ( @_ == 2 ) {
-        unless ( $_[1] =~ m/^\d+$/ ) {
-            return
-              '<p><blink>archives: 1st parameter must be digits.</blink></p>';
-        }
-        $backMonths = $_[1];
-    }
-
-   # ---------------------------------------------------------------------------
-
-    local (*DIR);
-    opendir( DIR, '.' )
-      or return
-      '<p><blink>archives: Could not open the working-directory.</blink></p>';
-    my (@diaries) =
-      sort grep { $_ =~ m/^\(\d+\.\d\d\.\d\d\)/ } map &::fname2title($_),
-      readdir(DIR);
-    closedir(DIR);
-
-   # ---------------------------------------------------------------------------
-
-    return '<ul class="sowp-nikkytools-archives"></ul>' unless @diaries;
-
-   # ---------------------------------------------------------------------------
-
-    $diaries[0] =~ m/\((\d+)\.(\d\d)\.\d\d\)/;
-    my ($firstMonths) = &new_Months( $1, $2 - 1 );
-
-    my (@localtime) = localtime;
-    my ($currentMonths) = &new_Months( $localtime[5] + 1900, $localtime[4] );
-
+    my $startym='1900.00';
     if ( defined($backMonths) ) {
-        my ($specifiedMonths) = $currentMonths - $backMonths;
-        $firstMonths = $specifiedMonths if $firstMonths < $specifiedMonths;
+        if( $backMonths !~ m/^\d+$/ ){
+            return '<blink>archives: 1st parameter must be digits.</blink>';
+        }
+        my @localtime = localtime;
+        my $currentMonths = ($localtime[5]+1900)*12+$localtime[4];
+        my $specifiedMonths = $currentMonths - $backMonths;
+        $startym = sprintf("%04d.%02d",int($specifiedMonths/12),$specifiedMonths%12+1);
     }
 
-   # ---------------------------------------------------------------------------
-
-    my ($html) = '<ul class="sowp-nikkytools-archives">';
-
-    for ( my ($m) = $currentMonths - 1 ; $firstMonths <= $m ; --$m ) {
-        my ($year)  = &Months_getYear($m);
-        my ($month) = &Months_getMonth($m);
-
-        my ($pattern) =
-          sprintf( '^\\(%d\\.%02d\\.\\d\\d\\)', $year, $month + 1 );
-        my ($diaries_length) = scalar( grep { $_ =~ m/${pattern}/ } @diaries );
-
-        next unless 0 < $diaries_length;
-
-        $html .=
-          sprintf(
-qq|<li class="sowp-nikkytools-archives-month"><a href="$ENV{'SCRIPT_NAME'}?a=archives;year=%d;month=%d">$Month_toEnglish[$month] $year [$diaries_length]</a></li>|,
-            $year, $month + 1 );
+    my %diary;
+    for my $fn ( &::list_page() ){
+        $diary{ $1 }++ if &::fname2title($fn) =~ /^\((\d+\.\d\d)\.\d\d\)/;
     }
 
-    $html .= '</ul>';
+    my $html = '<ul class="sowp-nikkytools-archives">';
+    for my $ym ( reverse sort keys %diary ){
+        my ($year,$month) = split(/\./,$ym);
 
-    return $html;
+        next if $ym < $startym;
+
+        $html .= sprintf( '<li class="sowp-nikkytools-archives-month"><a href="%s?a=archives;year=%d;month=%d">%s [%d]</a></li>', $::me, $year, $month, &year_and_month($year,$month),$diary{$ym});
+    }
+    $html . '</ul>';
 };
-
-# =============================================================================
-
-sub Error {
-    &::print_header( 'title' => 'archives: error.', userheader => 1 );
-    &::begin_day('archives: error.');
-    &::puts("<p><blink>archives: error: $_[0]</blink></p>");
-    &::end_day();
-    &::print_copyright();
-    &::print_sidebar_and_footer();
-}
-
-# -----------------------------------------------------------------------------
 
 $::action_plugin{'archives'} = sub {
-
-   # ---------------------------------------------------------------------------
-   # Extract valid parameters
-
-    my ($year)  = undef;
-    my ($month) = undef;
-
-    # year= ..............................
-
-    if ( exists( $::form{'year'} ) ) {
-        unless ( $::form{'year'} =~ m/^\d+$/ && 1900 <= $::form{'year'} ) {
-            &Error(
-'Parameter "year=" must be a number greater than or equal to 1900.'
-            );
-            return;
-        }
-
-        $year = $::form{'year'};
-        delete $::form{'year'};
+    my $year = $::form{year};
+    if( ! defined($year) || $year !~ /^\d\d\d\d$/ ){
+        die('!Parameter "year=" must be a number.!');
     }
-
-    unless ( defined($year) ) {
-        &Error('Parameter "year=" must be set.');
-        return;
+    my $month = $::form{month};
+    if( ! defined($month) || $month !~ /^\d\d?$/ ){
+        die('!Parameter "month=" must be a number!');
     }
-
-    # month= .............................
-
-    if ( exists( $::form{'month'} ) ) {
-        unless ( $::form{'month'} =~ m/^\d+$/
-            && 1 <= $::form{'month'}
-            && $::form{'month'} <= 12 )
-        {
-            &Error('Parameter "month=" must be a number from 1 to 12.');
-            return;
-        }
-
-        $month = $::form{'month'};
-        delete $::form{'month'};
-    }
-
-    unless ( defined($month) ) {
-        &Error('Parameter "month=" must be set.');
-        return;
-    }
-
-    # for an unknown parameter ...........
-
-    delete( $::form{'a'} );
-
-    if (%::form) {
-        foreach my $key ( keys(%::form) ) {
-            &Error(qq|An unknown parameter "${key}=" is set.|);
-            return;
-        }
-    }
-
-   # ---------------------------------------------------------------------------
-   # archives body
-
-    local (*DIR);
-    unless ( opendir( DIR, '.' ) ) {
-        &Error('Could not open the working-directory.');
-        return;
-    }
-    my ($pattern) = sprintf( '^\\(%d\\.%02d\\.\\d\\d\\)', $year, $month );
-    my (@diaries) = sort grep { $_ =~ m/${pattern}/ } map &::fname2title($_),
-      readdir(DIR);
-    closedir(DIR);
-
-    my ($ss_terminator) = %::ss ? $::ss{'terminator'} : 'terminator';
-    my ($h) = $::version ge '1.1' || &::is('cssstyle') ? 2 : 1;
+    my @diaries = &::ls_core( {} ,sprintf( '(%04d.%02d.??)*', $year, $month ) );
 
     &::print_header(
-        'title'      => "archives: ${year} $Month_toEnglish[$month-1]",
+        'title'      => 'archives: '.&year_and_month($year,$month) ,
         'userheader' => !0
     );
-    foreach my $diary (@diaries) {
-        next unless -f &::title2fname($diary);
-        &::puts('<div class="day">');
-        &::putenc( '<h%d><a href="%s">%s</a></h%d><div class="body">',
-            $h, &::title2url($diary), $diary, $h );
-        local ( $::form{'p'} ) = $diary;
-        &::print_page( 'title' => $diary );
-        &::puts('</div></div>');
-        &::print_page( 'title' => 'Footer', 'class' => $ss_terminator );
-    }
+    &concat_article( @diaries );
     &::print_copyright();
     &::print_sidebar_and_footer();
 };
 
-# =============================================================================
-!0;
+sub year_and_month{
+    my ($y,$m)=@_;
+    if( &::is('nikky_calendertype') ){
+        sprintf('%s %d' , ( qw/January February March April May June July 
+                            August September October November December/ )[$m-1],$y);
+    }else{
+        sprintf('%04d.%02d',$y,$m);
+    }
+}
 
 1;
