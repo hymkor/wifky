@@ -1,7 +1,3 @@
-# nikky.pl - diary plugin for wifky.pl
-# 2006-2007 (c) NoGood/VOYAGER/Hayamadas
-# Licensed with Modified BSD Style.
-
 package wifky::nikky;
 
 # use strict; use warnings;
@@ -13,7 +9,8 @@ my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
 
 push( @::body_header , qq{<form name="newdiary" action="$::me" method="post" style="display:none"><input type="hidden" name="p" /><input type="hidden" name="a" value="edt" /></form>} );
 
-$::menubar{'200_New'} &&= qq|<a href="$::me?a=new" onClick="JavaScript:(function(){var T=new Date();if(typeof(document.newdiary.p.value=prompt('Create a new diary','('+(1900+T.getYear())+'.'+(T.getMonth()+1)+'.'+T.getDate()+')'))!='undefined'){document.newdiary.submit()}})();return false">New</a>|;
+my @tm=localtime();
+$::menubar{'200_New'} &&= sprintf( q|<a href="%s?a=new" onClick="JavaScript:if(document.newdiary.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newdiary.submit()};return false;">New</a>|,$::me,$tm[5]+1900,$tm[4]+1,$tm[3] );
 
 $::inline_plugin{'nikky.pl_version'} = sub{ "nikky.pl $version" };
 $::inline_plugin{lastdiary}=\&lastdiary;
@@ -56,7 +53,7 @@ if( exists $::form{a} && ($::form{a} eq 'date' || $::form{a} eq 'nikky') ){
     delete $::menubar{'400_Edit(Admin)'};
 }
 
-$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/11/24 17:26:19 $'}= [
+$::preferences{'Plugin: nikky.pl '.$version.' $Date: 2007/11/25 10:33:31 $'}= [
     { desc=>'Author'
     , name=>'nikky_author' , size=>20 },
     { desc=>'Print diary as FrontPage'
