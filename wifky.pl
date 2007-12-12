@@ -177,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 21:35:10 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 21:43:59 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -720,12 +720,10 @@ sub action_commit{
     eval{
         &check_frozen();
         &check_conflict();
-        if( $::form{text_t} ne $::form{orgsrc_t} ){
-            &archive() if $::config{archivemode};
-            &do_submit();
-        }else{
-            &transfer_page();
+        if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
+            &archive();
         }
+        &do_submit();
     };
     &do_preview( &errmsg($@) ) if $@;
 }
