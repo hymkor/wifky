@@ -174,8 +174,9 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 13:59:46 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 14:31:05 $' ,
               type=>'rem' },
+            { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
             { desc=>'The sitename', name=>'sitename', size=>40 },
@@ -461,7 +462,7 @@ sub form_attachment{
         &puts('<strong>frozen</strong>') unless -w _;
         &puts(')<br>');
     }
-    &puts('</p><input type="submit" name="a" value="Freeze/Fresh">')
+    &puts('</p><input type="submit" name="a" value="Freeze/Fresh">');
     &puts('<input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">');
     &end_day();
 }
@@ -716,9 +717,22 @@ sub action_commit{
     eval{
         &check_frozen();
         &check_conflict();
-        &do_submit();
+        if( $::form{text_t} ne $::form{orgsrc_t} ){
+            &archive() if $::config{archivemode};
+            &do_submit();
+        }
     };
     &do_preview( &errmsg($@) ) if $@;
+}
+
+sub archive{
+    my @tm=localtime;
+    my $source=&title2fname($::form{p});
+    my $backno=&title2fname($::form{p},
+        sprintf('~%02d%02d%02d_%02d%02d.txt',$tm[5]%100,1+$tm[4],@tm[3,2,1] )
+    );
+    rename( $source , $backno );
+    chmod( 0444 , $backno );
 }
 
 sub action_preview{
