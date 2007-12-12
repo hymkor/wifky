@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
@@ -60,6 +60,9 @@ sub change_directory{
         mkdir($pagedir,0755);
         chdir $pagedir or die("can not access $pagedir.");
     }
+    # local *ERR;
+    # open(ERR,'>>stderr.txt');
+    # open(STDERR,'>&ERR');
 }
 
 sub init_globals{
@@ -174,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 14:31:05 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 21:35:10 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -568,7 +571,7 @@ sub check_frozen{
 }
 sub check_conflict{
     my $current_source = &read_object($::form{p});
-    my $before_source  = &deyen($::form{orgsrc_t});
+    my $before_source  = $::form{orgsrc_t};
     if( $current_source ne $before_source ){
         die( "!Someone else modified this page after you began to edit."  );
     }
@@ -720,6 +723,8 @@ sub action_commit{
         if( $::form{text_t} ne $::form{orgsrc_t} ){
             &archive() if $::config{archivemode};
             &do_submit();
+        }else{
+            &transfer_page();
         }
     };
     &do_preview( &errmsg($@) ) if $@;
