@@ -1,11 +1,11 @@
 #!/usr/local/bin/perl
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.3.0_0';
+$::version  = '1.3.1_0';
 %::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -123,6 +123,7 @@ sub init_globals{
         'new'           => \&action_new ,
         'signin'        => \&action_signin ,
         'signout'       => \&action_signout ,
+        'Freeze/Fresh'  => \&action_freeze_or_fresh ,
     );
 
     @::http_header = ( "Content-type: text/html; charset=$::charset" );
@@ -173,7 +174,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/11/23 01:41:52 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 13:59:46 $' ,
               type=>'rem' },
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -446,18 +447,22 @@ sub form_attachment{
     my @attachments=&list_attachment( $::form{p} ) or return;
     &puts('<p>');
     foreach my $attach (sort @attachments){
-        &putenc('<input type="radio" name="f" value="%s" ><input
-                type="text" name="dummy" readonly value="&lt;&lt;{%s}"
-                size="20" style="font-family:monospace"
-                onClick="this.select();">'
-              ,$attach ,$attach );
-
         my $fn = &title2fname($::form{p}, $attach);
-        &putenc('(%d bytes, at %s)',(stat $fn)[7],&mtime($fn));
-        &puts('<br>');
+
+        &putenc('<input type="checkbox" name="f" value="%s"' , $attach );
+        if( !&is_signed() && ! -w $fn ){
+            &puts(' disabled');
+        }
+        &putenc('><input type="text" name="dummy" readonly value="&lt;&lt;{%s}"
+                size="20" style="font-family:monospace"
+                onClick="this.select();">', $attach );
+        &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$attach } ).':' );
+        &putenc('%d bytes, at %s', (stat $fn)[7],&mtime($fn));
+        &puts('<strong>frozen</strong>') unless -w _;
+        &puts(')<br>');
     }
-    &puts('</p><input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">
-        <input type="submit" name="dummybotton" value="Download">');
+    &puts('</p><input type="submit" name="a" value="Freeze/Fresh">')
+    &puts('<input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">');
     &end_day();
 }
 
@@ -884,9 +889,28 @@ sub action_seek{
 sub action_delete{
     goto &action_signin if &is_frozen() && !&is_signed();
 
-    my $fn=&title2fname( $::form{p} , $::form{f} );
-    unlink( $fn ) or rmdir( $fn );
-        &cacheoff;
+    foreach my $f ( @{$::forms{f}} ){
+        my $fn=&title2fname( $::form{p} , $f );
+        if( -w $fn || &is_signed() ){
+            unlink( $fn ) or rmdir( $fn );
+        }
+    }
+    &cacheoff;
+    &do_preview;
+}
+
+sub action_freeze_or_fresh{
+    goto &action_signin unless &is_signed();
+
+    foreach my $f ( @{$::forms{f}} ){
+        my $fn=&title2fname( $::form{p} , $f );
+        if( -w $fn ){
+            chmod 0444,$fn;
+        }else{
+            chmod 0666,$fn;
+        }
+    }
+    &cacheoff;
     &do_preview;
 }
 
