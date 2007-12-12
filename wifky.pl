@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
@@ -177,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 21:43:59 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 22:17:28 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -978,9 +978,13 @@ sub do_index{
 sub action_upload{
     exists $::form{p} or die('not found pagename');
     &check_frozen;
-    &write_object( $::form{p} , $::form{'newattachment_b.filename'} ,
-                               \$::form{'newattachment_b'} );
-    &do_preview;
+    my $fn=&title2fname( $::form{p} , $::form{'newattachment_b.filename'} );
+    if( -r $fn && !-w _ ){
+        &do_preview('The attachment is frozen.');
+    }else{
+        &write_file( $fn , \$::form{'newattachment_b'} );
+        &do_preview;
+    }
 }
 
 sub lockdo{
