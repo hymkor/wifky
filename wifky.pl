@@ -177,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 22:17:28 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 22:31:53 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -732,7 +732,7 @@ sub archive{
     my @tm=localtime;
     my $source=&title2fname($::form{p});
     my $backno=&title2fname($::form{p},
-        sprintf('~%02d%02d%02d_%02d%02d.txt',$tm[5]%100,1+$tm[4],@tm[3,2,1] )
+        sprintf('~%02d%02d%02d_%02d%02d%02d.txt',$tm[5]%100,1+$tm[4],@tm[3,2,1,0] )
     );
     rename( $source , $backno );
     chmod( 0444 , $backno );
