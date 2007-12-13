@@ -177,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/12 22:31:53 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/13 15:31:59 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -465,7 +465,10 @@ sub form_attachment{
         &puts('<strong>frozen</strong>') unless -w _;
         &puts(')<br>');
     }
-    &puts('</p><input type="submit" name="a" value="Freeze/Fresh">');
+    &puts('</p>');
+    if( &is_signed() ){
+        &puts('<input type="submit" name="a" value="Freeze/Fresh">');
+    }
     &puts('<input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">');
     &end_day();
 }
