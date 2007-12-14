@@ -177,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/15 00:16:59 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/15 05:27:44 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -1407,7 +1407,6 @@ sub plugin_comment{
         close(FP);
     }
     unless( exists $opt{f} ){
-        my $readonly=(($::form{a}||0)eq'Preview'?' readonly':'');
         $buf .= <<HTML
 <div class="form">
 <form action="$::postme" method="post" class="comment">
@@ -1415,10 +1414,10 @@ sub plugin_comment{
 <input type="hidden" name="a" value="comment">
 <input type="hidden" name="comid" value="$ecomid">
 <div class="field name">
-<input type="text" name="who" size="10" class="field"$readonly>
+<input type="text" name="who" size="10" class="field">
 </div><!-- div.field name -->
 <div class="textarea">
-<textarea name="comment" cols="60" rows="1" class="field"$readonly></textarea>
+<textarea name="comment" cols="60" rows="1" class="field"></textarea>
 </div><!-- div.textarea -->
 <div class="button">
 <input type="submit" name="Comment" value="Comment">
