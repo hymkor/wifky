@@ -177,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/13 15:31:59 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/14 23:37:47 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -602,9 +602,7 @@ sub write_object{
 sub write_file{
     my ($fname,$body) = @_;
 
-    if( length( ref($body) ? $$body : $body ) <= 0 &&
-        scalar( grep(index($_,"${fname}__")==0 , &directory())) == 0 )
-    {
+    if( length( ref($body) ? $$body : $body ) <= 0 ){
         unlink($fname) or rmdir($fname);
         &cacheoff;
         0;
