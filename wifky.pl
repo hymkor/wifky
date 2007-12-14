@@ -177,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/14 23:37:47 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/15 00:16:59 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -1021,7 +1021,7 @@ sub do_submit{
         utime($sagetime,$sagetime,$fn) if $::form{sage};
         &transfer_page();
     }else{
-        &transfer_url($::me);
+        &transfer_url($::me.'?a=recent');
     }
 }
 
