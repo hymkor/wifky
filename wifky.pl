@@ -177,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/15 05:27:44 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/16 07:41:25 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -648,7 +648,7 @@ sub is_signed{
     
     my $remote_addr=$ENV{REMOTE_ADDR}||0;
     if( exists $::ip{$remote_addr} && 
-        $::ip{$remote_addr}->[0] eq $::cookie{$::session_cookie} )
+        $::ip{$remote_addr}->[0] eq ($::cookie{$::session_cookie}||'') )
     {
         &touch_session();
         $::signed=1;
@@ -763,8 +763,29 @@ sub action_passwd{
 sub action_tools{
     goto &action_signin unless is_signed();
 
+    push( @::html_header , <<HEADER );
+<script language="JavaScript">
+<!--
+    function hide(id){ document.getElementById(id).style.display = 'none'; }
+    function show(id){ document.getElementById(id).style.display = '';     }
+    var lastid="";
+// -->
+</script>
+HEADER
+
     &print_header( title=>'Tools' );
-    &begin_day('Change Administrator\'s Sign');
+
+    ### Section Select ###
+    &puts('<form action="#"><input type="hidden" name="a" value="tools">');
+    &putenc('<select onChange="if( lastid ){ hide(lastid); };show(this.options[this.selectedIndex].value);lastid=this.options[this.selectedIndex].value;return false;">' );
+    foreach my $section ( (sort keys %::preferences) , "Change Sign"){
+        &putenc('<option value="%s">%s</option>',$section,$section);
+    }
+    &puts('</select></form>');
+
+    ### Sign Change ###
+    &puts('<div id="Change Sign" style="display:none">');
+    &begin_day('Change Sign');
     &putenc('<form action="%s" method="post"
         ><p>Old Sign:<input name="password" type="password" size="40"
         ><br>New Sign(1):<input name="p1" type="password" size="40"
@@ -772,12 +793,15 @@ sub action_tools{
         ><br><input name="a" type="hidden"  value="pwd"
         ><input type="submit" value="Submit"></p></form>',$::postme);
     &end_day();
-    &begin_day('Preferences');
-    &putenc('<form action="%s" method="post">',$::postme);
+    &puts('</div>');
 
-    foreach my $section(sort keys %::preferences){
-        &putenc('<div class="section"><h3>%s</h3><div class="sectionbody"><p>'
-                    ,$section);
+    ### Other Sections ###
+    while( my ($section,undef)=each %::preferences ){
+        &putenc('<div id="%s" style="display:none" class="section">',$section );
+        &begin_day($section);
+        &putenc('<form action="%s" method="post">',$::postme);
+        &putenc('<input type="hidden" name="section" value="%s">',$section);
+
         foreach my $i ( @{$::preferences{$section}} ){
             $i->{type} ||= 'text';
             if( $i->{type} eq 'checkbox' ){
@@ -823,11 +847,11 @@ sub action_tools{
                 );
             }
         }
-        &puts('</p></div></div>');
+        &puts('<input type="hidden" name="a" value="preferences">',
+              '<input type="submit" value="Submit"></form>' );
+        &end_day();
+        &puts('</div>');
     }
-    &puts('<input type="hidden" name="a" value="preferences">',
-          '<input type="submit" value="Submit"></form>');
-    &end_day();
 
     &print_footer;
 }
@@ -835,24 +859,22 @@ sub action_tools{
 sub action_preferences{
     goto &action_signin unless is_signed();
 
-    foreach my $section (values %::preferences){
-        foreach my $i (@{$section}){
-            next unless exists $i->{name};
-            my $type = $i->{type} || 'text';
-            my $newval= exists $::form{'config__'.$i->{name}}
-                      ? $::form{'config__'.$i->{name}} : '';
-            if( $type eq 'checkbox' ){
-                $::config{ $i->{name} } = ($newval ? 1 : 0);
-            }elsif( $type eq 'password' ){
-                if( length($newval) > 0 ){
-                    if( $newval ne $::form{'verify__'.$i->{name}} ){
-                        die('invalud value for ' . $i->{name} );
-                    }
-                    $::config{ $i->{name} } = $newval;
+    foreach my $i ( @{$::preferences{$::form{section}}} ){
+        next unless exists $i->{name};
+        my $type = $i->{type} || 'text';
+        my $newval= exists $::form{'config__'.$i->{name}}
+                  ? $::form{'config__'.$i->{name}} : '';
+        if( $type eq 'checkbox' ){
+            $::config{ $i->{name} } = ($newval ? 1 : 0);
+        }elsif( $type eq 'password' ){
+            if( length($newval) > 0 ){
+                if( $newval ne $::form{'verify__'.$i->{name}} ){
+                    die('invalud value for ' . $i->{name} );
                 }
-            }else{
                 $::config{ $i->{name} } = $newval;
             }
+        }else{
+            $::config{ $i->{name} } = $newval;
         }
     }
     &save_config;
