@@ -2,10 +2,12 @@
 
 # use strict; use warnings;
 
+$::version  = '1.3.1_0';
+
+$::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
-$::version  = '1.3.1_0';
 %::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
@@ -177,7 +179,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/22 07:18:09 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/22 07:54:07 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -768,7 +770,7 @@ sub action_tools{
 <!--
     function hide(id){ document.getElementById(id).style.display = 'none'; }
     function show(id){ document.getElementById(id).style.display = '';     }
-    var lastid="";
+    var lastid="*Change Sign*";
 // -->
 </script>
 HEADER
@@ -778,13 +780,13 @@ HEADER
     ### Section Select ###
     &puts('<form action="#"><input type="hidden" name="a" value="tools">');
     &putenc('<select onChange="if( lastid ){ hide(lastid); };show(this.options[this.selectedIndex].value);lastid=this.options[this.selectedIndex].value;return false;">' );
-    foreach my $section ( (sort keys %::preferences) , "Change Sign"){
+    foreach my $section ( "*Change Sign*", sort keys %::preferences ){
         &putenc('<option value="%s">%s</option>',$section,$section);
     }
     &puts('</select></form>');
 
     ### Sign Change ###
-    &puts('<div id="Change Sign" style="display:none">');
+    &puts('<div id="*Change Sign*">');
     &begin_day('Change Sign');
     &putenc('<form action="%s" method="post"
         ><p>Old Sign:<input name="password" type="password" size="40"
