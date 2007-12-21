@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
@@ -177,7 +177,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/16 07:41:25 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/22 07:18:09 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
