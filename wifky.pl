@@ -179,7 +179,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/22 13:16:49 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/22 14:32:43 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -248,7 +248,6 @@ sub init_globals{
 
 sub browser_cache_off{
     push( @::http_header,"Pragma: no-cache\r\nCache-Control: no-cache\r\nExpires: Thu, 01 Dec 1994 16:00:00 GMT" );
-HERE
 }
 
 sub read_multimedia{
