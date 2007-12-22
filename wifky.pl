@@ -179,7 +179,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/22 07:54:07 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/22 13:16:49 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -244,6 +244,11 @@ sub init_globals{
     );
 
     @::outline = ();
+}
+
+sub browser_cache_off{
+    push( @::http_header,"Pragma: no-cache\r\nCache-Control: no-cache\r\nExpires: Thu, 01 Dec 1994 16:00:00 GMT" );
+HERE
 }
 
 sub read_multimedia{
@@ -765,6 +770,7 @@ sub action_passwd{
 sub action_tools{
     goto &action_signin unless is_signed();
 
+    &browser_cache_off();
     push( @::html_header , <<HEADER );
 <script language="JavaScript">
 <!--
@@ -1086,6 +1092,7 @@ sub do_preview{
 sub action_edit{
     goto &action_signin if is_frozen() && !&is_signed();
 
+    &browser_cache_off();
     my $title = $::form{p};
     &print_header(title=>'Edit');
     &begin_day($title);
