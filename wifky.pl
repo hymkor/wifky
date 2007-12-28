@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
 
 # use strict; use warnings;
 
@@ -179,7 +179,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/22 14:32:43 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/29 02:12:35 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -396,7 +396,7 @@ sub title2fname{
 }
 sub percent{
     my $s = shift;
-    $s =~ s/([^\w\'\.\-\*\(\)\_ ])/sprintf('%%%02X',ord($1))/eg;
+    $s =~ s/([^\w\'\.\-\*\_ ])/sprintf('%%%02X',ord($1))/eg;
     $s =~ s/ /+/g;
     $s;
 }
@@ -1044,7 +1044,6 @@ sub do_submit{
 
     &is_frozen() and chmod(0644,$fn);
 
-    defined($::hook_submit) and $::hook_submit->(\$title , \$::form{text_t});
     if( &lockdo( sub{ &write_file( $fn , \$::form{text_t} ) },$::form{p} )){
         chmod 0444,$fn if $::form{to_freeze};
         utime($sagetime,$sagetime,$fn) if $::form{sage};
