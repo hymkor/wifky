@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/local/bin/perl
 
 # use strict; use warnings;
 
@@ -179,7 +179,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/29 02:12:35 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2007/12/31 08:57:18 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -1044,6 +1044,7 @@ sub do_submit{
 
     &is_frozen() and chmod(0644,$fn);
 
+    $::hook_submit and $::hook_submit->(\$title , \$::form{text_t});
     if( &lockdo( sub{ &write_file( $fn , \$::form{text_t} ) },$::form{p} )){
         chmod 0444,$fn if $::form{to_freeze};
         utime($sagetime,$sagetime,$fn) if $::form{sage};
