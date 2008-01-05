@@ -59,7 +59,7 @@ if( $0 eq __FILE__ ){
 sub change_directory{
     my $pagedir = __FILE__ ; $pagedir =~ s/\.\w+((\.\w+)*)$/.dat$1/;
     unless( chdir $pagedir ){
-        mkdir($pagedir,0755);
+        mkdir( $pagedir,-o __FILE__ ? 0755 : 0775 );
         chdir $pagedir or die("can not access $pagedir.");
     }
     # local *ERR;
@@ -179,7 +179,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2007/12/31 08:57:18 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2008/01/05 21:35:26 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -236,6 +236,7 @@ sub init_globals{
         '900_verbatim' => \&unverb ,
     );
     %::form_list = (
+        '000_mode'           => \&form_mode ,
         '100_textarea'       => \&form_textarea ,
         '200_preview_botton' => \&form_preview_button ,
         '300_signarea'       => \&form_signarea ,
@@ -425,6 +426,13 @@ sub title2url{ &myurl( { p=>$_[0] } ); }
 sub attach2url{ &myurl( { p=>$_[0] , f=>$_[1]} );}
 sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
 
+sub form_mode{
+    if( $::config{archivemode} ){
+        &puts('<div class="archivemode">archive mode</div>');
+    }else{
+        &puts('<div class="noarchivemode">no archive mode</div>');
+    }
+}
 sub form_textarea{
     &putenc('<textarea cols="80" rows="20" name="text_t">%s</textarea><br>'
             , ${$_[0]} );
