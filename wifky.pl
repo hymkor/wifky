@@ -59,7 +59,7 @@ if( $0 eq __FILE__ ){
 sub change_directory{
     my $pagedir = __FILE__ ; $pagedir =~ s/\.\w+((\.\w+)*)$/.dat$1/;
     unless( chdir $pagedir ){
-        mkdir( $pagedir,-o __FILE__ ? 0755 : 0775 );
+        mkdir($pagedir,0755);
         chdir $pagedir or die("can not access $pagedir.");
     }
     # local *ERR;
@@ -179,7 +179,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2008/01/05 21:35:26 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2008/01/09 16:27:07 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
