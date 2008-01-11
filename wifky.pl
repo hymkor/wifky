@@ -183,7 +183,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2008/01/11 23:55:53 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2008/01/12 00:18:42 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -1070,7 +1070,7 @@ sub transfer_url{
     my $url=(shift || $::me);
     print join("\r\n",@::http_header),"\r\n\r\n";
     print '<html><head><title>Moving...</title>';
-    print '<meta http-equiv="refresh" content="1;URL=${url}">' unless $::messages;
+    print qq|<meta http-equiv="refresh" content="1;URL=${url}">\n| unless $::messages;
     print qq|</head><body><a href="${url}">Wait or Click Here</a>$::messages</body></html>|;
     exit(0);
 }
