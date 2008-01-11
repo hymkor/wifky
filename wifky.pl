@@ -13,6 +13,7 @@ $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 %::flag     = ();
+$::messages   = '';
 
 if( $0 eq __FILE__ ){
     binmode(STDOUT);
@@ -20,6 +21,9 @@ if( $0 eq __FILE__ ){
 
     eval{
         local $SIG{ALRM} = sub { die("Time out"); };
+        local $SIG{__WARN__} = sub { 
+            $::messages .= '<div>'.&::enc(join(" ",@_))."</div>\n" 
+        };
         eval{ alarm 60; };
 
         &read_form;
@@ -51,7 +55,7 @@ if( $0 eq __FILE__ ){
     };
     if( $@ ){
         print "Content-Type: text/html;\n\n<html><body>\n",
-              &errmsg($@),"\n</body></html>\n";
+              &errmsg($@),"\n$::messages</body></html>\n";
     }
     exit(0);
 }
@@ -179,7 +183,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2008/01/09 16:27:07 $' ,
+            { desc=>'script-revision '.$::version.' $Date: 2008/01/11 23:55:53 $' ,
               type=>'rem' },
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
@@ -548,7 +552,7 @@ sub print_footer{
         &puts('</div><!-- main --><div class="sidebar">');
         &print_page( title=>'Sidebar' );
     }
-    &puts('</div></body></html>');
+    &puts("</div>$::messages</body></html>");
 }
 
 sub print_sidebar_and_footer{ # for compatible with nikky.pl
@@ -1065,15 +1069,9 @@ sub do_submit{
 sub transfer_url{
     my $url=(shift || $::me);
     print join("\r\n",@::http_header),"\r\n\r\n";
-    print <<"BODY";
-<html>
-<head>
-<title>Moving...</title>
-<meta http-equiv="refresh" content="1;URL=${url}">
-</head>
-<body><a href="${url}">Wait or Click Here</a></body>
-</html>
-BODY
+    print '<html><head><title>Moving...</title>';
+    print '<meta http-equiv="refresh" content="1;URL=${url}">' unless $::messages;
+    print qq|</head><body><a href="${url}">Wait or Click Here</a>$::messages</body></html>|;
     exit(0);
 }
 
