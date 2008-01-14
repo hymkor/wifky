@@ -66,9 +66,6 @@ sub change_directory{
         mkdir($pagedir,0755);
         chdir $pagedir or die("can not access $pagedir.");
     }
-    # local *ERR;
-    # open(ERR,'>>stderr.txt');
-    # open(STDERR,'>&ERR');
 }
 
 sub init_globals{
