@@ -1,8 +1,8 @@
 #!/usr/local/bin/perl
 
-# use strict; use warnings;
+use strict; use warnings;
 
-$::version  = '1.3.1_0';
+$::version  = '1.3.2_0';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
