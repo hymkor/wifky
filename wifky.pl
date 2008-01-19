@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $::version  = '1.3.2_0';
 
@@ -60,7 +60,7 @@ if( $0 eq __FILE__ ){
     };
     if( $@ ){
         print "Content-Type: text/html;\n\n<html><body>\n",
-              &errmsg($@),"\n$::messages</body></html>\n";
+              &errmsg($@),"</body></html>\n";
     }
     exit(0);
 }
@@ -326,9 +326,11 @@ sub flush{
 }
 
 sub errmsg{
-    '<h1>Error !</h1><pre>'
-    . &enc( $_[0] =~ /^\!([^\!]+)\!/ ? $1 : $_[0] )
-    . '</pre>';
+    if( $_[0] =~ /^\!([^\!]+)\!/ ){
+        '<h1>'.&enc($1).'</h1>';
+    }else{
+        '<h1>Error !</h1><pre>'.&enc($_[0]).'</pre>'.$::messages;
+    }
 }
 
 sub enc{
