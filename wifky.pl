@@ -21,8 +21,13 @@ if( $0 eq __FILE__ ){
 
     eval{
         local $SIG{ALRM} = sub { die("Time out"); };
-        local $SIG{__WARN__} = sub { 
-            $::messages .= '<div>'.&::enc(join(" ",@_))."</div>\n" 
+        local $SIG{__WARN__} = local $SIG{__DIE__} = sub {
+            $::messages .= '<div>'.&::enc(join(" ",@_))."</div>\n" ;
+            my $i=0;
+            while( my (undef,$fn,$lno,$subnm)=caller($i++) ){
+                $::messages .= sprintf('<div> &nbsp; on %s at %s line %d.</div>' ,
+                            &enc($subnm),&enc($fn),$lno );
+            }
         };
         eval{ alarm 60; };
 
