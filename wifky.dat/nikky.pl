@@ -231,7 +231,9 @@ sub referer{
 };
 
 sub action_rss{
-    $::me='http://'.$ENV{'HTTP_HOST'}.$ENV{'SCRIPT_NAME'};
+    $::me='http://'.($ENV{'HTTP_HOST'}||$ENV{'SERVER_NAME'}).
+            (defined $ENV{SERVER_PORT} && $ENV{SERVER_PORT}!=80 
+            ? ':'.$ENV{SERVER_PORT} : '').$ENV{'SCRIPT_NAME'};
     $::inline_plugin{comment} = sub { &::plugin_comment(@_,'-f'); };
     my $feed_num = ($::config{nikky_rss_feed_num} || 3);
     my @pagelist;
@@ -251,9 +253,8 @@ sub action_rss{
         my $attachment = {};
         foreach my $attach ( &::list_attachment($p->{title}) ){
             my $e_attach = &::enc( $attach );
-            my $url=sprintf('http://%s%s?p=%s&amp;f=%s' ,
-                    $ENV{'HTTP_HOST'} ,
-                    $ENV{'SCRIPT_NAME'} ,
+            my $url=sprintf('%s?p=%s&amp;f=%s' ,
+                    $::me ,
                     &::percent( $p->{title} ) ,
                     &::percent( $attach )
             );
