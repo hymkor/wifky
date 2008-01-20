@@ -74,7 +74,7 @@ HTML
     }
     &::puts('</dl></form>');
     if( $updatable ){
-        &::putenc('<div class="edit_task"><form action="%s" method="POST">');
+        &::putenc('<div class="edit_task"><form action="%s" method="POST">',$::postme);
         &::putenc('<input type="hidden" name="a" value="edit_task">');
         &::putenc('<input type="hidden" name="p" value="%s">',$title);
         &::putenc('<input type="hidden" name="f" value="%s">',$attach);
