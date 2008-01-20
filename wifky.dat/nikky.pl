@@ -2,7 +2,7 @@ package wifky::nikky;
 
 # use strict; use warnings;
 
-my $version='0.23';
+my $version='0.23_1';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
 my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
@@ -10,7 +10,7 @@ my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
 push( @::body_header , qq{<form name="newdiary" action="$::me" method="post" style="display:none"><input type="hidden" name="p" /><input type="hidden" name="a" value="edt" /></form>} );
 
 my @tm=localtime();
-$::menubar{'200_New'} &&= sprintf( q|<a href="%s?a=new" onClick="JavaScript:if(document.newdiary.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newdiary.submit()};return false;">New</a>|,$::me,$tm[5]+1900,$tm[4]+1,$tm[3] );
+$::menubar{'200_New'} = sprintf( q|<a href="%s?a=new" onClick="JavaScript:if(document.newdiary.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newdiary.submit()};return false;">New</a>|,$::me,$tm[5]+1900,$tm[4]+1,$tm[3] ) if exists $::menubar{'200_New'};
 
 $::inline_plugin{'nikky.pl_version'} = sub{ "nikky.pl $version" };
 $::inline_plugin{lastdiary}=\&lastdiary;
