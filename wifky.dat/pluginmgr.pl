@@ -6,7 +6,7 @@
 
 # use strict;use warnings; 
 
-my $version='0.6';
+my $version='0.7';
 
 -d 'plugins' or mkdir('plugins',0777) or die('can not mkdir plugins directory');
 
@@ -122,14 +122,18 @@ $::action_plugin{'pluginmgr'} = sub {
 HTML
     , $::postme , $::charset );
     foreach my $p (@plugins){
-        &::putenc('<div><input type="checkbox" name="%s" value="1"%s> %s</div>'
+        my @stat=stat('plugins/'.$p->{hexnm});
+        &::putenc('<div><input type="checkbox" name="%s" value="1"%s><strong>%s</strong> (installed on %s)</em></div>'
             , $p->{key} 
             , $::config{$p->{key}} ? ' checked':''
-            , $p->{name} );
+            , $p->{name} 
+            , scalar(localtime($stat[9]))
+        );
     }
     foreach my $nm ( sort grep(/\.pl$/,&::directory() )){
-        &::putenc('<input type="checkbox" checked disabled> %s (hand-installed)<br>'
-            , $nm );
+        my @stat=stat($nm);
+        &::putenc('<input type="checkbox" checked disabled><strong>%s</strong> (hand-installed on %s)<br>'
+            , $nm , scalar(localtime($stat[9])) );
     }
     &::putenc(<<HTML
 <p>
