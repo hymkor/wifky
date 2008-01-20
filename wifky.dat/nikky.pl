@@ -316,9 +316,10 @@ sub action_rss{
 
                     $item{url} = sprintf('%s?p=%s#p%d',$::me,$pageurl,++$id) ;
                     $item{desc} = [];
-                    $item{title} = &::preprocess($1,{ attachment=>{} } );
-                    $item{title} =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
-                    $item{title} =~ s/\<[^\>]*\>\s*//g;
+                    my $title = &::preprocess($1,{ attachment=>{} } );
+                    $title =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
+                    $title =~ s/\<[^\>]*\>\s*//g;
+                    $item{title} = &::denc($title);
                 }
                 push(@{$item{desc}}, $frag );
             }
