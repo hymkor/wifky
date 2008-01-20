@@ -22,11 +22,17 @@ if( $0 eq __FILE__ ){
     eval{
         local $SIG{ALRM} = sub { die("Time out"); };
         local $SIG{__WARN__} = local $SIG{__DIE__} = sub {
-            $::messages .= '<div>'.&::enc(join(" ",@_))."</div>\n" ;
-            my $i=0;
-            while( my (undef,$fn,$lno,$subnm)=caller($i++) ){
-                $::messages .= sprintf('<div> &nbsp; on %s at %s line %d.</div>' ,
-                            &enc($subnm),&enc($fn),$lno );
+            return if ( caller(0) )[1] =~ /\.pm$/;
+            my $msg=join(' ',@_);
+            if( $msg =~ /^!(.*)!/ ){
+                $::messages .= '<div>'.&::enc($1)."</div>\n" ;
+            }else{
+                $::messages .= '<div>'.&::enc($msg)."</div>\n" ;
+                my $i=0;
+                while( my (undef,$fn,$lno,$subnm)=caller($i++) ){
+                    $::messages .= sprintf('<div> &nbsp; on %s at %s line %d.</div>' ,
+                                &enc($subnm),&enc($fn),$lno );
+                }
             }
         };
         eval{ alarm 60; };
@@ -59,8 +65,9 @@ if( $0 eq __FILE__ ){
         eval{ alarm 0; };
     };
     if( $@ ){
-        print "Content-Type: text/html;\n\n<html><body>\n",
-              &errmsg($@),"\n$::messages</body></html>\n";
+        print "Content-Type: text/html;\n\n<html><body>\n",&errmsg($@);
+        print $::messages if $@ !~ /^!/;
+        print "</body></html>\n";
     }
     exit(0);
 }
@@ -187,6 +194,7 @@ sub init_globals{
         ' General Options' => [
             { desc=>'script-revision '.$::version.' $Date: 2008/01/12 00:18:42 $' ,
               type=>'rem' },
+            { desc=>'Debug mode' , name=>'debugemode' , type=>'checkbox' } ,
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -746,7 +754,7 @@ sub action_commit{
         }
         &do_submit();
     };
-    &do_preview( &errmsg($@) ) if $@;
+    &do_preview( $@ ) if $@;
 }
 
 sub archive{
@@ -764,9 +772,9 @@ sub action_preview{
         &check_conflict;
     };
     if( $@ ){
-        &do_preview( &errmsg($@) );
+        &do_preview( $@ );
     }else{
-        &do_preview;
+        &do_preview();
     }
 }
 
@@ -957,7 +965,7 @@ sub action_delete{
         }
     }
     &cacheoff;
-    &do_preview;
+    &do_preview();
 }
 
 sub action_freeze_or_fresh{
@@ -972,7 +980,7 @@ sub action_freeze_or_fresh{
         }
     }
     &cacheoff;
-    &do_preview;
+    &do_preview();
 }
 
 sub action_comment{
@@ -1027,7 +1035,7 @@ sub action_upload{
         &do_preview('The attachment is frozen.');
     }else{
         &write_file( $fn , \$::form{'newattachment_b'} );
-        &do_preview;
+        &do_preview();
     }
 }
 
@@ -1084,11 +1092,10 @@ sub transfer_page{
 sub do_preview{
     goto &action_signin if is_frozen() && !&is_signed();
 
-    my $e_message = shift;
     my $title = $::form{p};
 
     &print_header(title=>'Preview');
-    defined($e_message) and &puts(qq(<div class="warning">${e_message}</div>));
+    &puts('<div class="warning">',&errmsg($_[0]),'</div>') if @_ ;
     &begin_day($title);
         &print_page( title=>$title , source=>\$::form{text_t} , index=>1 , main=>1 );
     &end_day();
