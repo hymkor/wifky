@@ -1,5 +1,5 @@
 package wifky::rssreader;
-my $version='0.1';
+my $version='0.2';
 
 use strict; use warnings;
 use IO::Socket;
@@ -173,14 +173,16 @@ sub http{
     my $http = IO::Socket::INET->new(PeerAddr=>$host,PeerPort=>80,Proto=>'tcp')
         or die("socket error.\n");
     &errlog('call %s/%s',$host,$path);
-    $http->print("GET $path HTTP/1.0\n");
+    $http->print("GET $path HTTP/1.1\r\n");
     if( defined($since) ){
-        $http->print("If-Modified-Since: $since\n");
+        $http->print("If-Modified-Since: $since\r\n");
         &errlog('If-Modified-Since: %s',$since);
     }
-    $http->print("Host: $host\n");
-    $http->print("Connection: close\n");
-    $http->print("\n");
+    $http->print("Host: ${host}:80\r\n");
+    $http->print("User-Agent: wifky rss-reader plugin.\r\n");
+    $http->print("Connection: close\r\n");
+    $http->print("\r\n");
+    $http->flush();
 
     my $flag=0;
     my $body='';
