@@ -13,7 +13,8 @@ $::me       = $::postme = $ENV{SCRIPT_NAME};
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 %::flag     = ();
-$::messages   = '';
+
+my $messages = '';
 
 if( $0 eq __FILE__ ){
     binmode(STDOUT);
@@ -25,12 +26,12 @@ if( $0 eq __FILE__ ){
             return if ( caller(0) )[1] =~ /\.pm$/;
             my $msg=join(' ',@_);
             if( $msg =~ /^!(.*)!/ ){
-                $::messages .= '<div>'.&::enc($1)."</div>\n" ;
+                $messages .= '<div>'.&::enc($1)."</div>\n" ;
             }else{
-                $::messages .= '<div>'.&::enc($msg)."</div>\n" ;
+                $messages .= '<div>'.&::enc($msg)."</div>\n" ;
                 my $i=0;
                 while( my (undef,$fn,$lno,$subnm)=caller($i++) ){
-                    $::messages .= sprintf('<div> &nbsp; on %s at %s line %d.</div>' ,
+                    $messages .= sprintf('<div> &nbsp; on %s at %s line %d.</div>' ,
                                 &enc($subnm),&enc($fn),$lno );
                 }
             }
@@ -66,7 +67,7 @@ if( $0 eq __FILE__ ){
     };
     if( $@ ){
         print "Content-Type: text/html;\n\n<html><body>\n",&errmsg($@);
-        print $::messages if $@ !~ /^!/;
+        print $messages if $@ !~ /^!/;
         print "</body></html>\n";
     }
     exit(0);
@@ -192,9 +193,7 @@ sub init_globals{
 
     %::preferences = (
         ' General Options' => [
-            { desc=>'script-revision '.$::version.' $Date: 2008/01/12 00:18:42 $' ,
-              type=>'rem' },
-            { desc=>'Debug mode' , name=>'debugemode' , type=>'checkbox' } ,
+            { desc=>'Debug mode' , name=>'debugmode' , type=>'checkbox' } ,
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
             { desc=>'Convert CRLF to <br>' ,
               name=>'autocrlf' , type=>'checkbox' } ,
@@ -562,7 +561,9 @@ sub print_footer{
         &puts('</div><!-- main --><div class="sidebar">');
         &print_page( title=>'Sidebar' );
     }
-    &puts("</div>$::messages</body></html>");
+    &puts('</div>');
+    &puts( $messages ) if $::config{debugmode} && $messages;
+    &puts('</body></html>');
 }
 
 sub print_sidebar_and_footer{ # for compatible with nikky.pl
@@ -1080,8 +1081,11 @@ sub transfer_url{
     my $url=(shift || $::me);
     print join("\r\n",@::http_header),"\r\n\r\n";
     print '<html><head><title>Moving...</title>';
-    print qq|<meta http-equiv="refresh" content="1;URL=${url}">\n| unless $::messages;
-    print qq|</head><body><a href="${url}">Wait or Click Here</a>$::messages</body></html>|;
+    print qq|<meta http-equiv="refresh" content="1;URL=${url}">\n| 
+        unless $::config{debugmode} && $messages;
+    print qq|</head><body><a href="${url}">Wait or Click Here</a>|;
+    print $messages if $::config{debugmode} && $messages;
+    print '</body></html>';
     exit(0);
 }
 
