@@ -318,7 +318,7 @@ sub read_form{
 }
 
 sub puts{
-    grep(($::print .= "$_\r\n",0),@_);
+    $::print .= "$_\r\n" for(@_);
 }
 
 # puts with auto escaping arguments but format-string.
@@ -508,7 +508,7 @@ sub print_form{
           accept-charset="%s" ><input type="hidden" name="orgsrc_y" value="%s"
         ><input type="hidden" name="p" value="%s"><br>'
         , $::postme , $::charset , &yen($$orgsrc) , $title );
-    grep( $::form_list{$_}->($newsrc), sort keys %::form_list );
+    $::form_list{$_}->($newsrc) for(sort keys %::form_list );
     &puts('</form></div>');
 }
 
@@ -656,8 +656,9 @@ sub action_new{
 }
 
 sub load_config{
-    grep( (/^\#?([^\#\!\t ]+)\t(.*)$/ and $::config{$1}=&deyen($2),0)
-        , split(/\n/,&read_file('index.cgi') ) );
+    for(split(/\n/,&read_file('index.cgi'))){
+        $::config{$1}=&deyen($2) if /^\#?([^\#\!\t ]+)\t(.*)$/;
+    }
 }
 
 sub is_signed{
@@ -1195,9 +1196,7 @@ sub object_exists{
 
 sub list_attachment{
     &cache_update();
-    map{ &fname2title(substr($_,2)) }
-        grep{ defined($_) && /^__/ }
-            @{ $::dir_cache{ &title2fname( shift ) } };
+    map{ $_ && /^__/ ? &fname2title($') : () } @{$::dir_cache{&title2fname(shift)}};
 }
 
 sub print_page{
@@ -1497,11 +1496,10 @@ sub plugin{
     
     $param =~ s/\x02.*?\x02/"\x05".unpack('h*',$&)."\x05"/eg;
     my @param=split(/\s+/,$param);
-    grep{
+    foreach(@param){
         s|\x05([^\x05]*)\x05|pack('h*',$1)|ge;
         s|\x02+|"\x02"x(length($&)>>1)|ge;
-        0;
-    } @param;
+    }
 
     ($::inline_plugin{$name} || sub{'Plugin not found.'} )
         ->($session,@param) || '';
@@ -1616,7 +1614,7 @@ sub midashi{
     }else{
         grep( $_ && &puts('</div></div>'),@{$section}[$depth .. $#{$section}]);
         $section->[ $depth ]++;
-        grep( $_ = 0 , @{$section}[$depth+1 .. $#{$section} ] );
+        $_=0 for(@{$section}[$depth+1 .. $#{$section} ]);
 
         my $tag = join('.',@{$section}[0...$depth]);
         my $h    = $depth+ 3 ;
