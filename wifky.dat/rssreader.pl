@@ -1,9 +1,11 @@
 package wifky::rssreader;
-my $version='0.2';
+my $version='0.3';
 
-use strict; use warnings;
+use strict;
+use warnings;
 use IO::Socket;
 use Encode;
+use Storable ();
 
 $::preferences{"RSS Reader $version"} = [
     { desc => 'allowed rss-list', name=>'rssreader__rssurl' ,
@@ -46,7 +48,7 @@ $::inline_plugin{'rssreader'} = sub {
         $maxnum = $default_number;
     }
 
-    my @entries = &rss( &::title2fname( $session->{title} , $rssurl . '.txt'   ) ,
+    my @entries = &rss( &::title2fname( $session->{title} , $rssurl . '.nst' ) ,
                           $host , $uri , $maxnum );
 
     my $tag= $opt{o} ? 'ol' : $opt{u} ? 'ul' : 'dl';
@@ -79,14 +81,11 @@ sub rss{
     ### Check cached entries ###
     my $lastmodified;
     my @oldentries;
-    my $cache=&::read_file($fname);
-    foreach my $line ( split("\n",$cache) ){
-        if( $line =~ /^last-modified:/ ){
-            $lastmodified = $';
-        }elsif( $line =~ /^entry:/ ){
-            push( @oldentries , [ map(&::deyen($_),split(/\t/,$',3)) ] );
-            last unless scalar(@oldentries) < $max_entries ;
-        }
+    my $ncache;
+    if( -f $fname ){
+        $ncache=Storable::retrieve($fname);
+        $lastmodified = $ncache->{lastmodified};
+        @oldentries = @{$ncache->{entries}};
     }
 
     ### Update entries with http:// ###
@@ -95,7 +94,7 @@ sub rss{
     ### These order is (2) <= (1) <= now.
 
     my $xml;
-    if( $cache eq '' || ( -M $fname ) >= &nvl($::config{rssreader__cycle},15)/1440.0 ){
+    if( (!defined $ncache) || ( -M $fname ) >= &nvl($::config{rssreader__cycle},15)/1440.0 ){
         utime( time , time , $fname );
         eval{
             local $SIG{ALRM} = sub { die('Timeout to read RSS'); };
@@ -151,17 +150,11 @@ sub rss{
 
     if( defined($xml) ){
         my @tm=split(/\s+/,scalar(gmtime(time()-30)));
-        &::write_file( $fname , 
-            join("\n",
-                sprintf('last-modified:%s, %02d %s %d %s GMT',
-                    $tm[0],$tm[2],$tm[1],$tm[4],$tm[3]) ,
-                map(
-                    "entry:".
-                    &::yen($_->[0]||'')."\t".
-                    &::yen($_->[1]||'')."\t".
-                    &::yen($_->[2]||'') , @entries )
-            )
-        );
+        Storable::nstore( {
+            lastmodified => 
+                sprintf('%s, %02d %s %d %s GMT',$tm[0],$tm[2],$tm[1],$tm[4],$tm[3]),
+            entries => \@entries ,
+        } , $fname );
     }
     @entries;
 }
