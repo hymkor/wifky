@@ -671,10 +671,9 @@ sub is_signed{
     }
 
     # time(TAB)ip(TAB)key
-    grep( (/^\#(\d+)\t([^\t]+)\t(.*)$/ 
-        and $1 > time - 24*60*60
-        and $::ip{$2}=[$3,$1],0)
-        , split(/\n/,&read_file('session.cgi') ) );
+    for( split(/\n/,&read_file('session.cgi') ) ){
+        $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ && $1>time-24*60*60;
+    }
     
     my $remote_addr=$ENV{REMOTE_ADDR}||0;
     if( exists $::ip{$remote_addr} && 
@@ -1326,7 +1325,7 @@ sub call_footnote{
             "#fm$i"),
             "$t</p>");
     }
-    &puts(qq(</div><!--footnote-->));
+    &puts('</div><!--footnote-->');
     delete $session->{footnotes};
 }
 
@@ -1740,6 +1739,7 @@ sub block_quoting{ ### "" ...
     return 0 unless $fragment =~ /\A&quot;&quot;/s;
 
     $fragment =~ s/^&quot;&quot;//gm;
+    $fragment =~ s/^$/<br><br>/gm;
     &puts('<blockquote>'.&preprocess($fragment,$session).'</blockquote>' );
     1;
 }
