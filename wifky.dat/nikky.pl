@@ -105,17 +105,17 @@ unshift( @::copyright ,
 );
 
 ### for AutoPagerize ###
-undef &::begin_day;
-*::begin_day = sub{
-    &::puts('<div class="day autopagerize_page_element">');
-    &::putenc('<h2><span class="title">%s</span></h2>',$_[0]);
-    &::puts('<div class="body">');
-};
-undef &::end_day;
-*::end_day = sub{
-    &::puts('</div></div><div class="autopagerize_insert_before"></div>');
-};
+(*org_print_header,*::print_header)=(*::print_header,*new_header);
+sub new_header{
+    &org_print_header;
+    &::puts('<div class="autopagerize_page_element">');
+}
 
+(*org_print_footer,*::print_footer)=(*::print_footer,*new_footer);
+sub new_footer{
+    &::puts('</div>');
+    &org_print_footer;
+}
 
 ### Next/Prev bar ###
 &set_nextprev;
@@ -160,7 +160,7 @@ sub concat_article{
     foreach my $p (@_){
         next unless -f $p->{fname};
         my $pagename=$p->{title};
-        &::puts('<div class="day autopagerize_page_element">');
+        &::puts('<div class="day">');
         &::putenc('<h%d><a href="%s">%s</a></h%d><div class="body">',
                     $h , &::title2url( $pagename ) , $pagename , $h );
         local $::form{p} = $pagename;
