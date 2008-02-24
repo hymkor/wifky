@@ -2,7 +2,7 @@ package wifky::nikky;
 
 # use strict; use warnings;
 
-my $version='0.23_1';
+my $version='0.23++';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
 my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
@@ -104,6 +104,19 @@ unshift( @::copyright ,
     <a href="$rssurl" class="rssurl">[RSS]</a></div>)
 );
 
+### for AutoPagerize ###
+undef &::begin_day;
+*::begin_day = sub{
+    &::puts('<div class="day autopagerize_page_element">');
+    &::putenc('<h2><span class="title">%s</span></h2>',$_[0]);
+    &::puts('<div class="body">');
+};
+undef &::end_day;
+*::end_day = sub{
+    &::puts('</div></div><div class="autopagerize_insert_before"></div>');
+};
+
+
 ### Next/Prev bar ###
 &set_nextprev;
 
@@ -147,7 +160,7 @@ sub concat_article{
     foreach my $p (@_){
         next unless -f $p->{fname};
         my $pagename=$p->{title};
-        &::puts('<div class="day">');
+        &::puts('<div class="day autopagerize_page_element">');
         &::putenc('<h%d><a href="%s">%s</a></h%d><div class="body">',
                     $h , &::title2url( $pagename ) , $pagename , $h );
         local $::form{p} = $pagename;
@@ -155,6 +168,7 @@ sub concat_article{
         &::puts('</div></div>');
         &::print_page( title=>'Footer' , class=>$ss_terminater );
     }
+    &::puts('<div class="autopagerize_insert_before"></div>');
 }
 
 sub lastdiary{
@@ -418,7 +432,7 @@ sub set_nextprev{
     }
     if( $prevday ){
         $prevday = &::title2url(&::fname2title($prevday));
-        push(@::html_header,qq(<link rel="prev" href="${prevday}">));
+        push(@::html_header,qq(<link rel="next" href="${prevday}">));
     }
     if( defined(%::menubar) ){
         $::menubar{'050_prevday'} = &prevday();
@@ -427,7 +441,7 @@ sub set_nextprev{
     }
     if( $nextday ){
         $nextday= &::title2url(&::fname2title($nextday));
-        push(@::html_header,qq(<link rel="next" href="${nextday}">));
+        push(@::html_header,qq(<link rel="prev" href="${nextday}">));
     }
     if( defined(%::menubar) ){
         $::menubar{'950_nextday'} = &nextday();
