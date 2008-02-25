@@ -1,7 +1,9 @@
 package wifky::nikky;
 
-# use strict; use warnings;
+use strict; use warnings;
 
+my %nikky;
+my @nikky;
 my $version='0.23++';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
@@ -9,8 +11,8 @@ my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
 
 push( @::body_header , qq{<form name="newdiary" action="$::me" method="post" style="display:none"><input type="hidden" name="p" /><input type="hidden" name="a" value="edt" /></form>} );
 
-my @tm=localtime();
-$::menubar{'200_New'} = sprintf( q|<a href="%s?a=new" onClick="JavaScript:if(document.newdiary.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newdiary.submit()};return false;">New</a>|,$::me,$tm[5]+1900,$tm[4]+1,$tm[3] ) if exists $::menubar{'200_New'};
+my @now=localtime();
+$::menubar{'200_New'} = sprintf( q|<a href="%s?a=new" onClick="JavaScript:if(document.newdiary.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newdiary.submit()};return false;">New</a>|,$::me,$now[5]+1900,$now[4]+1,$now[3] ) if exists $::menubar{'200_New'};
 
 $::inline_plugin{'nikky.pl_version'} = sub{ "nikky.pl $version" };
 $::inline_plugin{lastdiary}=\&lastdiary;
@@ -37,8 +39,6 @@ $::inline_plugin{nikky_referer} = sub {
 
 $::action_plugin{rss} = \&action_rss ;
 $::action_plugin{new} = \&action_newdiary;
-$::action_plugin{nikky} = \&action_nikky ;
-$::action_plugin{date} = \&action_date;
 
 exists $::form{date} and $::form{a}='date';
 
@@ -105,55 +105,20 @@ unshift( @::copyright ,
 );
 
 ### for AutoPagerize ###
-(*org_print_header,*::print_header)=(*::print_header,*new_header);
+if( !exists $::form{a} || $::form{a} eq 'nikky' || $::form{a} eq 'date' ){
+    (*org_print_header,*::print_header)=(*::print_header,*new_header);
+    (*org_print_footer,*::print_footer)=(*::print_footer,*new_footer);
+}
 sub new_header{
     &org_print_header;
     &::puts('<div class="autopagerize_page_element">');
 }
-
-(*org_print_footer,*::print_footer)=(*::print_footer,*new_footer);
 sub new_footer{
     &::puts('</div>');
     &org_print_footer;
 }
 
-### Next/Prev bar ###
-&set_nextprev;
-
-sub nikky_core{
-    my $days = shift;
-    my @list=&::ls_core( { r=>1 } , '(????.??.??)*' );
-    my @tm=localtime(time+24*60*60);
-    my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
-    @list = grep( $_->{title} lt $tomorrow && -f $_->{fname} , @list );
-    splice(@list,$days) if $#list > $days;
-    splice(@list,10) if $#list > 10;
-    &concat_article( @list );
-}
-
-sub nikky_core_r{
-    my $days = shift;
-    my @list = reverse &::ls_core( { number=>$days } , '(????.??.??)*' );
-    splice(@list,10) if $#list > 10;
-    &concat_article( @list );
-}
-
-sub nikky_core_n{
-    my $days = shift;
-    my @list=&::ls_core( { r=>1 , number=>$days } , '(????.??.??)*' );
-    splice(@list,10) if $#list > 10;
-    &concat_article( @list );
-}
-
-sub action_date{
-    my $ymd=$::form{date};
-    my @list=&::ls_core({},sprintf('(%2s.%2s.%2s)*',unpack('A4A2A2',$ymd)));
-
-    &::print_header( userheader=>'YES' );
-    &concat_article( @list );
-    &::puts(qq(<div class="$ss_copyright">),@::copyright,'</div>');
-    &::print_sidebar_and_footer;
-}
+&init();
 
 sub concat_article{
     my $h = ( $::version ge '1.1' || &::is('cssstyle') ? 2 : 1 );
@@ -174,29 +139,27 @@ sub concat_article{
 sub lastdiary{
     local $::inline_plugin{lastdiary}=sub{};
     local $::print='';
-    &nikky_core($#_ >= 1 ? $_[1] : 3);
+    my $days = $#_ >= 1 ? $_[1] : 3;
+    my @list=&::ls_core( { r=>1 } , '(????.??.??)*' );
+    my @tm=localtime(time+24*60*60);
+    my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
+    &concat_article( &lastN($days,grep( $_->{title} lt $tomorrow && -f $_->{fname} , @list )));
+
     $::print;
 }
 
 sub olddiary{
     local $::inline_plugin{olddiary}=sub{};
     local $::print='';
-    &nikky_core_r($#_ >= 1 ? $_[1] : 3);
+    &concat_article( &lastN($#_ >0 ? $_[1] : 3 ,@nikky) );
     $::print;
 }
 
 sub newdiary{
     local $::inline_plugin{newdiary}=sub{};
     local $::print='';
-    &nikky_core_n($#_ >= 1 ? $_[1] : 3);
+    &concat_article( &firstN($#_ >= 1 ? $_[1] : 3,@nikky));
     $::print;
-}
-
-sub action_nikky{
-    &::print_header( userheader=>'YES' );
-    &nikky_core($::config{nikky_days} || 3);
-    &::puts(qq(<div class="$ss_copyright">),@::copyright,'</div>');
-    &::print_sidebar_and_footer;
 }
 
 sub recentdiary{
@@ -405,7 +368,67 @@ sub printag{
     }
 }
 
-sub set_nextprev{
+sub init{
+    my $seq=0;
+    @nikky = map{
+        my $title = $_->{title};
+        $_->{seq} = $seq++;
+        $nikky{ $_->{title} } = $_;
+    } &::ls_core( {} , '(????.??.??)*' );
+
+    my $nextnikky;
+    my $prevnikky;
+    if( exists $::form{date} && $::form{date} =~ /^(\d{4})(\d\d)(\d\d)?$/ ){
+        if( defined $3 ){ ### YYYYMMDD
+            my $ymd=sprintf('(%4s.%2s.%2s)',$1,$2,$3);
+            my @region = grep(substr($_->{title},0,12) eq $ymd, @nikky);
+            set_view_thosenikky(
+                title  => $ymd ,
+                action => 'date' ,
+                region => \@region ,
+                prev   => \$prevnikky ,
+                next   => \$nextnikky ,
+            );
+            $::form{a} = 'date';
+        }else{ ### YYYYMM
+            my $ymd=sprintf('(%4s.%2s.',$1,$2);
+            my @region=grep(substr($_->{title},0,9) eq $ymd, @nikky);
+            &set_view_thosenikky(
+                title  => sprintf('(%04s.%02s)',$1,$2) ,
+                action => 'date' ,
+                region => \@region ,
+                prev   => \$prevnikky ,
+                next   => \$nextnikky ,
+            );
+            $::form{a} = 'date';
+        }
+    }elsif( exists $::form{a} && $::form{a} eq 'nikky' ){
+        my @tm=localtime(time+24*60*60);
+        my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
+        my $days = &nvl($::config{nikky_days},3); 
+        my @region=&lastN($days,grep($_->{title} lt $tomorrow , @nikky));
+        &set_view_thosenikky(
+            action => 'nikky' ,
+            region => \@region ,
+            prev   => \$prevnikky ,
+            next   => \$nextnikky ,
+        );
+    }elsif( exists $::form{p} && exists $nikky{ $::form{p} } ){
+        my $seq=$nikky{ $::form{p} }->{seq};
+        $prevnikky = $nikky[ $seq - 1 ] if $seq > 0 ;
+        $nextnikky = $nikky[ $seq + 1 ] if $seq < $#nikky;
+    }else{
+        $prevnikky = $nikky[ $#nikky ];
+    }
+    if( $prevnikky ){
+        $prevday = &::title2url($prevnikky->{title});
+        push(@::html_header, sprintf('<link rel="next" href="%s">' , $prevday ) );
+    }
+    if( $nextnikky ){
+        $nextday = &::title2url($nextnikky->{title});
+        push( @::html_header , sprintf('<link ref="prev" href="%s">' ,$nextday ) );
+    }
+
     my $p=$::form{p};
     if( exists $::form{date} ){
         $p = sprintf('(%04s.%02s.%02s)',unpack('A4A2A2',$::form{date}) );
@@ -414,51 +437,26 @@ sub set_nextprev{
         $p = sprintf( "(%04d.%02d.%02d)\xFF", 1900+$tm[5], 1+$tm[4], $tm[3] );
     }
     my $cur=&::title2fname($p);
-    my $month_first=&::title2fname( substr($p,0,9).'01)' );
-    my $month_end=&::title2fname( substr($p,0,9).'31)\xFF' );
-
-    foreach my $t ( grep( /^822303/ , &::list_page() ) ){
-        if( $t lt $cur && ( !defined($prevday) || $t gt $prevday ) ){
-            $prevday = $t;
-        }elsif( $t gt $cur && ( !defined($nextday) || $t lt $nextday ) ){
-            $nextday = $t;
-        }
-        if( $t lt $month_first && ( !defined($prevmonth) || $t gt $prevmonth ) ){
-            $prevmonth = $t;
-        }
-        if( $t gt $month_end && ( !defined($nextmonth) || $t lt $nextmonth ) ){
-            $nextmonth = $t;
-        }
+    my $month_first=&::title2fname( substr($p,0,9).'00)' );
+    my $month_end  =&::title2fname( substr($p,0,9).'99)' );
+    foreach(@nikky){
+        $prevmonth   = $_ if $_->{title} lt $month_first;
+        $nextmonth ||= $_ if $_->{title} gt $month_end  ;
     }
-    if( $prevday ){
-        $prevday = &::title2url(&::fname2title($prevday));
-        push(@::html_header,qq(<link rel="next" href="${prevday}">));
-    }
+    $prevmonth = &::title2url($prevmonth->{title}) if $prevmonth;
+    $nextmonth = &::title2url($nextmonth->{title}) if $nextmonth;
     if( defined(%::menubar) ){
         $::menubar{'050_prevday'} = &prevday();
     }else{
         unshift(@::menubar,&prevday);
-    }
-    if( $nextday ){
-        $nextday= &::title2url(&::fname2title($nextday));
-        push(@::html_header,qq(<link rel="prev" href="${nextday}">));
     }
     if( defined(%::menubar) ){
         $::menubar{'950_nextday'} = &nextday();
     }else{
         push(@::menubar,&nextday);
     }
-
-    $prevmonth &&= &::title2url(&::fname2title($prevmonth));
-    $nextmonth &&= &::title2url(&::fname2title($nextmonth));
-
-    ### Startday
-    my ($day) = &::ls_core( { number=>1 }, '(????.??.??)*' );
-    $startday = &::title2url( $day->{title} );
-
-    ### Endday
-    ($day) = &::ls_core( { r=>1, number=>1 }, '(????.??.??)*' );
-    $endday   = &::title2url( $day->{title} );
+    $startday = &::title2url($nikky[ 0]->{title}) if @nikky;
+    $endday   = &::title2url($nikky[-1]->{title}) if @nikky;
 }
 
 sub date_anchor{
@@ -470,8 +468,8 @@ sub date_anchor{
     : qq(<span class="no${xxxxday}">$symbol</span>) ;
 }
 
-sub prevday  { &date_anchor('prevday'  ,$prevday   ,'<' , $_[1]); }
-sub nextday  { &date_anchor('nextday'  ,$nextday   ,'>' , $_[1]); }
+sub prevday  { &date_anchor('prevday'  ,$prevday ,'<' , $_[1]); }
+sub nextday  { &date_anchor('nextday'  ,$nextday ,'>' , $_[1]); }
 sub prevmonth{ &date_anchor('prevmonth',$prevmonth ,'<<', $_[1]); }
 sub nextmonth{ &date_anchor('nextmonth',$nextmonth ,'>>', $_[1]); }
 sub startday { &date_anchor('startday' ,$startday  ,'|' , $_[1]); }
@@ -633,7 +631,7 @@ $::inline_plugin{'archives'} = sub {
 
         next if $ym < $startym;
 
-        $html .= sprintf( '<li class="sowp-nikkytools-archives-month"><a href="%s?a=archives;year=%d;month=%d">%s [%d]</a></li>', $::me, $year, $month, &year_and_month($year,$month),$diary{$ym});
+        $html .= sprintf( '<li class="sowp-nikkytools-archives-month"><a href="%s?date=%04d%02d">%s [%d]</a></li>', $::me, $year, $month, &year_and_month($year,$month),$diary{$ym});
     }
     $html . '</ul>';
 };
@@ -649,31 +647,11 @@ $::inline_plugin{'packedarchives'} = sub {
     for my $y ( sort keys %diary ){
         $html .= '<li class="sowp-nikkytools-archives-month">'.$y;
         for my $m ( sort keys %{$diary{$y}} ){
-            $html .= sprintf('|<a href="%s?a=archives;year=%d;month=%d" title="%d article(s)">%02d</a>' , $::me , $y , $m , $diary{$y}->{$m} , $m );
+            $html .= sprintf('|<a href="%s?date=%04d%02d" title="%d article(s)">%02d</a>' , $::me , $y , $m , $diary{$y}->{$m} , $m );
         }
         $html .= '</li>';
     }
     $html . '</ul>';
-};
-
-$::action_plugin{'archives'} = sub {
-    my $year = $::form{year};
-    if( ! defined($year) || $year !~ /^\d\d\d\d$/ ){
-        die('!Parameter "year=" must be a number.!');
-    }
-    my $month = $::form{month};
-    if( ! defined($month) || $month !~ /^\d\d?$/ ){
-        die('!Parameter "month=" must be a number!');
-    }
-    my @diaries = &::ls_core( {} ,sprintf( '(%04d.%02d.??)*', $year, $month ) );
-
-    &::print_header(
-        'title'      => 'archives: '.&year_and_month($year,$month) ,
-        'userheader' => !0
-    );
-    &concat_article( @diaries );
-    &::print_copyright();
-    &::print_sidebar_and_footer();
 };
 
 sub year_and_month{
@@ -686,4 +664,50 @@ sub year_and_month{
     }
 }
 
+sub nvl{
+    my ($n,$default)=@_;
+    if( defined($n) && $n =~ /^\d+$/ ){
+        $n;
+    }else{
+        $default;
+    }
+}
+
+sub firstN{
+    my @result;
+    my $n=shift;
+    push(@result,shift(@_)) while( $n-- > 0 && @_ );
+    @result;
+}
+
+sub lastN{
+    my @result;
+    my $n=shift;
+    push(@result,pop(@_)) while( $n-- > 0 && @_ );
+    @result;
+}
+
+sub set_view_thosenikky{
+    my %o=@_;
+
+    my ($prevnikky,$nextnikky);
+    my $max=-1;
+    my $min=$#nikky+1;
+    for( @{$o{region}} ){
+        $max = $_->{seq} if $_->{seq} > $max;
+        $min = $_->{seq} if $_->{seq} < $min;
+    }
+    ${$o{next}} = $nikky[ $max + 1 ] if $max < $#nikky ;
+    ${$o{prev}} = $nikky[ $min - 1 ] if $min > 0;
+    $::action_plugin{$o{action}} = sub {
+        if( $o{title} ){
+            &::print_header( userheader=>'YES' , title=> $o{title}  );
+        }else{
+            &::print_header( userheader=>'YES' );
+        }
+        &concat_article( @{$o{region}} );
+        &::puts(qq(<div class="$ss_copyright">),@::copyright,'</div>');
+        &::print_sidebar_and_footer;
+    } if exists $o{action};
+}
 1;

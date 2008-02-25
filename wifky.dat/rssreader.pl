@@ -97,13 +97,11 @@ sub rss{
     if( (!defined $ncache) || ( -M $fname ) >= &nvl($::config{rssreader__cycle},15)/1440.0 ){
         utime( time , time , $fname );
         eval{
-            local $SIG{ALRM} = sub { die('Timeout to read RSS'); };
             alarm(30);
-                $xml = &http( $host , $uri , $lastmodified );
-            alarm(0);
+            local $SIG{ALRM} = sub { die('Timeout to read RSS'); };
+            $xml = &http( $host , $uri , $lastmodified );
         };
         if( $@ ){
-            alarm(0);
             if( $@ =~ /Timeout to read RSS/ ||
                 $@ =~ /not found/ ){
                 undef $xml;
