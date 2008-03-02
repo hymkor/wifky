@@ -1,5 +1,4 @@
-use strict;
-use warnings;
+# use strict; use warnings;
 
 if( $::form{a} && $::form{a} eq 'edt' &&
     ( !defined(&::is_signed) || &is_signed() ) )
@@ -59,10 +58,14 @@ $::action_plugin{rmcmnt} = sub{
         &ninsho;
     }
     my $comments = &read_object( $::form{p} , 'comment.0' );
-    my @comments = split(/\n/,$comments );
+
+    # This strange regular expression is to recover broken comments demilitor.
+    my @comments = split(/\r?[\r\n]/,$comments );
     $comments[ $_ ] = '' for( @{$::forms{no}} );
 
-    &write_object( $::form{p} , 'comment.0' , join("\n",grep($_ ne '',@comments) ) );
+    &write_object( $::form{p} , 'comment.0' , 
+		   join("",map{$_ ne '' ? "$_\r\n" : () } @comments ) );
+
     &::transfer_page();
 };
 
