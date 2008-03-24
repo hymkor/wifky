@@ -459,7 +459,7 @@ sub form_signarea{
     &puts('<input type="hidden" name="admin" value="admin">');
 
     &puts('<input type="checkbox" name="to_freeze" value="1"');
-    &is_frozen() and &puts('checked');
+    &puts('checked') if &is_frozen();
     &puts(' >freeze');
 
     my $fname=&title2fname( $::form{p} );
@@ -783,7 +783,7 @@ sub action_passwd{
     goto &signin unless is_signed();
 
     my ($p1,$p2) = ( $::form{p1} , $::form{p2} );
-    ( $p1 ne $p2 ) and die('!New signs differ from each other!');
+    die('!New signs differ from each other!') if $p1 ne $p2;
     $::config{crypt} = crypt($p1,'wk');
     &save_config;
     &transfer_url($::me);
@@ -923,7 +923,7 @@ sub action_rename{
     foreach my $suffix ( @{$::dir_cache{$fname}} ){
         my $older=$fname    . $suffix ;
         my $newer=$newfname . $suffix ;
-        -f $newfname and die("!The new page name '$newtitle' is already used.!");
+        die("!The new page name '$newtitle' is already used.!") if -f $newfname;
         push(@list, [ $older , $newer ] );
     }
     rename( $_->[0] , $_->[1] ) foreach @list;
@@ -1065,9 +1065,9 @@ sub do_submit{
     my $fn=&title2fname($title);
     my $sagetime=&mtimeraw($fn);
 
-    &is_frozen() and chmod(0644,$fn);
+    chmod(0644,$fn) if &is_frozen();
 
-    $::hook_submit and $::hook_submit->(\$title , \$::form{text_t});
+    $::hook_submit->(\$title , \$::form{text_t}) if $::hook_submit;
     if( &lockdo( sub{ &write_file( $fn , \$::form{text_t} ) },$::form{p} )){
         chmod 0444,$fn if $::form{to_freeze};
         utime($sagetime,$sagetime,$fn) if $::form{sage};
@@ -1304,7 +1304,7 @@ sub plugin_footnote{
 
     my $i=$#{$session->{footnotes}} + 1;
     my %attr=( title=>&strip_tag($footnotetext)  );
-    $session->{index} and $attr{name}="fm${i}";
+    $attr{name}="fm${i}" if $session->{index};
     '<sup>' .
     &anchor("*${i}", { p=> $::form{p} } , \%attr , "#ft${i}" ) .
     '</sup>' ;
