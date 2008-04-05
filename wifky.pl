@@ -1226,31 +1226,31 @@ sub print_template{
         },
     );
     &print_header( userheader=>'template' );
-    $template =~ s/\&{(.*?)}/&template_callback(\%default,\%hash,$1)/ge;
-    $template =~ s/\%{(.*?)}/&template_include($1)/ge;
+    $template =~ s/([\&\%]){(.*?)}/&template_callback(\%default,\%hash,$1,$2)/ge;
     &::puts( $template );
     &puts('</body></html>');
 }
 sub template_callback{
-    my ($default,$hash,$word)=@_;
-    my $target="<!-- unknown function $word-->";
-    if( exists $default->{$word} ){
-        $target = $default->{$word};
-    }elsif( exists $hash->{$word} ){
-        $target = $hash->{$word};
-    }
-    if( ref($target) ){
-        local $::print="";
-        my $value=$target->( $word );
-        $::print || $value || '';
+    my ($default,$hash,$mark,$word)=@_;
+    if( $mark eq '&' ){
+        my $target="<!-- unknown function $word-->";
+        if( exists $default->{$word} ){
+            $target = $default->{$word};
+        }elsif( exists $hash->{$word} ){
+            $target = $hash->{$word};
+        }
+        if( ref($target) ){
+            local $::print="";
+            my $value=$target->( $word );
+            $::print || $value || '';
+        }else{
+            $target;
+        }
     }else{
-        $target;
+        local $::print='';
+        &::print_page( title=>$word );
+        $::print;
     }
-}
-sub template_include{
-    local $::print='';
-    &::print_page( title=>$_[0] );
-    $::print;
 }
 
 sub action_view{
