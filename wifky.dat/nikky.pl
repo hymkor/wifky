@@ -104,24 +104,11 @@ unshift( @::copyright ,
     <a href="$rssurl" class="rssurl">[RSS]</a></div>)
 );
 
-### for AutoPagerize ###
-if( !exists $::form{a} || $::form{a} eq 'nikky' || $::form{a} eq 'date' ){
-    (*org_print_header,*::print_header)=(*::print_header,*new_header);
-    (*org_print_footer,*::print_footer)=(*::print_footer,*new_footer);
-}
-sub new_header{
-    &org_print_header;
-    &::puts('<div class="autopagerize_page_element">');
-}
-sub new_footer{
-    &::puts('</div>');
-    &org_print_footer;
-}
-
 &init();
 
 sub concat_article{
     my $h = ( $::version ge '1.1' || &::is('cssstyle') ? 2 : 1 );
+    &::puts('<div class="autopagerize_page_element">');
     foreach my $p (@_){
         next unless -f $p->{fname};
         my $pagename=$p->{title};
@@ -133,6 +120,7 @@ sub concat_article{
         &::puts('</div></div>');
         &::print_page( title=>'Footer' , class=>$ss_terminater );
     }
+    &::puts('</div>');
     &::puts('<div class="autopagerize_insert_before"></div>');
 }
 

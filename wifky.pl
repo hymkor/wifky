@@ -258,72 +258,40 @@ sub init_globals{
     );
 
     @::outline = ();
-    $::user_template = <<TEMPLATE ;
+
+    $::user_template = '
         <div class="main">
             <div class="header">
-                #{header}
-                #{warning}
+                &{header}
             </div><!-- header -->
-            <div class="day">
-                <h2><span class="title">#{title}</span></h2>
-                <div class="body">
-                    #{main}
-                </div><!-- body -->
-            </div><!-- day  -->
-            #{previewform}
-            <div class="terminator">
-                #{footer}
+            <div class="autopagerize_page_element">
+            &{main}
             </div>
+            <div class="terminator">
+                %{Footer}
+            </div>
+            <div class="autopagerize_insert_before"></div>
             <div class="copyright footer">
-                #{copyright}
+                &{copyright}
             </div><!-- copyright -->
         </div><!-- main -->
         <div class="sidebar">
-        #{sidebar}
+        %{Sidebar}
         </div><!-- sidebar -->
-        #{message}
-TEMPLATE
+        &{message}';
 
-    $::system_template = <<TEMPLATE ;
+    $::system_template = '
         <div class="max">
             <div class="Header">
-            #{menubar}
-            <h1>#{Title}</h1>
-            </div>
-            #{warning}
-            <div class="day">
-                <h2><span class="title">#{title}</span></h2>
-                <div class="body">
-                    #{main}
-                </div><!-- body -->
-            </div><!-- day  -->
-            #{previewform}
-            <div class="terminator">
-            #{footer}
-            </div>
+                &{menubar}
+                <h1>&{Title}</h1>
+            </div><!-- Header -->
+            &{main}
             <div class="copyright footer">
-                #{copyright}
+                &{copyright}
             </div><!-- copyright -->
         </div><!-- max -->
-        #{message}
-TEMPLATE
-    $::tools_template = <<TEMPLATE ;
-        <div class="max">
-            <div class="Header">
-            #{menubar}
-            <h1>#{Title}</h1>
-            </div>
-            #{warning}
-            #{main}
-            <div class="terminator">
-            #{footer}
-            </div>
-            <div class="copyright footer">
-                #{copyright}
-            </div><!-- copyright -->
-        </div><!-- max -->
-        #{message}
-TEMPLATE
+        &{message}';
 }
 
 sub browser_cache_off{
@@ -538,7 +506,8 @@ sub form_commit_button{
 }
 
 sub form_attachment{
-    &begin_day('Attachment');
+    ### &begin_day('Attachment');
+    &puts('<h3>Attachment</h3>');
     &puts('<p>New:<input type="file" name="newattachment_b" size="48">');
     &puts('<input type="submit" name="a" value="Upload"></p>');
     my @attachments=&list_attachment( $::form{p} ) or return;
@@ -563,7 +532,7 @@ sub form_attachment{
         &puts('<input type="submit" name="a" value="Freeze/Fresh">');
     }
     &puts('<input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">');
-    &end_day();
+    ### &end_day();
 }
 
 sub print_form{
@@ -607,7 +576,9 @@ sub print_header{
     &puts( &is_frozen() ? '<body class="frozen">' : '<body>' );
     &puts( @::body_header );
     if( $arg{userheader} ){
-        if( $arg{userheader} > 0 ){
+        if( $arg{userheader} eq 'template' ){
+            $::flag{userheader} = 'template';
+        }else{
             &putenc('<div class="%s">' , $arg{divclass}||'main' );
             my $r=&print_page( title=>'Header' , class=>'header' );
             &puts( &plugin({},'menubar') ) unless $::flag{menubar_printed} ;
@@ -623,8 +594,9 @@ sub print_header{
     }
 }
 
-sub print_footer{
+sub print_footer{ ### deprecate ###
     if( $::flag{userheader} ){
+        return if $::flag{userheader} eq 'template';
         &puts('<div class="copyright footer">',@::copyright,'</div>') if @::copyright;
         &puts('</div><!-- main --><div class="sidebar">');
         &print_page( title=>'Sidebar' );
@@ -634,11 +606,11 @@ sub print_footer{
     &puts('</body></html>');
 }
 
-sub print_sidebar_and_footer{ # for compatible with nikky.pl
+sub print_sidebar_and_footer{ ### deprecate ###
     @::copyright=();
     &print_footer(); 
 } 
-sub print_copyright{} # for compatible.
+sub print_copyright{} ### deprecate ###
 
 sub is_frozen{
     if( -r &title2fname(  $#_>=0            ? $_[0]
@@ -718,11 +690,13 @@ sub action_new{
         template=>$::system_template ,
         Title => 'Create Page' ,
         main => sub {
+            &begin_day();
             &putenc(qq(<form action="%s" method="post" accept-charset="%s">
                 <p><input type="text" name="p" size="40">
                 <input type="hidden" name="a" value="edt">
                 <input type="submit" value="Create"></p></form>)
                 , $::postme , $::charset );
+            &end_day();
         },
     );
 }
@@ -788,6 +762,7 @@ sub action_signin{
         template => $::system_template ,
         Title=> 'Signin form',
         main=> sub{
+            &begin_day();
             &putenc(qq(<form action="%s" method="POST" accept-charset="%s">
                 <p>Sign: <input type="password" name="password">
                 <input type="submit" name="signing" value="Enter">)
@@ -802,6 +777,7 @@ sub action_signin{
                 }
             }
             &puts('</p></form>');
+            &end_day();
         }
     );
 }
@@ -880,7 +856,7 @@ sub action_tools{
 HEADER
 
     &print_template(
-        template=>$::tools_template ,
+        template=>$::system_template ,
         Title => 'Tools' ,
         main => sub {
             ### Section Select ###
@@ -1014,8 +990,8 @@ sub action_seek{
 
     &print_template(
         Title => qq(Seek: "$ekeyword") ,
-        title => qq(Seek: "$ekeyword") ,
         main => sub {
+            &begin_day( qq(Seek: "$ekeyword") );
             &puts('<ul>');
             foreach my $fn ( &list_page() ){
                 my $title  = &fname2title( $fn );
@@ -1032,6 +1008,7 @@ sub action_seek{
                 }
             }
             &puts('</ul>');
+            &end_day();
         },
     );
 }
@@ -1089,7 +1066,7 @@ sub action_comment{
 
 sub begin_day{
     &puts('<div class="day">');
-    &putenc('<h2><span class="title">%s</span></h2>',$_[0]);
+    &putenc('<h2><span class="title">%s</span></h2>',$_[0]) if @_;
     &puts('<div class="body">');
 }
 
@@ -1103,10 +1080,12 @@ sub do_index{
     &print_template(
         title => 'IndexPage' ,
         main  => sub{
-            '<ul><li><tt>' .
-            &anchor(' Last Modified Time' , { a=>$t } ) .
-            '&nbsp' . &anchor('Page Title' , { a=>$n } ) .
-            '</tt></li>' . &ls(@param) . '</ul>' ;
+            &begin_day('IndexPage');
+            &puts( '<ul><li><tt>' .
+                    &anchor(' Last Modified Time' , { a=>$t } ) .
+                    '&nbsp' . &anchor('Page Title' , { a=>$n } ) .
+                    '</tt></li>' . &ls(@param) . '</ul>' );
+            &end_day();
         }
     );
 }
@@ -1183,12 +1162,11 @@ sub do_preview{
     my $title = $::form{p};
     &print_template(
         template => $::system_template ,
-        warning=> (@param ? '<div class="warning">'.&errmsg($_[0]).'</div>' : ''),
-        title=>sub{ 'Preview:'.$::form{p} },
         main=>sub{
+            &puts(@param ? '<div class="warning">'.&errmsg($_[0]).'</div>' : '');
+            &begin_day('Preview:'.$::form{p} );
             &print_page( title=>$title , source=>\$::form{text_t} , index=>1 , main=>1 );
-        },
-        previewform=>sub{
+            &end_day();
             &print_form( $title , \$::form{text_t} , \$::form{orgsrc_t} );
         },
     );
@@ -1199,24 +1177,29 @@ sub action_edit{
 
     &browser_cache_off();
     my $title = $::form{p};
-    &print_header(title=>'Edit');
-    &begin_day($title);
-    my $fn=&title2fname($title);
-    my $source=&read_file($fn);
-    &print_form( $title , \$source , \$source );
-    &end_day();
 
-    if( &object_exists($::form{p}) && &is_signed() ){
-        &begin_day('Rename');
-        &putenc('<p><form action="%s" method="post">
-            <input type="hidden"  name="a" value="ren">
-            <input type="hidden"  name="p" value="%s">
-            Title: <input type="text" name="newtitle" value="%s" size="80">'
-            , $::postme , $::form{p} , $::form{p} );
-        &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
-        &end_day();
-    }
-    &print_footer();
+    &print_template(
+        template => $::system_template ,
+        Title => 'Edit' ,
+        main  => sub {
+            &begin_day( $title );
+            my $fn=&title2fname($title);
+            my $source=&read_file($fn);
+            &print_form( $title , \$source , \$source );
+            &end_day();
+
+            if( &object_exists($::form{p}) && &is_signed() ){
+                &begin_day('Rename');
+                &putenc('<p><form action="%s" method="post">
+                    <input type="hidden"  name="a" value="ren">
+                    <input type="hidden"  name="p" value="%s">
+                    Title: <input type="text" name="newtitle" value="%s" size="80">'
+                    , $::postme , $::form{p} , $::form{p} );
+                &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
+                &end_day();
+            }
+        }
+    );
 }
 
 sub print_template{
@@ -1229,8 +1212,6 @@ sub print_template{
             &putenc('<h1>%s</h1>',$::config{sitename}) if !$r && $::config{sitename};
             $::flag{userheader} = 1;
         },
-        sidebar=>sub{ &::print_page( title=>'Sidebar' ) },
-        footer =>sub{ &::print_page( title=>'Footer'  ) },
         message=>sub{
             $::config{debugmode} && $messages ? $messages : '';
         },
@@ -1244,8 +1225,9 @@ sub print_template{
             }
         },
     );
-    &print_header( userheader=>-1 );
-    $template =~ s/\#{(.*?)}/&template_callback(\%default,\%hash,$1)/ge;
+    &print_header( userheader=>'template' );
+    $template =~ s/\&{(.*?)}/&template_callback(\%default,\%hash,$1)/ge;
+    $template =~ s/\%{(.*?)}/&template_include($1)/ge;
     &::puts( $template );
     &puts('</body></html>');
 }
@@ -1265,12 +1247,21 @@ sub template_callback{
         $target;
     }
 }
+sub template_include{
+    local $::print='';
+    &::print_page( title=>$_[0] );
+    $::print;
+}
 
 sub action_view{
     my $title=$::form{p}=shift;
     &print_template( 
         title => $title ,
-        main  => sub{ &print_page( title=>$title , index=>1 , main=>1 ) }
+        main  => sub{ 
+            &begin_day( $title );
+            &print_page( title=>$title , index=>1 , main=>1 )
+            &end_day();
+        }
     );
 }
 
