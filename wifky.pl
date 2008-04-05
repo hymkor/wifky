@@ -259,16 +259,16 @@ sub init_globals{
 
     @::outline = ();
 
-    $::user_template = '
+    $::user_template ||= '
         <div class="main">
             <div class="header">
                 &{header}
             </div><!-- header -->
             <div class="autopagerize_page_element">
-            &{main}
-            </div>
-            <div class="terminator">
-                %{Footer}
+                &{main}
+                <div class="terminator">
+                    %{Footer}
+                </div>
             </div>
             <div class="autopagerize_insert_before"></div>
             <div class="copyright footer">
@@ -280,7 +280,7 @@ sub init_globals{
         </div><!-- sidebar -->
         &{message}';
 
-    $::system_template = '
+    $::system_template ||= '
         <div class="max">
             <div class="Header">
                 &{menubar}

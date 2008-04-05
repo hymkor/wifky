@@ -53,6 +53,14 @@ if( exists $::form{a} && ($::form{a} eq 'date' || $::form{a} eq 'nikky') ){
     delete $::menubar{'400_Edit(Admin)'};
 }
 
+$::inline_plugin{read_more} = sub {
+    if( $::form{a} && $::form{a} eq 'rss' ){
+        &::anchor('(more...)',{ p=>$::form{p} } ) . '<!--- READ MORE --->';
+    }else{
+        '';
+    }
+};
+
 $::preferences{'Nikky Plugin '.$version}= [
     { desc=>'Author'
     , name=>'nikky_author' , size=>20 },
@@ -339,6 +347,8 @@ sub action_rss{
             join("\n\n",@{$t->{desc}}) ,
             { title => $t->{page} , attachment => $t->{attachment} }
         );
+        $::print =~ s/<!--- READ MORE --->.*\Z//s;
+        
         print  '<description><![CDATA[';
         &::flush;
         print  "]]></description>\r\n<content:encoded><![CDATA[";
@@ -658,10 +668,7 @@ sub nvl{
 }
 
 sub firstN{
-    my @result;
-    my $n=shift;
-    push(@result,shift(@_)) while( $n-- > 0 && @_ );
-    @result;
+    my $n=shift; grep( $n-- > 0 , @_ );
 }
 
 sub lastN{
