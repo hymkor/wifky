@@ -258,6 +258,72 @@ sub init_globals{
     );
 
     @::outline = ();
+    $::user_template = <<TEMPLATE ;
+        <div class="main">
+            <div class="header">
+                #{header}
+                #{warning}
+            </div><!-- header -->
+            <div class="day">
+                <h2><span class="title">#{title}</span></h2>
+                <div class="body">
+                    #{main}
+                </div><!-- body -->
+            </div><!-- day  -->
+            #{previewform}
+            <div class="terminator">
+                #{footer}
+            </div>
+            <div class="copyright footer">
+                #{copyright}
+            </div><!-- copyright -->
+        </div><!-- main -->
+        <div class="sidebar">
+        #{sidebar}
+        </div><!-- sidebar -->
+        #{message}
+TEMPLATE
+
+    $::system_template = <<TEMPLATE ;
+        <div class="max">
+            <div class="Header">
+            #{menubar}
+            <h1>#{Title}</h1>
+            </div>
+            #{warning}
+            <div class="day">
+                <h2><span class="title">#{title}</span></h2>
+                <div class="body">
+                    #{main}
+                </div><!-- body -->
+            </div><!-- day  -->
+            #{previewform}
+            <div class="terminator">
+            #{footer}
+            </div>
+            <div class="copyright footer">
+                #{copyright}
+            </div><!-- copyright -->
+        </div><!-- max -->
+        #{message}
+TEMPLATE
+    $::tools_template = <<TEMPLATE ;
+        <div class="max">
+            <div class="Header">
+            #{menubar}
+            <h1>#{Title}</h1>
+            </div>
+            #{warning}
+            #{main}
+            <div class="terminator">
+            #{footer}
+            </div>
+            <div class="copyright footer">
+                #{copyright}
+            </div><!-- copyright -->
+        </div><!-- max -->
+        #{message}
+TEMPLATE
 }
 
 sub browser_cache_off{
@@ -541,11 +607,13 @@ sub print_header{
     &puts( &is_frozen() ? '<body class="frozen">' : '<body>' );
     &puts( @::body_header );
     if( $arg{userheader} ){
-        &putenc('<div class="%s">' , $arg{divclass}||'main' );
-        my $r=&print_page( title=>'Header' , class=>'header' );
-        &puts( &plugin({},'menubar') ) unless $::flag{menubar_printed} ;
-        &putenc('<h1>%s</h1>',$::config{sitename}) if !$r && $::config{sitename};
-        $::flag{userheader} = 1;
+        if( $arg{userheader} > 0 ){
+            &putenc('<div class="%s">' , $arg{divclass}||'main' );
+            my $r=&print_page( title=>'Header' , class=>'header' );
+            &puts( &plugin({},'menubar') ) unless $::flag{menubar_printed} ;
+            &putenc('<h1>%s</h1>',$::config{sitename}) if !$r && $::config{sitename};
+            $::flag{userheader} = 1;
+        }
     }else{
         &putenc('<div class="%s">' , $arg{divclass}||'max' );
         &puts('<div class="Header">');
@@ -646,13 +714,17 @@ sub write_file{
 }
 
 sub action_new{
-    &print_header( title=>'Create Page' );
-    &putenc(qq(<form action="%s" method="post" accept-charset="%s">
-        <p><input type="text" name="p" size="40">
-        <input type="hidden" name="a" value="edt">
-        <input type="submit" value="Create"></p></form>)
-        , $::postme , $::charset );
-    &print_footer;
+    &print_template(
+        template=>$::system_template ,
+        Title => 'Create Page' ,
+        main => sub {
+            &putenc(qq(<form action="%s" method="post" accept-charset="%s">
+                <p><input type="text" name="p" size="40">
+                <input type="hidden" name="a" value="edt">
+                <input type="submit" value="Create"></p></form>)
+                , $::postme , $::charset );
+        },
+    );
 }
 
 sub load_config{
@@ -712,22 +784,26 @@ sub save_session{
 }
 
 sub action_signin{
-    &print_header( title=>'Signin form' );
-    &putenc(qq(<form action="%s" method="POST" accept-charset="%s">
-        <p>Sign: <input type="password" name="password">
-        <input type="submit" name="signing" value="Enter">)
-        , $::postme , $::charset , $ENV{REQUEST_METHOD} );
+    &print_template(
+        template => $::system_template ,
+        Title=> 'Signin form',
+        main=> sub{
+            &putenc(qq(<form action="%s" method="POST" accept-charset="%s">
+                <p>Sign: <input type="password" name="password">
+                <input type="submit" name="signing" value="Enter">)
+                , $::postme , $::charset , $ENV{REQUEST_METHOD} );
 
-    while( my ($key,$val)=each %::form ){
-        if( $key =~ /_t$/ ){
-            &putenc('<input type="hidden" name="%s_y" value="%s" />' ,
-                        $` , &yen($val) );
-        }elsif( ($key ne 'a' || $val ne 'signin') && $key !~ /_b$/ ){
-            &putenc('<input type="hidden" name="%s" value="%s" />', $key , $val );
+            while( my ($key,$val)=each %::form ){
+                if( $key =~ /_t$/ ){
+                    &putenc('<input type="hidden" name="%s_y" value="%s" />' ,
+                                $` , &yen($val) );
+                }elsif( ($key ne 'a' || $val ne 'signin') && $key !~ /_b$/ ){
+                    &putenc('<input type="hidden" name="%s" value="%s" />', $key , $val );
+                }
+            }
+            &puts('</p></form>');
         }
-    }
-    &puts('</p></form>');
-    &print_footer;
+    );
 }
 
 sub action_signout{
@@ -803,87 +879,89 @@ sub action_tools{
 </script>
 HEADER
 
-    &print_header( title=>'Tools' );
+    &print_template(
+        template=>$::tools_template ,
+        Title => 'Tools' ,
+        main => sub {
+            ### Section Select ###
+            &puts('<form action="#"><input type="hidden" name="a" value="tools">');
+            &putenc('<select onChange="if( lastid ){ hide(lastid); };show(this.options[this.selectedIndex].value);lastid=this.options[this.selectedIndex].value;return false;">' );
+            foreach my $section ( "*Change Sign*", sort keys %::preferences ){
+                &putenc('<option value="%s">%s</option>',$section,$section);
+            }
+            &puts('</select></form>');
 
-    ### Section Select ###
-    &puts('<form action="#"><input type="hidden" name="a" value="tools">');
-    &putenc('<select onChange="if( lastid ){ hide(lastid); };show(this.options[this.selectedIndex].value);lastid=this.options[this.selectedIndex].value;return false;">' );
-    foreach my $section ( "*Change Sign*", sort keys %::preferences ){
-        &putenc('<option value="%s">%s</option>',$section,$section);
-    }
-    &puts('</select></form>');
+            ### Sign Change ###
+            &puts('<div id="*Change Sign*">');
+            &begin_day('Change Sign');
+            &putenc('<form action="%s" method="post"
+                ><p>Old Sign:<input name="password" type="password" size="40"
+                ><br>New Sign(1):<input name="p1" type="password" size="40"
+                ><br>New Sign(2):<input name="p2" type="password" size="40"
+                ><br><input name="a" type="hidden"  value="pwd"
+                ><input type="submit" value="Submit"></p></form>',$::postme);
+            &end_day();
+            &puts('</div>');
 
-    ### Sign Change ###
-    &puts('<div id="*Change Sign*">');
-    &begin_day('Change Sign');
-    &putenc('<form action="%s" method="post"
-        ><p>Old Sign:<input name="password" type="password" size="40"
-        ><br>New Sign(1):<input name="p1" type="password" size="40"
-        ><br>New Sign(2):<input name="p2" type="password" size="40"
-        ><br><input name="a" type="hidden"  value="pwd"
-        ><input type="submit" value="Submit"></p></form>',$::postme);
-    &end_day();
-    &puts('</div>');
+            ### Other Sections ###
+            while( my ($section,undef)=each %::preferences ){
+                &putenc('<div id="%s" style="display:none" class="section">',$section );
+                &begin_day($section);
+                &putenc('<form action="%s" method="post">',$::postme);
+                &putenc('<input type="hidden" name="section" value="%s">',$section);
 
-    ### Other Sections ###
-    while( my ($section,undef)=each %::preferences ){
-        &putenc('<div id="%s" style="display:none" class="section">',$section );
-        &begin_day($section);
-        &putenc('<form action="%s" method="post">',$::postme);
-        &putenc('<input type="hidden" name="section" value="%s">',$section);
-
-        foreach my $i ( @{$::preferences{$section}} ){
-            $i->{type} ||= 'text';
-            if( $i->{type} eq 'checkbox' ){
-                &putenc('<input type="checkbox" name="config__%s" value="1"%s> %s<br>'
-                    , $i->{name}
-                    , ( &is($i->{name}) ? ' checked' : '' )
-                    , $i->{desc}
-                );
-            }elsif( $i->{type} eq 'password' ){
-                &putenc('%s <input type="password" name="config__%s">
-                        (retype)<input type="password" name="verify__%s"><br>'
-                    , $i->{desc} , $i->{name} , $i->{name}
-                );
-            }elsif( $i->{type} eq 'textarea' ){
-                &putenc(
-                    '%s<br><textarea name="config__%s" cols="%s" rows="%s">%s</textarea><br>'
-                    , $i->{desc} , $i->{name}
-                    , ($i->{cols} || 40 )
-                    , ($i->{rows} ||  4 )
-                    , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
-                );
-            }elsif( $i->{type} eq 'radio' ){
-                &putenc('%s<br>',$i->{desc});
-                foreach my $p (@{$i->{option}}){
-                    &putenc('<input type="radio" name="config__%s" value="%s"%s>%s<br>'
-                        , $i->{name}
-                        , $p->[0]
-                        , ( defined($::config{$i->{name}}) &&
-                            $::config{$i->{name}} eq $p->[0]
-                          ? ' checked' : '' )
-                        , $p->[1] );
+                foreach my $i ( @{$::preferences{$section}} ){
+                    $i->{type} ||= 'text';
+                    if( $i->{type} eq 'checkbox' ){
+                        &putenc('<input type="checkbox" name="config__%s" value="1"%s> %s<br>'
+                            , $i->{name}
+                            , ( &is($i->{name}) ? ' checked' : '' )
+                            , $i->{desc}
+                        );
+                    }elsif( $i->{type} eq 'password' ){
+                        &putenc('%s <input type="password" name="config__%s">
+                                (retype)<input type="password" name="verify__%s"><br>'
+                            , $i->{desc} , $i->{name} , $i->{name}
+                        );
+                    }elsif( $i->{type} eq 'textarea' ){
+                        &putenc(
+                            '%s<br><textarea name="config__%s" cols="%s" rows="%s">%s</textarea><br>'
+                            , $i->{desc} , $i->{name}
+                            , ($i->{cols} || 40 )
+                            , ($i->{rows} ||  4 )
+                            , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
+                        );
+                    }elsif( $i->{type} eq 'radio' ){
+                        &putenc('%s<br>',$i->{desc});
+                        foreach my $p (@{$i->{option}}){
+                            &putenc('<input type="radio" name="config__%s" value="%s"%s>%s<br>'
+                                , $i->{name}
+                                , $p->[0]
+                                , ( defined($::config{$i->{name}}) &&
+                                    $::config{$i->{name}} eq $p->[0]
+                                  ? ' checked' : '' )
+                                , $p->[1] );
+                        }
+                    }elsif( $i->{type} eq 'a' ){
+                        &putenc('<a href="%s">%s</a><br>',$i->{href},$i->{desc} );
+                    }elsif( $i->{type} eq 'rem' ){
+                        &putenc('%s<br>',$i->{desc} );
+                    }else{ # text
+                        &putenc(
+                            '%s <input type="text" name="config__%s" value="%s" size="%s"><br>'
+                            , $i->{desc} , $i->{name}
+                            , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
+                            , $i->{size} || 10
+                        );
+                    }
                 }
-            }elsif( $i->{type} eq 'a' ){
-                &putenc('<a href="%s">%s</a><br>',$i->{href},$i->{desc} );
-            }elsif( $i->{type} eq 'rem' ){
-                &putenc('%s<br>',$i->{desc} );
-            }else{ # text
-                &putenc(
-                    '%s <input type="text" name="config__%s" value="%s" size="%s"><br>'
-                    , $i->{desc} , $i->{name}
-                    , exists $::config{$i->{name}} ? $::config{$i->{name}} : ''
-                    , $i->{size} || 10
-                );
+                &puts('<input type="hidden" name="a" value="preferences">',
+                      '<input type="submit" value="Submit"></form>' );
+                &end_day();
+                &puts('</div>');
             }
         }
-        &puts('<input type="hidden" name="a" value="preferences">',
-              '<input type="submit" value="Submit"></form>' );
-        &end_day();
-        &puts('</div>');
-    }
-
-    &print_footer;
+    );
 }
 
 sub action_preferences{
@@ -934,26 +1012,28 @@ sub action_seek{
     my $keyword=$::form{keyword};
     my $ekeyword=&enc( $keyword );
 
-    &print_header( title=>qq(Seek: "$ekeyword") , userheader=>1 );
-    &begin_day(qq(Seek: "$ekeyword"));
-    &puts('<ul>');
-    foreach my $fn ( &list_page() ){
-        my $title  = &fname2title( $fn );
-        if( index($title ,$keyword) >= 0 ){
-            &puts('<li>' . &anchor($title,{ p=>$title }) . ' (title)</li>');
-        }elsif( open(FP,$fn) ){
-            while( <FP> ){
-                if( index($_,$keyword) >= 0 ){
-                    &puts('<li>' . &anchor($title,{ p=>$title } ) . '</li>' );
-                    last;
+    &print_template(
+        Title => qq(Seek: "$ekeyword") ,
+        title => qq(Seek: "$ekeyword") ,
+        main => sub {
+            &puts('<ul>');
+            foreach my $fn ( &list_page() ){
+                my $title  = &fname2title( $fn );
+                if( index($title ,$keyword) >= 0 ){
+                    &puts('<li>' . &anchor($title,{ p=>$title }) . ' (title)</li>');
+                }elsif( open(FP,$fn) ){
+                    while( <FP> ){
+                        if( index($_,$keyword) >= 0 ){
+                            &puts('<li>' . &anchor($title,{ p=>$title } ) . '</li>' );
+                            last;
+                        }
+                    }
+                    close(FP);
                 }
             }
-            close(FP);
-        }
-    }
-    &puts('</ul>');
-    &end_day();
-    &print_footer();
+            &puts('</ul>');
+        },
+    );
 }
 
 sub action_delete{
@@ -1018,14 +1098,17 @@ sub end_day{ &puts('</div></div>'); }
 sub do_index{
     my $t=shift;
     my $n=shift;
+    my @param=@_;
 
-    &print_header( title=>'IndexPage' , userheader=>1 );
-    &begin_day('IndexPage');
-        &puts('<ul><li><tt>' . &anchor(' Last Modified Time' , { a=>$t } ) .
-                '&nbsp' . &anchor('Page Title' , { a=>$n } ) .
-                '</tt></li>' , &ls(@_) , '</ul>' );
-    &end_day();
-    &print_footer();
+    &print_template(
+        title => 'IndexPage' ,
+        main  => sub{
+            '<ul><li><tt>' .
+            &anchor(' Last Modified Time' , { a=>$t } ) .
+            '&nbsp' . &anchor('Page Title' , { a=>$n } ) .
+            '</tt></li>' . &ls(@param) . '</ul>' ;
+        }
+    );
 }
 
 sub action_upload{
@@ -1096,15 +1179,19 @@ sub transfer_page{
 sub do_preview{
     goto &action_signin if is_frozen() && !&is_signed();
 
+    my @param=@_;
     my $title = $::form{p};
-
-    &print_header(title=>'Preview');
-    &puts('<div class="warning">',&errmsg($_[0]),'</div>') if @_ ;
-    &begin_day($title);
-        &print_page( title=>$title , source=>\$::form{text_t} , index=>1 , main=>1 );
-    &end_day();
-    &print_form( $title , \$::form{text_t} , \$::form{orgsrc_t} );
-    &print_footer();
+    &print_template(
+        template => $::system_template ,
+        warning=> (@param ? '<div class="warning">'.&errmsg($_[0]).'</div>' : ''),
+        title=>sub{ 'Preview:'.$::form{p} },
+        main=>sub{
+            &print_page( title=>$title , source=>\$::form{text_t} , index=>1 , main=>1 );
+        },
+        previewform=>sub{
+            &print_form( $title , \$::form{text_t} , \$::form{orgsrc_t} );
+        },
+    );
 }
 
 sub action_edit{
@@ -1132,14 +1219,59 @@ sub action_edit{
     &print_footer();
 }
 
+sub print_template{
+    my %hash=@_;
+    my $template = $hash{template} || $::user_template;
+    my %default=(
+        header=>sub{
+            my $r=&::print_page( title=>'Header' );
+            &puts( &plugin({},'menubar') ) unless $::flag{menubar_printed} ;
+            &putenc('<h1>%s</h1>',$::config{sitename}) if !$r && $::config{sitename};
+            $::flag{userheader} = 1;
+        },
+        sidebar=>sub{ &::print_page( title=>'Sidebar' ) },
+        footer =>sub{ &::print_page( title=>'Footer'  ) },
+        message=>sub{
+            $::config{debugmode} && $messages ? $messages : '';
+        },
+        copyright => sub{ join('',@::copyright); },
+        menubar => sub {
+            if( $::flag{menubar_printed} ){
+                "";
+            }else{
+                $::flag{menubar_printed} = 1;
+                &plugin({},'menubar');
+            }
+        },
+    );
+    &print_header( userheader=>-1 );
+    $template =~ s/\#{(.*?)}/&template_callback(\%default,\%hash,$1)/ge;
+    &::puts( $template );
+    &puts('</body></html>');
+}
+sub template_callback{
+    my ($default,$hash,$word)=@_;
+    my $target="<!-- unknown function $word-->";
+    if( exists $default->{$word} ){
+        $target = $default->{$word};
+    }elsif( exists $hash->{$word} ){
+        $target = $hash->{$word};
+    }
+    if( ref($target) ){
+        local $::print="";
+        my $value=$target->( $word );
+        $::print || $value || '';
+    }else{
+        $target;
+    }
+}
+
 sub action_view{
-    my $title = $::form{p} = shift;
-    &print_header( userheader=>1 );
-    &begin_day( $title );
-        &print_page( title=>$::form{p} , index=>1 , main=>1 );
-    &end_day();
-    &print_page( title=>'Footer' , class=>'terminator' );
-    &print_footer();
+    my $title=$::form{p}=shift;
+    &print_template( 
+        title => $title ,
+        main  => sub{ &print_page( title=>$title , index=>1 , main=>1 ) }
+    );
 }
 
 sub action_cat{
