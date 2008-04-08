@@ -2,6 +2,24 @@ package wifky::nikky;
 
 use strict; use warnings;
 
+$wifky::nikky::template ||= '
+    <div class="main">
+        <div class="header">
+            &{header}
+        </div><!-- header -->
+        <div class="autopagerize_page_element">
+            &{main}
+        </div>
+        <div class="autopagerize_insert_before"></div>
+        <div class="copyright footer">
+            &{copyright}
+        </div><!-- copyright -->
+    </div><!-- main -->
+    <div class="sidebar">
+    %{Sidebar}
+    </div><!-- sidebar -->
+    &{message}';
+
 my %nikky;
 my @nikky;
 my $version='0.23++';
@@ -116,7 +134,6 @@ unshift( @::copyright ,
 
 sub concat_article{
     my $h = ( $::version ge '1.1' || &::is('cssstyle') ? 2 : 1 );
-    &::puts('<div class="autopagerize_page_element">');
     foreach my $p (@_){
         next unless -f $p->{fname};
         my $pagename=$p->{title};
@@ -128,8 +145,6 @@ sub concat_article{
         &::puts('</div></div>');
         &::print_page( title=>'Footer' , class=>$ss_terminater );
     }
-    &::puts('</div>');
-    &::puts('<div class="autopagerize_insert_before"></div>');
 }
 
 sub lastdiary{
@@ -691,14 +706,24 @@ sub set_view_thosenikky{
     ${$o{next}} = $nikky[ $max + 1 ] if $max < $#nikky ;
     ${$o{prev}} = $nikky[ $min - 1 ] if $min > 0;
     $::action_plugin{$o{action}} = sub {
-        if( $o{title} ){
-            &::print_header( userheader=>'YES' , title=> $o{title}  );
+        if( defined &::print_template ){
+            &::print_template(
+                template => $wifky::nikky::template ,
+                Title => $o{title} || '',
+                main => sub{
+                    &concat_article( @{$o{region}} );
+                }
+            );
         }else{
-            &::print_header( userheader=>'YES' );
+            if( $o{title} ){
+                &::print_header( userheader=>'YES' , title=> $o{title}  );
+            }else{
+                &::print_header( userheader=>'YES' );
+            }
+            &concat_article( @{$o{region}} );
+            &::puts(qq(<div class="$ss_copyright">),@::copyright,'</div>');
+            &::print_sidebar_and_footer;
         }
-        &concat_article( @{$o{region}} );
-        &::puts(qq(<div class="$ss_copyright">),@::copyright,'</div>');
-        &::print_sidebar_and_footer;
     } if exists $o{action};
 }
 1;
