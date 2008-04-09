@@ -1,6 +1,6 @@
 package wifky::nikky;
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $wifky::nikky::template ||= '
     <div class="main">
@@ -8,7 +8,7 @@ $wifky::nikky::template ||= '
             &{header}
         </div><!-- header -->
         <div class="autopagerize_page_element">
-            &{main}
+            &{main} <!-- contents and footers -->
         </div>
         <div class="autopagerize_insert_before"></div>
         <div class="copyright footer">
@@ -22,7 +22,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='0.23++';
+my $version='0.24';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
 my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
@@ -151,7 +151,7 @@ sub lastdiary{
     local $::inline_plugin{lastdiary}=sub{};
     local $::print='';
     my $days = $#_ >= 1 ? $_[1] : 3;
-    my @list=&::ls_core( { r=>1 } , '(????.??.??)*' );
+    my @list=&::ls_core( {} , '(????.??.??)*' );
     my @tm=localtime(time+24*60*60);
     my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
     &concat_article( &lastN($days,grep( $_->{title} lt $tomorrow && -f $_->{fname} , @list )));
@@ -162,14 +162,14 @@ sub lastdiary{
 sub olddiary{
     local $::inline_plugin{olddiary}=sub{};
     local $::print='';
-    &concat_article( &lastN($#_ >0 ? $_[1] : 3 ,@nikky) );
+    &concat_article( &firstN($#_ >0 ? $_[1] : 3 ,@nikky) );
     $::print;
 }
 
 sub newdiary{
     local $::inline_plugin{newdiary}=sub{};
     local $::print='';
-    &concat_article( &firstN($#_ >= 1 ? $_[1] : 3,@nikky));
+    &concat_article( &lastN($#_ >= 1 ? $_[1] : 3,@nikky));
     $::print;
 }
 
