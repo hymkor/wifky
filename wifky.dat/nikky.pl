@@ -138,7 +138,7 @@ sub concat_article{
         next unless -f $p->{fname};
         my $pagename=$p->{title};
         &::puts('<div class="day">');
-        &::putenc('<h%d><a href="%s">%s</a></h%d><div class="body">',
+        &::putenc('<h%d><span class="title"><a href="%s">%s</a></span></h%d><div class="body">',
                     $h , &::title2url( $pagename ) , $pagename , $h );
         local $::form{p} = $pagename;
         &::print_page( title=>$pagename );
