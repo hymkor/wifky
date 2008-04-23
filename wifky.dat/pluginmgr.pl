@@ -1,25 +1,26 @@
 # Plugin Manager
-# support wifky 1.3 or later.
+# support wifky 1.3.2+  1.2.0  1.0.3.2
 
-# Do not use 'package' statement.
-# PackageManager must run in main-packages.
+package wifky::pluginmgr;
 
-# use strict;use warnings; 
+#use strict;use warnings; 
 
-my $version='0.7';
+my $version='0.8';
 
--d 'plugins' or mkdir('plugins',0777) or die('can not mkdir plugins directory');
+-d 'plugins' or mkdir('plugins',0755) or die('can not mkdir plugins directory');
 
 ###
 ### Create link to pluginmgr
 ###
 
-if( &is_signed() ){
+if( !defined &::is_signed || &::is_signed() ){
     $::inline_plugin{'a_pluginmgr'} = sub {
         &::verb( qq(<a href="$::me?a=pluginmgr">Plugin Manager</a>) );
     };
+}
+if( defined &::is_signed &&::is_signed() ){
     $::menubar{'501_Pluginmgr'} 
-        = &anchor('Plugin',{a=>'pluginmgr'},{ref=>'nofollow'});
+        = &::anchor('Plugin',{a=>'pluginmgr'},{ref=>'nofollow'});
 }
 
 ###
@@ -48,7 +49,8 @@ closedir(DIR);
 
 unless( $::form{a} && ($::form{a} =~ /^pluginmgr/ || $::form{a} eq 'signin') ){
     foreach my $p ( grep( $::config{$_->{key}} , @plugins) ){
-        do $p->{path} ; $@ and die($@);
+        package main;
+        do $p->{path} ; die($@) if $@;
     }
 }
 
@@ -57,7 +59,11 @@ unless( $::form{a} && ($::form{a} =~ /^pluginmgr/ || $::form{a} eq 'signin') ){
 ###
 
 $::action_plugin{'pluginmgr_upload'} = sub{
-    goto &action_signin unless &is_signed();
+    if( defined &::is_signed ){
+        goto &::action_signin unless &::is_signed();
+    }else{
+        &::ninsho();
+    }
 
     my $name=$::form{'plugin.filename'};
     my $body=$::form{'plugin'};
@@ -80,7 +86,11 @@ $::action_plugin{'pluginmgr_upload'} = sub{
 ###
 
 $::action_plugin{'pluginmgr_permit'} = sub {
-    goto &action_signin unless &is_signed();
+    if( defined &::is_signed ){
+        goto &::action_signin unless &::is_signed();
+    }else{
+        &::ninsho;
+    }
 
     foreach my $key (grep(/^pluginmgr__/,keys %::config)){
         delete $::config{$key};
@@ -96,7 +106,11 @@ $::action_plugin{'pluginmgr_permit'} = sub {
 ### Plugin Eraser
 ###
 $::action_plugin{'pluginmgr_erase'} = sub {
-    goto &action_signin unless &is_signed();
+    if( defined &::is_signed ){
+        goto &::action_signin unless &::is_signed();
+    }else{
+        &::ninsho();
+    }
 
     my $fn=$::form{target};
     $fn =~ /^([0-9a-f][0-9a-f])+$/ or die("!Invalied plugin-filename $fn!");
@@ -110,10 +124,33 @@ $::action_plugin{'pluginmgr_erase'} = sub {
 ###
 
 $::action_plugin{'pluginmgr'} = sub {
-    goto &action_signin unless &is_signed();
+    if( defined &::is_signed ){
+        goto &::action_signin unless &::is_signed();
+    }
 
     unshift(@::copyright,"<div>Plugin Manager $version</div>");
-    &::print_header( divclass=>'max' , title=>'Plugin Manager' );
+    if( defined &::print_template ){
+        &::print_template(
+            template => $::system_template ,
+            Title => 'Plugin Manager' ,
+            main => \&print_body ,
+        );
+    }else{
+        &::print_header( divclass=>'max' , title=>'Plugin Manager' );
+        &print_body();
+        &::print_copyright;
+        &::print_footer;
+    }
+};
+
+1;
+
+sub print_body{
+    my $passwordfield='Sign:<input type="password" name="password" />';
+    if( defined &::is_signed ){
+	$passwordfield = '';
+    }
+
     &::putenc(<<HTML
 <div class="day">
 <h2>Enable/Disable Plugin</h2>
@@ -137,6 +174,7 @@ HTML
     }
     &::putenc(<<HTML
 <p>
+${passwordfield}
 <input type="hidden" name="a" value="pluginmgr_permit">
 <input type="submit" value="Enable/Disable">
 </p>
@@ -150,7 +188,7 @@ HTML
  method="post" accept-charset="%s" >
 <p>Plugin file: <input type="file" name="plugin" size="48">
 <input type="checkbox" name="enable" value="1" checked>enable?</p>
-<p><input type="hidden" name="a" value="pluginmgr_upload"
+<p>${passwordfield}<input type="hidden" name="a" value="pluginmgr_upload"
 ><input type="submit" value="Upload">
 </p>
 </form>
@@ -175,14 +213,10 @@ HTML
     }
     &::putenc(<<HTML
 <p><input type="hidden" name="a" value="pluginmgr_erase"
-><input type="submit" value="Erase" onClick="JavaScript:return window.confirm('Erase Sure?')"></p>
+>${passwordfield}<input type="submit" value="Erase" onClick="JavaScript:return window.confirm('Erase Sure?')"></p>
 </form>
 </div><!-- body -->
 </div><!-- day -->
 HTML
     );
-    &::print_copyright;
-    &::print_footer;
-};
-
-1;
+}
