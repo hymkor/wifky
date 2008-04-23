@@ -799,15 +799,19 @@ sub save_config{
 }
 
 sub action_commit{
+    my $rollback;
     eval{
         &check_frozen();
         &check_conflict();
         if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
-            &archive();
+            $rollback = &archive();
         }
         &do_submit();
     };
-    &do_preview( $@ ) if $@;
+    if( $@ ){
+        $rollback->() if defined $rollback;
+        &do_preview( $@ );
+    }
 }
 
 sub archive{
@@ -816,8 +820,13 @@ sub archive{
     my $backno=&title2fname($::form{p},
         sprintf('~%02d%02d%02d_%02d%02d%02d.txt',$tm[5]%100,1+$tm[4],@tm[3,2,1,0] )
     );
+    my $frozen=(-f $source);
     rename( $source , $backno );
     chmod( 0444 , $backno );
+    sub{
+        rename( $backno , $source );
+        chmod( 0644 , $source ) unless $frozen;
+    };
 }
 
 sub action_preview{
