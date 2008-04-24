@@ -802,9 +802,6 @@ sub action_commit{
     eval{
         &check_frozen();
         &check_conflict();
-        if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
-            &archive();
-        }
         &do_submit();
     };
     &do_preview( $@ ) if $@;
@@ -1130,6 +1127,9 @@ sub do_submit{
     chmod(0644,$fn) if &is_frozen();
 
     $::hook_submit->(\$title , \$::form{text_t}) if $::hook_submit;
+    if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
+        &archive();
+    }
     if( &lockdo( sub{ &write_file( $fn , \$::form{text_t} ) },$::form{p} )){
         chmod 0444,$fn if $::form{to_freeze};
         utime($sagetime,$sagetime,$fn) if $::form{sage};
