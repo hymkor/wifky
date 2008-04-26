@@ -2,7 +2,7 @@
 
 # use strict; use warnings;
 
-$::version  = '1.3.2_1';
+$::version  = '1.3.2_2';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -1163,7 +1163,7 @@ sub do_preview{
     &print_template(
         template => $::system_template ,
         main=>sub{
-            &puts(@param ? '<div class="warning">'.&errmsg($_[0]).'</div>' : '');
+            &puts(@param ? '<div class="warning">'.&errmsg($param[0]).'</div>' : '');
             &begin_day('Preview:'.$::form{p} );
             &print_page( title=>$title , source=>\$::form{text_t} , index=>1 , main=>1 );
             &end_day();
