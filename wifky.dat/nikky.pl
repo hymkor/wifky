@@ -22,7 +22,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='0.24';
+my $version='0.24_1';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
 my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
@@ -449,9 +449,8 @@ sub init{
         my @tm=localtime(time);
         $p = sprintf( "(%04d.%02d.%02d)\xFF", 1900+$tm[5], 1+$tm[4], $tm[3] );
     }
-    my $cur=&::title2fname($p);
-    my $month_first=&::title2fname( substr($p,0,9).'00)' );
-    my $month_end  =&::title2fname( substr($p,0,9).'99)' );
+    my $month_first=substr($p,0,9).'00)';
+    my $month_end  =substr($p,0,9).'99)';
     foreach(@nikky){
         $prevmonth   = $_ if $_->{title} lt $month_first;
         $nextmonth ||= $_ if $_->{title} gt $month_end  ;
