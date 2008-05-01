@@ -1,6 +1,6 @@
 package wifky::nikky;
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $wifky::nikky::template ||= '
     <div class="main">
@@ -219,9 +219,13 @@ sub referer{
 };
 
 sub action_rss{
-    $::me='http://'.($ENV{'HTTP_HOST'}||$ENV{'SERVER_NAME'}).
-            (defined $ENV{SERVER_PORT} && $ENV{SERVER_PORT}!=80 
-            ? ':'.$ENV{SERVER_PORT} : '').$ENV{'SCRIPT_NAME'};
+    $::me = 'http://' . (
+                    defined $ENV{'HTTP_HOST'}
+                  ? $ENV{'HTTP_HOST'}
+                  : defined $ENV{'SERVER_PORT'} && $ENV{'SERVER_PORT'} != 80
+                  ? $ENV{'SERVER_NAME'} . ':' . $ENV{'SERVER_PORT'}
+                  : $ENV{'SERVER_NAME'}
+            ) . $ENV{'SCRIPT_NAME'};
     $::inline_plugin{comment} = sub { &::plugin_comment(@_,'-f'); };
     my $feed_num = ($::config{nikky_rss_feed_num} || 3);
     my @pagelist;
