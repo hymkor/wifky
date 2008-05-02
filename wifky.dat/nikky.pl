@@ -1,6 +1,6 @@
 package wifky::nikky;
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $wifky::nikky::template ||= '
     <div class="main">
