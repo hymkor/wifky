@@ -335,8 +335,8 @@ sub set_form{
 }
 
 sub read_form{
-    foreach my $set (split(/[,;]\s*/,$ENV{'HTTP_COOKIE'}||'') ){
-        $::cookie{$`}=$' if $set =~ /=/ ;
+    foreach(split(/[,;]\s*/,$ENV{'HTTP_COOKIE'}||'') ){
+        $::cookie{$`}=$' if /=/;
     }
     if( exists $ENV{REQUEST_METHOD} && $ENV{REQUEST_METHOD} eq 'POST' ){
         $ENV{CONTENT_LENGTH} > 1024*1024 and die('Too large form data');
@@ -970,13 +970,13 @@ sub action_rename{
     my $fname    = &title2fname($title);
     my $newfname = &title2fname($newtitle);
 
-    my @list;
-    foreach my $suffix ( @{$::dir_cache{$fname}} ){
-        my $older=$fname    . $suffix ;
-        my $newer=$newfname . $suffix ;
+    my @list = map {
+        my $older=$fname    . $_ ;
+        my $newer=$newfname . $_ ;
         die("!The new page name '$newtitle' is already used.!") if -f $newfname;
-        push(@list, [ $older , $newer ] );
-    }
+        [ $older , $newer ];
+    } @{$::dir_cache{$fname}};
+
     rename( $_->[0] , $_->[1] ) foreach @list;
     &transfer_page($newtitle);
 }
@@ -1028,11 +1028,7 @@ sub action_freeze_or_fresh{
 
     foreach my $f ( @{$::forms{f}} ){
         my $fn=&title2fname( $::form{p} , $f );
-        if( -w $fn ){
-            chmod 0444,$fn;
-        }else{
-            chmod 0666,$fn;
-        }
+        chmod( -w $fn ? 0444 : 0666 , $fn );
     }
     &cacheoff;
     &do_preview();
@@ -1563,18 +1559,13 @@ sub plugin_comment{
     $session->{"comment.$comid"} = 1;
 
     my $ecomid = &enc($comid);
-    my $fname=&title2fname( $::form{p} , "comment.$comid" );
     my $buf = '<div class="comment">'.$caption.'<div class="commentshort">';
-    if( open(FP, $fname) ){
-        while( <FP> ){
-            chomp;
-            my ($dt,$who,$say) = split(/\t/,$_,3);
-            my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
-            $buf .= sprintf('<p><span class="commentator">%s</span>
-                %s <span class="comment_date">(%s)</span></p>'
-                    , &enc(&deyen($who)), $text , &enc($dt) );
-        }
-        close(FP);
+    for(split(/\r?\n/,read_object($::form{p} , "comment.$comid"))){
+        my ($dt,$who,$say) = split(/\t/,$_,3);
+        my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
+        $buf .= sprintf('<p><span class="commentator">%s</span>'.
+            '%s <span class="comment_date">(%s)</span></p>'
+                , &enc(&deyen($who)), $text , &enc($dt) );
     }
     unless( exists $opt{f} ){
         $buf .= <<HTML
