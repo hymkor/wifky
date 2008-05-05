@@ -919,6 +919,8 @@ HEADER
                         &putenc('<a href="%s">%s</a><br>',$i->{href},$i->{desc} );
                     }elsif( $i->{type} eq 'rem' ){
                         &putenc('%s<br>',$i->{desc} );
+                    }elsif( $i->{type} eq 'function' ){
+                        $i->{display}->('config__'.$i->{name},$::config{$i->{name}});
                     }else{ # text
                         &putenc(
                             '%s <input type="text" name="config__%s" value="%s" size="%s"><br>'
