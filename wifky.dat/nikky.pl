@@ -543,8 +543,8 @@ sub query_current_month{
         $::form{p} =~ /^\((\d\d\d\d)\.(\d\d)\.(\d\d)\)/ ){
         @r=($1,$2,$3);
     }elsif( defined($::form{date}) &&
-        $::form{date} =~ /^(\d\d\d\d)(\d\d)(\d\d)$/ ){
-        @r=($1,$2,$3);
+        $::form{date} =~ /^(\d\d\d\d)(\d\d)(\d\d)?$/ ){
+        @r=($1,$2,$3||'00');
     }else{
         my ($y,$m,$today)=(localtime)[5,4,3];
         @r=($y + 1900 , $m+1 , $today );
