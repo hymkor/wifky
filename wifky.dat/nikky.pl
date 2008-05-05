@@ -1,6 +1,6 @@
 package wifky::nikky;
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $wifky::nikky::template ||= '
     <div class="main">
@@ -322,8 +322,13 @@ sub action_rss{
             $item{desc} = [ $text ] ;
             push(@topics , { %item } );
         }
-        if( $p->{attachment}->{'comment.0'} ){
-            $item{url} = sprintf('%s?p=%s#c',$::me,$pageurl) ;
+        while( my ($name,$value)=each %{$p->{attachment}} ){
+            next if $name !~ /^comment\./;
+            my $id=$';
+
+            $item{url} = sprintf('%s?p=%s#c_%s_%s',$::me,$pageurl,
+                                unpack('h*',$p->{title}) ,
+                                unpack('h*',$id)) ;
             $item{title} = sprintf('Comment for %s', $p->{title} );
             $item{desc} = [ 
                 '<dl>' . join("\n",
@@ -331,7 +336,7 @@ sub action_rss{
                         my ($dt,$who,$text)=
                             map{ &::enc(&::deyen($_)) } split(/\t/,$_,3);
                         "<dt>$who ($dt)</dt><dd>$text</dd>";
-                    } split(/\n/,&::read_object($p->{title},'comment.0') )
+                    } split(/\n/,&::read_object($p->{title},$name) )
                 ) . '</dl>'
             ];
             push(@topics , { %item } );

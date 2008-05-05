@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $::version  = '1.3.2_2';
 
@@ -1561,7 +1561,10 @@ sub plugin_comment{
     $session->{"comment.$comid"} = 1;
 
     my $ecomid = &enc($comid);
-    my $buf = '<div class="comment">'.$caption.'<div class="commentshort">';
+    my $buf = sprintf('<div class="comment" id="c_%s_%s">%s<div class="commentshort">',
+                unpack('h*',$::form{p}) ,
+                unpack('h*',$comid) ,
+                $caption );
     for(split(/\r?\n/,read_object($::form{p} , "comment.$comid"))){
         my ($dt,$who,$say) = split(/\t/,$_,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
