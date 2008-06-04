@@ -520,8 +520,8 @@ sub form_attachment{
             &puts(' disabled');
         }
         &putenc('><input type="text" name="dummy" readonly value="&lt;&lt;{%s}"
-                size="20" style="font-family:monospace"
-                onClick="this.select();">', $attach );
+                size="%d" style="font-family:monospace"
+                onClick="this.select();">', $attach, length($attach)+4 );
         &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$attach } ).':' );
         &putenc('%d bytes, at %s', (stat $fn)[7],&mtime($fn));
         &puts('<strong>frozen</strong>') unless -w _;
