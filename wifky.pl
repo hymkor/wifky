@@ -292,6 +292,38 @@ sub init_globals{
             </div><!-- copyright -->
         </div><!-- max -->
         &{message}';
+
+    %::default_contents = (
+        &title2fname('CSS') => <<HERE ,
+p.centering,big{ font-size:200% }
+
+h1,h2,h3,td{border-width:0px 1px 1px 0px;border-style:solid}
+
+dt,span.commentator,span.rssreader_subject{font-weight:bold}
+
+span.comment_date{font-style:italic}
+
+div.sidebar{ float:right; width:25% ; word-break: break-all}
+
+div.main{ float:left; width:70% }
+
+a{ text-decoration:none }
+
+pre{
+ background-color:#DDD;
+ margin-left: 1cm;
+ white-space: -moz-pre-wrap; /* Mozilla */
+ white-space: -o-pre-wrap; /* Opera 7 */
+ white-space: pre-wrap; /* CSS3 */
+ word-wrap: break-word; /* IE 5.5+ */
+}
+HERE
+    &title2fname("Header") => <<HERE ,
+((menubar))
+
+!!!! ((sitename))
+HERE
+    );
 }
 
 sub browser_cache_off{
@@ -580,17 +612,13 @@ sub print_header{
             $::flag{userheader} = 'template';
         }else{
             &putenc('<div class="%s">' , $arg{divclass}||'main' );
-            my $r=&print_page( title=>'Header' , class=>'header' );
-            &puts( &plugin({},'menubar') ) unless $::flag{menubar_printed} ;
-            &putenc('<h1>%s</h1>',$::config{sitename}) if !$r && $::config{sitename};
+            &print_page( title=>'Header' , class=>'header' );
             $::flag{userheader} = 1;
         }
     }else{
         &putenc('<div class="%s">' , $arg{divclass}||'max' );
-        &puts('<div class="Header">');
-        &puts( &plugin_menubar(undef) );
-        &putenc( '<h1>%s</h1>' , $arg{title} ) if exists $arg{title};
-        &puts('</div><!--Header-->');
+        &print_page( title =>'Header' ,
+                     source=>\$::default_contents{ &title2fname('Header')} );
     }
 }
 
@@ -654,11 +682,11 @@ sub read_object{
 }
 
 sub read_file{
-    open(FP,$_[0]) or return '';
+    open(FP,$_[0]) or return $::default_contents{ $_[0] } || '';
     local $/; undef $/;
     my $object = <FP>;
     close(FP);
-    defined($object) ? $object : '';
+    defined($object) ? $object : $::default_contents{ $_[0] } || '';
 }
 
 # write object with OBJECT-NAME(S) , not filename.
@@ -1205,9 +1233,7 @@ sub print_template{
     my $template = $hash{template} || $::user_template;
     my %default=(
         header=>sub{
-            my $r=&::print_page( title=>'Header' );
-            &puts( &plugin({},'menubar') ) unless $::flag{menubar_printed} ;
-            &putenc('<h1>%s</h1>',$::config{sitename}) if !$r && $::config{sitename};
+            &::print_page( title=>'Header' );
             $::flag{userheader} = 1;
         },
         message=>sub{
