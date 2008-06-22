@@ -316,9 +316,10 @@ div.sidebar{ float:right; width:25% ; word-break: break-all}
 div.main{ float:left; width:70% }
 
 a{ text-decoration:none }
+a:visited{ color:darkblue }
 
 pre{
- background-color:#DDD;
+ background-color:#DDF;
  margin-left: 1cm;
  white-space: -moz-pre-wrap; /* Mozilla */
  white-space: -o-pre-wrap; /* Opera 7 */
