@@ -662,7 +662,7 @@ sub is_frozen{
 
 sub auth_check{ # If password is right, return true.
     !$::config{crypt} ||
-    grep(crypt($_,'wk') eq $::config{crypt},@{$::forms{password}})>0;
+    grep(crypt($_,$::config{crypt}) eq $::config{crypt},@{$::forms{password}})>0;
 }
 
 sub ninsho{ # If password is wrong, then die.
@@ -870,7 +870,8 @@ sub action_passwd{
 
     my ($p1,$p2) = ( $::form{p1} , $::form{p2} );
     die('!New signs differ from each other!') if $p1 ne $p2;
-    $::config{crypt} = crypt($p1,'wk');
+    my @salts=('0'..'9','A'..'Z','a'..'z',".","/");
+    $::config{crypt} = crypt($p1,$salts[ int(rand(64)) ].$salts[ int(rand(65)) ]);
     &save_config;
     &transfer_url($::me);
 }
