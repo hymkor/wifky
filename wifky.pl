@@ -45,8 +45,7 @@ if( $0 eq __FILE__ ){
         }
         &load_config;
         &init_globals;
-        foreach my $pl (sort grep(/\.pl$/,&directory) ){
-            next if $pl eq 'pluginmgr.pl';
+        foreach my $pl (sort grep(/\.pl$/ && $_ ne 'pluginmgr.pl',&directory) ){
             do $pl; die($@) if $@;
         }
         pluginmgr_init();
@@ -55,7 +54,7 @@ if( $0 eq __FILE__ ){
             $::action_plugin{ $::form{a} }->();
         }elsif( exists $::form{p} ){ # page view
             if( exists $::form{f} ){ # output attachment
-                &action_cat;
+                &action_cat();
             }else{ # output page itself.
                 &action_view($::form{p});
             }
@@ -144,12 +143,12 @@ sub init_globals{
         'preferences'   => \&action_preferences ,
         'new'           => \&action_new ,
         'Freeze/Fresh'  => \&action_freeze_or_fresh ,
-        'signin'        => \&action_signin ,
-        'signout'       => \&action_signout ,
-        'pluginmgr'     => \&action_pluginmgr_menu ,
-        'pluginmgr_permit' => \&action_pluginmgr_permit ,
-        'pluginmgr_upload' => \&action_pluginmgr_upload ,
-        'pluginmgr_erase'  => \&action_pluginmgr_erase ,
+        '-signin'           => \&action_signin ,
+        '-signout'          => \&action_signout ,
+        '-pluginmgr'        => \&action_pluginmgr_menu ,
+        '-pluginmgr_permit' => \&action_pluginmgr_permit ,
+        '-pluginmgr_upload' => \&action_pluginmgr_upload ,
+        '-pluginmgr_erase'  => \&action_pluginmgr_erase ,
     );
 
     @::http_header = ( "Content-type: text/html; charset=$::charset" );
@@ -170,10 +169,10 @@ sub init_globals{
     }
     @::menubar = ();
     if( &is_signed() ){
-        $::menubar{'900_SignOut'} = &anchor('SignOut',{a=>'signout'},{ref=>'nofollow'});
+        $::menubar{'900_SignOut'} = &anchor('SignOut',{a=>'-signout'},{ref=>'nofollow'});
         $::menubar{'500_Tools'} = &anchor('Tools',{a=>'tools'},{ref=>'nofollow'});
     }else{
-        my $p={a=>'signin'};
+        my $p={a=>'-signin'};
         if( ($ENV{REQUEST_METHOD}||'') eq 'GET' ){
             while( my ($key,$val)=each %::form ){
                 $p->{$key} ||= $val ;
@@ -810,7 +809,7 @@ sub action_signin{
                 if( $key =~ /_t$/ ){
                     &putenc('<input type="hidden" name="%s_y" value="%s" />' ,
                                 $` , &yen($val) );
-                }elsif( ($key ne 'a' || $val ne 'signin') && $key !~ /_b$/ ){
+                }elsif( ($key ne 'a' || $val ne '-signin') && $key !~ /_b$/ ){
                     &putenc('<input type="hidden" name="%s" value="%s" />', $key , $val );
                 }
             }
@@ -1971,10 +1970,10 @@ sub pluginmgr_init{
     ### Create link to pluginmgr ###
     if( &is_signed() ){
         $::inline_plugin{'a_pluginmgr'} = sub {
-            &verb( qq(<a href="$::me?a=pluginmgr">Plugin Manager</a>) );
+            &verb( qq(<a href="$::me?a=-pluginmgr">Plugin Manager</a>) );
         };
         $::menubar{'501_Pluginmgr'}
-            = &anchor('Plugin',{a=>'pluginmgr'},{ref=>'nofollow'});
+            = &anchor('Plugin',{a=>'-pluginmgr'},{ref=>'nofollow'});
     }
 
     ### create plugin list ###
@@ -1995,7 +1994,7 @@ sub pluginmgr_init{
     closedir(DIR);
 
     ### Load plugins ###
-    unless( $::form{a} && ($::form{a} =~ /^pluginmgr/ || $::form{a} =~ /^signin/ ) ){
+    unless( $::form{a} && $::form{a} =~ /^\-/ ){
         foreach my $p ( grep( $::config{$_->{key}} , @::plugins) ){
             do $p->{path} ; die($@) if $@;
         }
@@ -2018,7 +2017,7 @@ sub action_pluginmgr_upload{
         $::config{"pluginmgr__$hexnm"} = 0;
     }
     &save_config();
-    &transfer_url( "$::me?a=pluginmgr" );
+    &transfer_url( "$::me?a=-pluginmgr" );
 };
 
 sub action_pluginmgr_permit{
@@ -2030,18 +2029,16 @@ sub action_pluginmgr_permit{
     while( my ($key,$value)=each %::form ){
         $::config{$key} = 1 if $key =~ /^pluginmgr__/;
     }
-    &save_config;
-    &transfer_url( "$::me?a=pluginmgr" );
+    &save_config();
+    &transfer_url( "$::me?a=-pluginmgr" );
 };
 
 sub action_pluginmgr_erase{
     goto &::action_signin unless &is_signed();
 
-    my $fn=$::form{target};
-    $fn =~ /^([0-9a-f][0-9a-f])+$/ or die("!Invalied plugin-filename $fn!");
-    -f "./plugins/$fn" or die('!Remove not exists plugin!');
-    unlink "./plugins/$fn";
-    &transfer_url( "$::me?a=pluginmgr" );
+    my $fn=unpack('h*',$::form{target});
+    unlink "plugins/$fn" or die('!Remove not exists plugin!');
+    &transfer_url( "$::me?a=-pluginmgr" );
 }
 
 sub action_pluginmgr_menu{
@@ -2051,6 +2048,19 @@ sub action_pluginmgr_menu{
         template => $::system_template ,
         Title => 'Plugin Manager' ,
         main => sub{
+            &begin_day("New Plugin");
+            &putenc( <<HTML
+<form name="plugin_form" action="%s" enctype="multipart/form-data"
+ method="post" accept-charset="%s" >
+<p>Plugin file: <input type="file" name="plugin" size="48">
+<input type="checkbox" name="enable" value="1" checked>enable?</p>
+<p><input type="hidden" name="a" value="-pluginmgr_upload"
+><input type="submit" value="Upload">
+</p>
+</form>
+HTML
+                , $::me , $::charset );
+            &end_day();
             &begin_day( "Enable/Disable Plugin" );
             &putenc('<form name="plugin_form" action="%s" method="post"
                       accept-charset="%s" >'
@@ -2070,36 +2080,21 @@ sub action_pluginmgr_menu{
                 &putenc('<strong>%s</strong> (hand-installed on %s)<br>'
                         , $nm , scalar(localtime($stat[9])) );
             }
-            &puts('<p><input type="hidden" name="a" value="pluginmgr_permit">',
+            &puts('<p><input type="hidden" name="a" value="-pluginmgr_permit">',
                   '<input type="submit" value="Enable/Disable"></p></form>');
             &end_day();
 
-            &begin_day("New Plugin");
-            &putenc( <<HTML
-<form name="plugin_form" action="%s" enctype="multipart/form-data"
- method="post" accept-charset="%s" >
-<p>Plugin file: <input type="file" name="plugin" size="48">
-<input type="checkbox" name="enable" value="1" checked>enable?</p>
-<p><input type="hidden" name="a" value="pluginmgr_upload"
-><input type="submit" value="Upload">
-</p>
-</form>
-HTML
-                , $::me , $::charset );
-            &end_day();
             &begin_day("Erase unused Plugins");
             &putenc('<form action="%s" method="post" accept-charset="%s">'
                     , $::me , $::charset );
             foreach my $p (@::plugins){
                 unless( $::config{ $p->{key} } ){
                     &putenc('<div><input type="radio" name="target" value="%s"> %s</div>'
-                        , $p->{hexnm}
-                        , $p->{name}
-                    );
+                        , $p->{name} , $p->{name} );
                 }
             }
             &putenc(<<HTML
-<p><input type="hidden" name="a" value="pluginmgr_erase"
+<p><input type="hidden" name="a" value="-pluginmgr_erase"
 ><input type="submit" value="Erase" onClick="JavaScript:return window.confirm('Erase Sure?')"></p>
 </form>
 HTML
