@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.3.2_2';
+$::version  = '1.3.3_0';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -26,9 +26,9 @@ if( $0 eq __FILE__ ){
             return if ( caller(0) )[1] =~ /\.pm$/;
             my $msg=join(' ',@_);
             if( $msg =~ /^!(.*)!/ ){
-                $messages .= '<div>'.&::enc($1)."</div>\n" ;
+                $messages .= '<div>'.&enc($1)."</div>\n" ;
             }else{
-                $messages .= '<div>'.&::enc($msg)."</div>\n" ;
+                $messages .= '<div>'.&enc($msg)."</div>\n" ;
                 my $i=0;
                 while( my (undef,$fn,$lno,$subnm)=caller($i++) ){
                     $messages .= sprintf('<div> &nbsp; on %s at %s line %d.</div>' ,
@@ -46,8 +46,11 @@ if( $0 eq __FILE__ ){
         &load_config;
         &init_globals;
         foreach my $pl (sort grep(/\.pl$/,&directory) ){
+            next if $pl eq 'pluginmgr.pl';
             do $pl; die($@) if $@;
         }
+        pluginmgr_init();
+
         if( exists $::form{a} && exists $::action_plugin{$::form{a}} ){
             $::action_plugin{ $::form{a} }->();
         }elsif( exists $::form{p} ){ # page view
@@ -140,9 +143,13 @@ sub init_globals{
         'tools'         => \&action_tools ,
         'preferences'   => \&action_preferences ,
         'new'           => \&action_new ,
+        'Freeze/Fresh'  => \&action_freeze_or_fresh ,
         'signin'        => \&action_signin ,
         'signout'       => \&action_signout ,
-        'Freeze/Fresh'  => \&action_freeze_or_fresh ,
+        'pluginmgr'     => \&action_pluginmgr_menu ,
+        'pluginmgr_permit' => \&action_pluginmgr_permit ,
+        'pluginmgr_upload' => \&action_pluginmgr_upload ,
+        'pluginmgr_erase'  => \&action_pluginmgr_erase ,
     );
 
     @::http_header = ( "Content-type: text/html; charset=$::charset" );
@@ -151,18 +158,14 @@ sub init_globals{
       qq(<meta http-equiv="Content-Type" content="text/html; charset=$::charset">\n<meta http-equiv="Content-Style-Type" content="text/css">\n<meta name="generator" content="wifky.pl $::version">\n<link rel="start" href="$::me">\n<link rel="index" href="$::me?a=index">)
     );
 
-    @::body_header = ( 
-        ### qq{<form name="newform" action="$::me" method="post" style="display:none"><input type="hidden" name="p" /><input type="hidden" name="a" value="edt" /></form>} || 
-        $::config{body_header}||'' );
+    @::body_header = ( $::config{body_header}||'' );
 
     %::menubar = (
         '100_FrontPage' => &anchor($::config{FrontPage} , undef  ) ,
         '600_Index'     => &anchor('Index',{a=>'recent'}) ,
     );
     if( !&is('lonely') || &is_signed() ){
-        $::menubar{'200_New'} 
-            = &anchor('New' , { a=>'new' } 
-         ###, { onClick=> "JavaScript:if(typeof(document.newform.p.value=prompt('New page name'))!='undefined'){document.newform.submit()};return false" }
+        $::menubar{'200_New'} = &anchor('New' , { a=>'new' }
         );
     }
     @::menubar = ();
@@ -569,9 +572,7 @@ sub form_attachment{
         &puts(')<br>');
     }
     &puts('</p>');
-    if( &is_signed() ){
-        &puts('<input type="submit" name="a" value="Freeze/Fresh">');
-    }
+    &puts('<input type="submit" name="a" value="Freeze/Fresh">') if &is_signed();
     &puts('<input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">');
     ### &end_day();
 }
@@ -645,8 +646,8 @@ sub print_footer{ ### deprecate ###
 
 sub print_sidebar_and_footer{ ### deprecate ###
     @::copyright=();
-    &print_footer(); 
-} 
+    &print_footer();
+}
 sub print_copyright{} ### deprecate ###
 
 sub is_frozen{
@@ -757,9 +758,9 @@ sub is_signed{
     for( split(/\n/,&read_file('session.cgi') ) ){
         $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ && $1>time-24*60*60;
     }
-    
+
     my $remote_addr=$ENV{REMOTE_ADDR}||0;
-    if( exists $::ip{$remote_addr} && 
+    if( exists $::ip{$remote_addr} &&
         $::ip{$remote_addr}->[0] eq ($::cookie{$::session_cookie}||'') )
     {
         &touch_session();
@@ -771,7 +772,7 @@ sub is_signed{
 
 sub touch_session{
     my $remote_addr = $ENV{REMOTE_ADDR}||0;
-    if( exists $::ip{$remote_addr} && 
+    if( exists $::ip{$remote_addr} &&
         $::ip{$remote_addr}->[0] eq $::cookie{$::session_cookie} )
     {
         ### update current session ###
@@ -786,11 +787,11 @@ sub touch_session{
 }
 
 sub save_session{
-    &lockdo( sub{ 
-        &write_file( 'session.cgi' , 
+    &lockdo( sub{
+        &write_file( 'session.cgi' ,
             join("\n",map(sprintf("#%s\t%s\t%s",$::ip{$_}->[1],$_,$::ip{$_}->[0]),
                  keys %::ip ))
-        ); } , 'session.cgi' 
+        ); } , 'session.cgi'
     );
 }
 
@@ -1193,7 +1194,7 @@ sub transfer_url{
     my $url=(shift || $::me);
     print join("\r\n",@::http_header),"\r\n\r\n";
     print '<html><head><title>Moving...</title>';
-    print qq|<meta http-equiv="refresh" content="1;URL=${url}">\n| 
+    print qq|<meta http-equiv="refresh" content="1;URL=${url}">\n|
         unless $::config{debugmode} && $messages;
     print qq|</head><body><a href="${url}">Wait or Click Here</a>|;
     print $messages if $::config{debugmode} && $messages;
@@ -1275,7 +1276,7 @@ sub print_template{
     );
     &print_header( userheader=>'template' );
     $template =~ s/([\&\%]){(.*?)}/&template_callback(\%default,\%hash,$1,$2)/ge;
-    &::puts( $template );
+    &puts( $template );
     &puts('</body></html>');
 }
 sub template_callback{
@@ -1303,9 +1304,9 @@ sub template_callback{
 
 sub action_view{
     my $title=$::form{p}=shift;
-    &print_template( 
+    &print_template(
         title => $title ,
-        main  => sub{ 
+        main  => sub{
             &begin_day( $title );
             &print_page( title=>$title , index=>1 , main=>1 )
             &end_day();
@@ -1663,7 +1664,7 @@ sub plugin{
     my $session=shift;
     my ($name,$param)=(map{(my $s=$_)=~s/<br>\Z//;$s} split(/\s+/,shift,2),'');
     $session->{argv} = $param;
-    
+
     $param =~ s/\x02.*?\x02/"\x05".unpack('h*',$&)."\x05"/eg;
     my @param=split(/\s+/,$param);
     foreach(@param){
@@ -1960,4 +1961,150 @@ sub block_normal{
         }
     }
     1;
+}
+
+sub pluginmgr_init{
+    unless( -d 'plugins' ){
+        mkdir('plugins',0755) or die('can not mkdir plugins directory');
+    }
+
+    ### Create link to pluginmgr ###
+    if( &is_signed() ){
+        $::inline_plugin{'a_pluginmgr'} = sub {
+            &verb( qq(<a href="$::me?a=pluginmgr">Plugin Manager</a>) );
+        };
+        $::menubar{'501_Pluginmgr'}
+            = &anchor('Plugin',{a=>'pluginmgr'},{ref=>'nofollow'});
+    }
+
+    ### create plugin list ###
+    local *DIR;
+    opendir(DIR,'plugins');
+    @::plugins =
+        sort{ $a->{name} cmp $b->{name} }
+        map {
+            +{
+                name  => pack('h*',$_) ,
+                hexnm => $_  ,
+                key   => "pluginmgr__$_" ,
+                path  => "plugins/$_" ,
+            };
+        }
+        grep{ /^([0-9a-f][0-9a-f])+$/ }
+        readdir(DIR) ;
+    closedir(DIR);
+
+    ### Load plugins ###
+    unless( $::form{a} && ($::form{a} =~ /^pluginmgr/ || $::form{a} =~ /^signin/ ) ){
+        foreach my $p ( grep( $::config{$_->{key}} , @::plugins) ){
+            do $p->{path} ; die($@) if $@;
+        }
+    }
+}
+
+sub action_pluginmgr_upload{
+    goto &action_signin unless &is_signed();
+
+    my $name=$::form{'plugin.filename'};
+    my $body=$::form{'plugin'};
+    local *FP;
+    my $hexnm = unpack('h*',$name);
+    open(FP,">plugins/$hexnm") or die;
+        print FP $body;
+    close(FP);
+    if( $::form{'enable'} ){
+        $::config{"pluginmgr__$hexnm"} = 1;
+    }else{
+        $::config{"pluginmgr__$hexnm"} = 0;
+    }
+    &save_config();
+    &transfer_url( "$::me?a=pluginmgr" );
+};
+
+sub action_pluginmgr_permit{
+    goto &::action_signin unless &is_signed();
+
+    foreach my $key (grep(/^pluginmgr__/,keys %::config)){
+        delete $::config{$key};
+    }
+    while( my ($key,$value)=each %::form ){
+        $::config{$key} = 1 if $key =~ /^pluginmgr__/;
+    }
+    &save_config;
+    &transfer_url( "$::me?a=pluginmgr" );
+};
+
+sub action_pluginmgr_erase{
+    goto &::action_signin unless &is_signed();
+
+    my $fn=$::form{target};
+    $fn =~ /^([0-9a-f][0-9a-f])+$/ or die("!Invalied plugin-filename $fn!");
+    -f "./plugins/$fn" or die('!Remove not exists plugin!');
+    unlink "./plugins/$fn";
+    &transfer_url( "$::me?a=pluginmgr" );
+}
+
+sub action_pluginmgr_menu{
+    goto &action_signin unless &is_signed();
+
+    &print_template(
+        template => $::system_template ,
+        Title => 'Plugin Manager' ,
+        main => sub{
+            &begin_day( "Enable/Disable Plugin" );
+            &putenc('<form name="plugin_form" action="%s" method="post"
+                      accept-charset="%s" >'
+                    , $::postme , $::charset );
+            foreach my $p (@::plugins){
+                my @stat=stat('plugins/'.$p->{hexnm});
+                &putenc('<div><input type="checkbox" name="%s" value="1"%s>'
+                            , $p->{key}
+                            , $::config{$p->{key}} ? ' checked':'');
+                &putenc('<strong>%s</strong> (installed on %s)</em></div>'
+                        , $p->{name}
+                        , scalar(localtime($stat[9])) );
+            }
+            foreach my $nm ( sort grep(/\.pl$/,&directory() )){
+                my @stat=stat($nm);
+                &puts('<input type="checkbox" checked disabled>');
+                &putenc('<strong>%s</strong> (hand-installed on %s)<br>'
+                        , $nm , scalar(localtime($stat[9])) );
+            }
+            &puts('<p><input type="hidden" name="a" value="pluginmgr_permit">',
+                  '<input type="submit" value="Enable/Disable"></p></form>');
+            &end_day();
+
+            &begin_day("New Plugin");
+            &putenc( <<HTML
+<form name="plugin_form" action="%s" enctype="multipart/form-data"
+ method="post" accept-charset="%s" >
+<p>Plugin file: <input type="file" name="plugin" size="48">
+<input type="checkbox" name="enable" value="1" checked>enable?</p>
+<p><input type="hidden" name="a" value="pluginmgr_upload"
+><input type="submit" value="Upload">
+</p>
+</form>
+HTML
+                , $::me , $::charset );
+            &end_day();
+            &begin_day("Erase unused Plugins");
+            &putenc('<form action="%s" method="post" accept-charset="%s">'
+                    , $::me , $::charset );
+            foreach my $p (@::plugins){
+                unless( $::config{ $p->{key} } ){
+                    &putenc('<div><input type="radio" name="target" value="%s"> %s</div>'
+                        , $p->{hexnm}
+                        , $p->{name}
+                    );
+                }
+            }
+            &putenc(<<HTML
+<p><input type="hidden" name="a" value="pluginmgr_erase"
+><input type="submit" value="Erase" onClick="JavaScript:return window.confirm('Erase Sure?')"></p>
+</form>
+HTML
+            );
+            &end_day();
+        }
+    );
 }
