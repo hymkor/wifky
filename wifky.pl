@@ -318,7 +318,9 @@ div.sidebar{ float:right; width:25% ; word-break: break-all}
 div.main{ float:left; width:70% }
 
 a{ text-decoration:none }
-a:visited{ color:darkblue }
+a:hover{ text-decoration:underline }
+
+blockquote{ background-color:#DDF }
 
 pre{
  background-color:#DDF;
