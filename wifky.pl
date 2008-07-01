@@ -1445,7 +1445,7 @@ sub inner_link{
     if( &object_exists($title) ){
         &anchor( $symbol , { p=>$title } , undef , $sharp);
     }else{
-        qq(<blink>${symbol}?</blink>);
+        qq(<blink class="page_not_found">${symbol}?</blink>);
     }
 }
 
@@ -1710,6 +1710,7 @@ sub attach2tag{
     my ($session,$nm,$label)=@_;
     my ($p,$f)=($session->{title},&denc($nm));
     $label ||= $nm;
+    $label =~ s/\r*\n/ /gs;
 
     if( exists $session->{attachment}->{$nm} ){
         if( $nm =~ /\.png$/i || $nm =~ /\.gif$/i  || $nm =~ /\.jpe?g$/i ){
@@ -1718,7 +1719,7 @@ sub attach2tag{
             &anchor($label ,{ p=>$p , f=>$f } , { title=>$label } )
         }
     }else{
-        "<blink>$nm</blink>";
+        qq(<blink class="attachment_not_found">$nm</blink>);
     }
 }
 
