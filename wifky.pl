@@ -50,10 +50,10 @@ if( $0 eq __FILE__ ){
         }
         pluginmgr_init();
 
-        if( exists $::form{a} && exists $::action_plugin{$::form{a}} ){
+        if( $::form{a} && $::action_plugin{$::form{a}} ){
             $::action_plugin{ $::form{a} }->();
-        }elsif( exists $::form{p} ){ # page view
-            if( exists $::form{f} ){ # output attachment
+        }elsif( $::form{p} ){ # page view
+            if( $::form{f} ){ # output attachment
                 &action_cat();
             }else{ # output page itself.
                 &action_view($::form{p});
