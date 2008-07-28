@@ -303,24 +303,29 @@ sub init_globals{
         &{message}';
 
     %::default_contents = (
-        &title2fname('CSS') => <<HERE ,
+        &title2fname('CSS') => <<'HERE' ,
 p.centering,big{ font-size:200% }
 
-h1,h2,h3,table.bordered td,table.bordered th{
+h2{background-color:#DDF}
+
+h3,table.bordered td,table.bordered th{
 border-width:0px 1px 1px 0px;border-style:solid}
 
 dt,span.commentator,span.rssreader_subject{font-weight:bold}
 
 span.comment_date{font-style:italic}
 
-div.sidebar{ float:right; width:25% ; word-break: break-all}
+div.sidebar{ float:right; width:25% ; word-break: break-all;font-size:90%}
 
 div.main{ float:left; width:70% }
 
 a{ text-decoration:none }
+
 a:hover{ text-decoration:underline }
 
 blockquote{ background-color:#DDF }
+
+table.block{ margin-left:1cm }
 
 pre{
  background-color:#DDF;
@@ -330,6 +335,12 @@ pre{
  white-space: pre-wrap; /* CSS3 */
  word-wrap: break-word; /* IE 5.5+ */
 }
+
+@media print{
+ div.sidebar,div.footer,div.adminmenu{ display:none }
+ div.main{ width:100% }
+}
+
 HERE
     &title2fname("Header") => <<HERE ,
 ((menubar))
@@ -1390,8 +1401,8 @@ sub print_page{
             name => $attach ,
             url  => $url ,
             tag  => $attach =~ /\.(png|gif|jpg|jpeg)$/i
-                    ? qq(<img src="${url}" alt="${e_attach}">)
-                    : qq(<a href="${url}" title="${e_attach}">${e_attach}</a>) ,
+                    ? qq(<img src="${url}" alt="${e_attach}" class="inline">)
+                    : qq(<a href="${url}" title="${e_attach}" class="attachment">${e_attach}</a>) ,
         };
     }
     my %session=(
@@ -1443,7 +1454,7 @@ sub inner_link{
     }
 
     if( &object_exists($title) ){
-        &anchor( $symbol , { p=>$title } , undef , $sharp);
+        &anchor( $symbol , { p=>$title } , { class=>'wikipage' } , $sharp);
     }else{
         qq(<blink class="page_not_found">${symbol}?</blink>);
     }
@@ -1714,7 +1725,7 @@ sub attach2tag{
 
     if( exists $session->{attachment}->{$nm} ){
         if( $nm =~ /\.png$/i || $nm =~ /\.gif$/i  || $nm =~ /\.jpe?g$/i ){
-            &img(   $label ,{ p=>$p , f=>$f } );
+            &img(   $label ,{ p=>$p , f=>$f } , { class=>'inline' } );
         }else{
             &anchor($label ,{ p=>$p , f=>$f } , { title=>$label } )
         }
@@ -1904,7 +1915,7 @@ sub block_centering{ ### >> ... <<
     return 0 unless $fragment =~ /\A\s*\&gt;&gt;\s*(.*)\s*\&lt;\&lt;\s*\Z/s;
 
     my $s=&preprocess($1,$session);
-    &puts('<p class="centering" align="center">',$s,'</p>');
+    &puts('<p class="centering block" align="center">',$s,'</p>');
     1;
 }
 
@@ -1914,7 +1925,7 @@ sub block_quoting{ ### "" ...
 
     $fragment =~ s/^&quot;&quot;//gm;
     $fragment =~ s/^$/<br><br>/gm;
-    &puts('<blockquote>'.&preprocess($fragment,$session).'</blockquote>' );
+    &puts('<blockquote class="block">'.&preprocess($fragment,$session).'</blockquote>' );
     1;
 }
 
@@ -1923,7 +1934,7 @@ sub block_table{ ### || ... | ... |
     return 0 unless $fragment =~ /\A\s*\|\|/;
 
     my $i=0;
-    &puts('<table class="bordered">');
+    &puts('<table class="block">');
     foreach my $tr ( split(/\|\|/,&preprocess($',$session) ) ){
         my $tag='td';
         if( $tr =~ /\A\|/ ){
