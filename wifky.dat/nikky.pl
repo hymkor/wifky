@@ -190,6 +190,8 @@ sub referer{
     my $session=shift;
     my @exclude=@_;
     my @title=($::form{p} || 'FrontPage' , 'referer.txt' );
+    return '' unless &::object_exists($title[0]);
+
     my $ref=$ENV{'HTTP_REFERER'};
 
     my @lines=split(/\n/,&::read_object(@title));
