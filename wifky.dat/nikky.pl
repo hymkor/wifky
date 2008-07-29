@@ -22,7 +22,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='0.24_1';
+my $version='0.24_2';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
 my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
