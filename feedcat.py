@@ -80,7 +80,7 @@ def import_contents(d, coding="utf8", pattern=None):
     if pattern :
         pattern = re.compile(pattern,re.DOTALL)
     for e in d["entries"]:
-        content = urllib.urlopen(e["link"]).read().decode(coding)
+        content = d.urlopen(e["link"]).read().decode(coding)
         if pattern:
             m = pattern.search( content )
             if m :
@@ -100,29 +100,44 @@ def recentonly(d,days):
            if datetime.datetime( *e["updated_parsed"][:6] ) >= start_dt
     ]
 
-def mixi_feed(config):
-    email,passwd = config["mixi"].split(":")
-    cookiejar = cookielib.CookieJar()
-    cookie_processor = urllib2.HTTPCookieProcessor(cookiejar)
+class norm_feed(dict):
+    def __init__(self,config):
+        dict.__init__(self,feedparser.parse( config["feed"] ) )
+    def urlopen(self, *url ):
+        return urllib.urlopen( *url )
 
-    opener = urllib2.build_opener( cookie_processor )
-    urlobj = opener.open(
-            "http://mixi.jp/login.pl" ,
-            urllib.urlencode( 
-                { "next_url":"/home.pl" , 
-                  "email":email ,
-                  "password":passwd 
-                }
-            )
-    )
-    urlobj.close()
-    return feedparser.parse( config["feed"] , handlers=[cookie_processor] )
+class sns_feed(dict):
+    def __init__(self):
+        cookiejar = cookielib.CookieJar()
+        self.cookie_processor = urllib2.HTTPCookieProcessor(cookiejar)
+        self.opener = urllib2.build_opener( self.cookie_processor )
+    def urlopen(self, *url ):
+        return self.opener.open( *url )
+    def parse(self, url):
+        return feedparser.parse(url,handlers=[self.cookie_processor])
+
+class mixi_feed(sns_feed):
+    def __init__(self,config):
+        sns_feed.__init__(self)
+        email,passwd = config["mixi"].split(":")
+
+        self.urlopen(
+                "http://mixi.jp/login.pl" ,
+                urllib.urlencode(
+                    { "next_url":"/home.pl" , 
+                      "email":email ,
+                      "password":passwd 
+                    }
+                )
+        ).close()
+
+        self.update( self.parse(config["feed"]) )
 
 def interpret( config ):
     if "mixi" in config:
         d = mixi_feed( config )
     else:
-        d = feedparser.parse( config["feed"] )
+        d = norm_feed( config )
     recentonly(d,2)
     if "reject" in config:
         reject(d,config["reject"])
