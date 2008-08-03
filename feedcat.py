@@ -3,6 +3,7 @@
 import cgi
 import cgitb ; cgitb.enable()
 import codecs
+import cookielib
 import datetime
 import ConfigParser
 import os
@@ -10,7 +11,8 @@ import re
 import sys
 import urllib
 import urllib2
-import cookielib
+import urlparse
+import cPickle as pickle
 
 import feedparser
 
@@ -52,6 +54,7 @@ def feedcat(d,fd):
             ("link","link") ,
             ("lastBuildDate","updated") ,
             ("author","author") ,
+            ("dc:author","author") ,
             ("dc:creator","author") ,
             ("dc:date","updated"),
         ):
@@ -76,18 +79,38 @@ def http_output(d):
     sys.stdout.write("Content-Type: application/rss+xml; charset=utf-8\n\n")
     feedcat(d,sys.stdout)
 
-def import_contents(d, coding="utf8", pattern=None):
+def import_contents(d, cachefn=None ,coding="utf8", pattern=None):
+    cache = {}
+    new_cache = {}
+
+    if cachefn:
+        try:
+            fd = file(cachefn)
+            cache = pickle.load( fd )
+            fd.close()
+        except:
+            pass
     if pattern :
         pattern = re.compile(pattern,re.DOTALL)
+
     for e in d["entries"]:
-        content = d.urlopen(e["link"]).read().decode(coding)
-        if pattern:
-            m = pattern.search( content )
-            if m :
-                content = m.group(1).strip()
+        if e["link"] in cache:
+            content = cache[e["link"]]
+        else:
+            content = d.urlopen(e["link"]).read().decode(coding)
+            if pattern:
+                m = pattern.search( content )
+                if m :
+                    content = m.group(1).strip()
         if content:
             e.setdefault("content",[]).append({ "value":content })
             e["description"] = content
+            new_cache[e["link"]] = content
+
+    if cachefn:
+        fd = file(cachefn,"w")
+        pickle.dump( new_cache , fd )
+        fd.close()
 
 def reject(d,pattern):
     pattern = re.compile(pattern)
@@ -95,10 +118,20 @@ def reject(d,pattern):
 
 def recentonly(d,days):
     start_dt = datetime.datetime.today() - datetime.timedelta(days)
-    d["entries"] = [
-        e for e in d["entries"]
-           if datetime.datetime( *e["updated_parsed"][:6] ) >= start_dt
+    d["entries"] = [  e
+                 for  e in d["entries"]
+                  if  "updated_parsed" in e 
+                 and  datetime.datetime( *e["updated_parsed"][:6] ) >= start_dt
     ]
+
+class feed_not_found(dict):
+    def __init__(self,config):
+        self["entries"] = []
+        self["feed"] = {
+            "link":"http://example.com",
+            "title":"Feed not found!",
+            "description":"feed not found.",
+        }
 
 class norm_feed(dict):
     def __init__(self,config):
@@ -106,11 +139,28 @@ class norm_feed(dict):
     def urlopen(self, *url ):
         return urllib.urlopen( *url )
 
+def parse_param(text):
+    loginpost = re.split(r"[\s\;\&\?]+",text)
+    url = loginpost.pop(0)
+    param = {}
+    for e in loginpost:
+        p = e.split("=",2)
+        param[ p[0] ] = p[1]
+    return url,param
+
 class sns_feed(dict):
-    def __init__(self):
+    def __init__(self,config):
         cookiejar = cookielib.CookieJar()
         self.cookie_processor = urllib2.HTTPCookieProcessor(cookiejar)
         self.opener = urllib2.build_opener( self.cookie_processor )
+
+        if "loginpost" in config:
+            url,param = parse_param(config["loginpost"])
+            self.urlopen( url , urllib.urlencode( param ) ).close()
+        elif "login" in config:
+            url,param = parse_param(config["login"])
+            self.urlopen( "%s?%s" % ( url , urllib.urlencode( param )) ).close()
+
     def urlopen(self, *url ):
         return self.opener.open( *url )
     def parse(self, url):
@@ -118,32 +168,30 @@ class sns_feed(dict):
 
 class mixi_feed(sns_feed):
     def __init__(self,config):
-        sns_feed.__init__(self)
-        email,passwd = config["mixi"].split(":")
-
-        self.urlopen(
-                "http://mixi.jp/login.pl" ,
-                urllib.urlencode(
-                    { "next_url":"/home.pl" , 
-                      "email":email ,
-                      "password":passwd 
-                    }
-                )
-        ).close()
-
+        sns_feed.__init__(self,config)
         self.update( self.parse(config["feed"]) )
 
+feed_class = {
+    "feed":norm_feed ,
+    "mixi":mixi_feed ,
+}
+
 def interpret( config ):
-    if "mixi" in config:
-        d = mixi_feed( config )
-    else:
-        d = norm_feed( config )
-    recentonly(d,2)
+    classname = config.get("class","feed")
+    if "@" in classname :
+        classname,plugin = classname.split("@",2)
+        execfile(plugin+".py",globals(),locals())
+
+    d = feed_class.get(classname, feed_not_found)( config )
+
     if "reject" in config:
         reject(d,config["reject"])
 
+    recentonly(d,3)
+
     if "import" in config:
         import_contents( d ,
+                         config.get("cache") ,
                          config.get("htmlcode","utf8") ,
                          config["import"] )
     http_output(d)
@@ -156,23 +204,17 @@ def menu(config):
     print "<body><h1>FeedCat</h1>"
     print "<ul>"
     for e in config.sections():
-        print '<li><a href="%s?%s">%s</a>' % (
+        print '<li><a href="%s?%s">%s</a></li>' % (
             os.getenv("SCRIPT_NAME") ,
             cgi.escape(e) ,
             cgi.escape(e)
         )
-        print '<ul>'
-        for f in config.items(e):
-            print '<li>%s=%s</li>' %(
-                cgi.escape(f[0]) ,
-                cgi.escape(f[1]) ,
-            )
-        print '</ul></li>'
     print "</body></html>"
 
 def main(inifname):
     config = ConfigParser.ConfigParser()
     config.read( inifname )
+
     feedname = os.getenv("QUERY_STRING")
     if feedname and config.has_section(feedname) :
         interpret( dict( config.items(feedname) ) )
