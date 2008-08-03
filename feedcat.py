@@ -13,6 +13,7 @@ import urllib
 import urllib2
 import urlparse
 import cPickle as pickle
+import inspect
 
 import feedparser
 
@@ -211,8 +212,10 @@ def menu(config):
         )
     print "</body></html>"
 
-def main(inifname):
+def main():
     config = ConfigParser.ConfigParser()
+    inifname = re.sub( r"\.py$", ".ini" , inspect.getfile(main) )
+    os.chdir( os.path.dirname(inifname) or "." )
     config.read( inifname )
 
     feedname = os.getenv("QUERY_STRING")
@@ -222,4 +225,4 @@ def main(inifname):
         menu(config)
 
 if __name__ == '__main__':
-    main( re.sub(r"\.\w+$" , ".ini" , sys.argv[0]) )
+    main()
