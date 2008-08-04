@@ -113,7 +113,7 @@ $::preferences{'Nikky Plugin '.$version}= [
     { desc=>'Print month with English'
     , name=>'nikky_calendertype' , type=>'checkbox' },
 
-    { desc=>'Displayed RSS Feed URL' ,
+    { desc=>"RSS Feed ProxyURL (which is displayed instead of $::me?a=rss)" ,
     , name=>'nikky_display_rssurl'    , size=>30 },
 ];
 
