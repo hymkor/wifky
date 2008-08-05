@@ -210,9 +210,14 @@ def menu(config):
             cgi.escape(e) ,
             cgi.escape(e)
         )
-    print "</body></html>"
+    print "</ul></body></html>"
 
-def main(inifname=None):
+def be_silent():
+    print "Content-Type: text/html"
+    print ""
+    print "<html><body></body></html>"
+
+def main(inifname=None,index=True):
     config = ConfigParser.ConfigParser()
     if inifname is None:
         inifname = re.sub( r"\.py$", ".ini" , inspect.getfile(main) )
@@ -222,8 +227,10 @@ def main(inifname=None):
     feedname = os.getenv("QUERY_STRING")
     if feedname and config.has_section(feedname) :
         interpret( dict( config.items(feedname) ) )
-    else:
+    elif index:
         menu(config)
+    else:
+        be_silent()
 
 if __name__ == '__main__':
     main()
