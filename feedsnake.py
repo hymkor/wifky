@@ -201,8 +201,8 @@ def menu(config):
     print "Content-Type: text/html"
     print ""
     print "<html>"
-    print "<title>FeedCat</title>"
-    print "<body><h1>FeedCat</h1>"
+    print "<title>FeedSnake Come On!</title>"
+    print "<body><h1>FeedSnake Come On!</h1>"
     print "<ul>"
     for e in config.sections():
         print '<li><a href="%s?%s">%s</a></li>' % (
@@ -212,9 +212,10 @@ def menu(config):
         )
     print "</body></html>"
 
-def main():
+def main(inifname=None):
     config = ConfigParser.ConfigParser()
-    inifname = re.sub( r"\.py$", ".ini" , inspect.getfile(main) )
+    if inifname is None:
+        inifname = re.sub( r"\.py$", ".ini" , inspect.getfile(main) )
     os.chdir( os.path.dirname(inifname) or "." )
     config.read( inifname )
 
