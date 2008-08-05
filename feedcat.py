@@ -20,7 +20,7 @@ import feedparser
 def feedcat(d,fd):
     fd = codecs.getwriter('utf_8')(fd)
     def output(t):
-        print >>fd,t
+	fd.write(t.strip()+"\r\n")
 
     output('<?xml version="1.0" encoding="UTF-8" ?>')
     output('<rdf:RDF')
@@ -29,27 +29,27 @@ def feedcat(d,fd):
     output(' xmlns:content="http://purl.org/rss/1.0/modules/content/"')
     output(' xmlns:dc="http://purl.org/dc/elements/1.1/"')
     output(' xml:lang="ja">')
-    output('<channel rdf:about="%s">' % d["feed"]["link"] )
+    output('<channel rdf:about="%s">' % cgi.escape(d["feed"]["link"]) )
     for tag,key in (
         ("title","title"),
         ("link","link"),
         ("description","description"),
     ):
         if key in d["feed"]:
-            output("<%s>%s</%s>" % (tag,d["feed"][key],tag))
+            output("<%s>%s</%s>" % ( tag, cgi.escape( d["feed"][key] ),tag ))
 
     output('<items>')
     output('<rdf:Seq>')
 
     for e in d["entries"]:
-        output('  <rdf:li rdf:resource="%(id)s" />' % e)
+        output('  <rdf:li rdf:resource="%s" />' % cgi.escape(e["id"]))
 
     output('</rdf:Seq>')
     output('</items>')
     output('</channel>')
 
     for e in d["entries"]:
-        output( '<item rdf:about="%(id)s">' % e )
+        output( '<item rdf:about="%s">' % cgi.escape(e["id"]) )
         for tag,key in (
             ("title","title") ,
             ("link","link") ,
@@ -77,7 +77,7 @@ def feedcat(d,fd):
     output("</rdf:RDF>")
 
 def http_output(d):
-    sys.stdout.write("Content-Type: application/rss+xml; charset=utf-8\n\n")
+    sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
     feedcat(d,sys.stdout)
 
 def import_contents(d, cachefn=None ,coding="utf8", pattern=None):
