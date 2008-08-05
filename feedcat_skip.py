@@ -7,16 +7,38 @@ class open_skip(sns_feed):
         html = u.read().decode("utf8")
         u.close()
 
+        entry_pattern = re.compile(
+            r'<div class="page_line">(.*?</div>)\s*</div>'
+            , re.DOTALL)
+
+        entry_author_pattern = re.compile(
+            r'<div class="page_from"><a[^>]+>(.*?)</a>'
+            , re.DOTALL)
+
+        entry_date_pattern = re.compile(
+            r'<div class="page_date">(?P<month>\d\d)/(?P<day>\d\d) ' +
+            r'(?P<hour>\d\d):(?P<minute>\d\d)</div>'
+            , re.DOTALL )
+
+        entry_title_pattern = re.compile(
+            r'<div class="page_title">.*?<a href="(?P<url>[^"]+)"[^>]*>' +
+            r'(?P<title>[^<]*)</a>'
+            , re.DOTALL )
+
+        feed_title_pattern = re.compile(
+            r'<title>(.*?)</title>'
+            , re.IGNORECASE )
+
         entries = []
-        for block in re.finditer(r'<div class="page_line">(.*?</div>)\s*</div>',html,re.DOTALL):
+        for block in entry_pattern.finditer(html):
             b = block.group(1)
             entry = {}
 
-            m = re.search(r'<div class="page_from"><a[^>]+>(.*?)</a>',b,re.DOTALL)
+            m = entry_author_pattern.search(b)
             if m:
                 entry["author"] = m.group(1)
 
-            m = re.search(r'<div class="page_date">(?P<month>\d\d)/(?P<day>\d\d) (?P<hour>\d\d):(?P<minute>\d\d)</div>',b,re.DOTALL)
+            m = entry_date_pattern.search(b)
             if m :
                 md = m.groupdict()
                 dt = datetime.datetime(
@@ -35,17 +57,22 @@ class open_skip(sns_feed):
                 dt.hour , dt.minute , dt.second ,
                 dt.microsecond )
 
-            m = re.search(r'<div class="page_title">.*?<a href="(?P<url>[^"]+)"[^>]*>(?P<title>[^<]*)</a>',b,re.DOTALL)
+            m = entry_title_pattern.search(b)
             if m:
                 entry["link"] = entry["id"] = \
                     urlparse.urljoin(config["index"], m.group("url") )
                 entry["title"] = m.group("title")
             entries.append(entry)
-        self["feed"] = {
-            "link":"http://www.openskip.org/demo/",
-            "title":"dummy title",
-            "description":"dummy description",
-        }
+
+        feed = { "link":config["index"] }
+            
+        m = feed_title_pattern.search(html)
+        if m: 
+            feed["title"] = m.group(1)
+        else:
+            feed["title"] = config["index"]
+
+        self["feed"] = feed
         self["entries"] = entries
 
 feed_class[ "skip" ] = open_skip
