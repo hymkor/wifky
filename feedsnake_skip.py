@@ -66,11 +66,14 @@ class open_skip(sns_feed):
 
         feed = { "link":config["index"] }
             
-        m = feed_title_pattern.search(html)
-        if m: 
-            feed["title"] = m.group(1)
-        else:
-            feed["title"] = config["index"]
+	if "feed_title" in config:
+	    feed["title"] = config["feed_title"].decode("utf8")
+	else:
+	    m = feed_title_pattern.search(html)
+	    if m: 
+		feed["title"] = m.group(1)
+	    else:
+		feed["title"] = config["index"]
 
         self["feed"] = feed
         self["entries"] = entries
