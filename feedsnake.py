@@ -117,14 +117,6 @@ def reject(d,pattern):
     pattern = re.compile(pattern)
     d["entries"] = filter( lambda e:not pattern.search(e["title"]) , d["entries"] )
 
-def recentonly(d,days):
-    start_dt = datetime.datetime.today() - datetime.timedelta(days)
-    d["entries"] = [  e
-                 for  e in d["entries"]
-                  if  "updated_parsed" in e 
-                 and  datetime.datetime( *e["updated_parsed"][:6] ) >= start_dt
-    ]
-
 class feed_not_found(dict):
     def __init__(self,config):
         self["entries"] = []
@@ -188,7 +180,11 @@ def interpret( config ):
     if "reject" in config:
         reject(d,config["reject"])
 
-    recentonly(d,3)
+    try:
+        max_entries = int(config.get("max_entries","5"))
+    except ValueError:
+        max_entries = 5
+    del d["entries"][max_entries:]
 
     if "import" in config:
         import_contents( d ,
