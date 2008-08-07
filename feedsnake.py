@@ -20,7 +20,7 @@ import feedparser
 def feedcat(d,fd):
     fd = codecs.getwriter('utf_8')(fd)
     def output(t):
-	fd.write(t.strip()+"\r\n")
+        fd.write(t.strip()+"\r\n")
 
     output('<?xml version="1.0" encoding="UTF-8" ?>')
     output('<rdf:RDF')
@@ -95,18 +95,33 @@ def import_contents(d, cachefn=None ,coding="utf8", pattern=None):
         pattern = re.compile(pattern,re.DOTALL)
 
     for e in d["entries"]:
-        if e["link"] in cache:
-            content = cache[e["link"]]
+        link = e["link"]
+        if link in cache:
+            content = cache[link]
         else:
-            content = d.urlopen(e["link"]).read().decode(coding)
+            content = d.urlopen(link).read().decode(coding)
             if pattern:
                 m = pattern.search( content )
                 if m :
                     content = m.group(1).strip()
+            content = re.sub(
+                r'(<a[^>]+href=")([^."]*)"' ,
+                lambda m:m.group(1) +
+                urlparse.urljoin(link, m.group(2)) +
+                '"',
+                content
+            )
+            content = re.sub(
+                r'(<img[^>]+src=")([^."]*)"' ,
+                lambda m:m.group(1) +
+                urlparse.urljoin(link, m.group(2)) +
+                '"',
+                content
+            )
         if content:
             e.setdefault("content",[]).append({ "value":content })
             e["description"] = content
-            new_cache[e["link"]] = content
+            new_cache[link] = content
 
     if cachefn:
         fd = file(cachefn,"w")
