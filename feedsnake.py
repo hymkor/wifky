@@ -112,10 +112,10 @@ def import_contents(d, cachefn=None ,coding="utf8", pattern=None):
                 content
             )
             content = re.sub(
-                r'(<img[^>]+src=")([^."]*)"' ,
+                r'''(<img[^>]+src=['"])([^"']*)(["'])''' ,
                 lambda m:m.group(1) +
                 urlparse.urljoin(link, m.group(2)) +
-                '"',
+                m.group(3) ,
                 content
             )
         if content:
@@ -179,13 +179,23 @@ class mixi_feed(sns_feed):
         sns_feed.__init__(self,config)
         self.update( self.parse(config["feed"]) )
 
+def default_feed(config):
+    if "login" in config or "loginpost" in config:
+        if "feed" in config:
+            return mixi_feed(config)
+    else:
+        if "feed" in config:
+            return norm_feed(config)
+    return feed_not_found(config)
+
 feed_class = {
     "feed":norm_feed ,
     "mixi":mixi_feed ,
+    "default":default_feed ,
 }
 
 def interpret( config ):
-    classname = config.get("class","feed")
+    classname = config.get("class","default")
     if "@" in classname :
         classname,plugin = classname.split("@",2)
         execfile(plugin+".py",globals(),locals())
