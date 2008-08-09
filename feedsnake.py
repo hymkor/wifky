@@ -17,6 +17,8 @@ import urlparse
 
 import feedparser
 
+version="0.1"
+
 def feedcat(d,fd):
     fd = codecs.getwriter('utf_8')(fd)
     def output(t):
@@ -42,14 +44,19 @@ def feedcat(d,fd):
     output('<rdf:Seq>')
 
     for e in d["entries"]:
-        output('  <rdf:li rdf:resource="%s" />' % cgi.escape(e["id"]))
+        id1 = e.get("id") or e.get("link")
+        if id1:
+            output('  <rdf:li rdf:resource="%s" />' % cgi.escape(id1))
 
     output('</rdf:Seq>')
     output('</items>')
     output('</channel>')
 
     for e in d["entries"]:
-        output( '<item rdf:about="%s">' % cgi.escape(e["id"]) )
+        id1 = e.get("id") or e.get("link")
+        if id1 is None:
+            continue
+        output( '<item rdf:about="%s">' % cgi.escape(id1) )
         for tag,key in (
             ("title","title") ,
             ("link","link") ,
@@ -80,7 +87,25 @@ def http_output(d):
     sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
     feedcat(d,sys.stdout)
 
-def import_contents(d, cachefn=None ,coding="utf8", pattern=None):
+error_cnt=0
+def insert_message_as_feed(d,message):
+    global error_cnt
+    error_cnt += 1
+    d["entries"].insert(0,
+        {
+            "title":"Feed Error! [%d]" % error_cnt ,
+            "id":"http://example.com/#%d" % error_cnt ,
+            "author":"FeedSnake System" ,
+            "description": message ,
+            "content":[ {"value":message} ] ,
+        }
+    )
+
+def import_contents(d, config):
+    cachefn = config.get("cache") 
+    coding  = config.get("htmlcode")
+    pattern = config["import"]
+
     cache = {}
     new_cache = {}
 
@@ -91,54 +116,90 @@ def import_contents(d, cachefn=None ,coding="utf8", pattern=None):
             fd.close()
         except:
             pass
-    if pattern :
+    try:
         pattern = re.compile(pattern,re.DOTALL)
+    except:
+        insert_message_as_feed(d,
+            "Invalid Regular Expression '%s'" % cgi.escape(pattern) 
+        )
+        return
+
+    cache_fail_cnt = 0
 
     for e in d["entries"]:
         link = e["link"]
         if link in cache:
             content = cache[link]
         else:
-            content = d.urlopen(link).read().decode(coding)
-            if pattern:
+            cache_fail_cnt += 1
+            content = d.urlopen(link).read()
+            try:
+                if coding is None:
+                    m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',content,re.IGNORECASE)
+                    if m:
+                        coding = m.group(1).lower()
+                    else:
+                        coding = "utf8"
+
+                content = content.decode(coding)
                 m = pattern.search( content )
                 if m :
                     content = m.group(1).strip()
-            content = re.sub(
-                r'(<a[^>]+href=")([^."]*)"' ,
-                lambda m:m.group(1) +
-                urlparse.urljoin(link, m.group(2)) +
-                '"',
-                content
-            )
-            content = re.sub(
-                r'(<img[^>]+src=")([^."]*)"' ,
-                lambda m:m.group(1) +
-                urlparse.urljoin(link, m.group(2)) +
-                '"',
-                content
-            )
+                else:
+                    continue
+                content = re.sub(
+                    r'(<a[^>]+href=")([^."]*)"' ,
+                    lambda m:m.group(1) +
+                    urlparse.urljoin(link, m.group(2)) +
+                    '"',
+                    content
+                )
+                content = re.sub(
+                    r'(<img[^>]+src=")([^."]*)"' ,
+                    lambda m:m.group(1) +
+                    urlparse.urljoin(link, m.group(2)) +
+                    '"',
+                    content
+                )
+            except UnicodeDecodeError:
+                content = u""
+
         if content:
             e.setdefault("content",[]).append({ "value":content })
             e["description"] = content
             new_cache[link] = content
 
-    if cachefn:
-        fd = file(cachefn,"w")
-        pickle.dump( new_cache , fd )
-        fd.close()
+    if cache_fail_cnt > 0 and cachefn:
+        try:
+            fd = file(cachefn,"w")
+            pickle.dump( new_cache , fd )
+            fd.close()
+        except IOError:
+            insert_message_as_feed(d,
+                "could not update cache file '%s'" %
+                cgi.escape(cachefn)
+            )
 
-def reject(d,pattern):
-    pattern = re.compile(pattern)
+def exclude(d,pattern):
+    try:
+        pattern = re.compile(pattern)
+    except:
+        insert_message_as_feed(d,
+            "Invalid Regular Expression '%s'" %
+                cgi.escape(pattern) 
+        )
+        return
+
     d["entries"] = filter( lambda e:not pattern.search(e["title"]) , d["entries"] )
+       
 
-class feed_not_found(dict):
-    def __init__(self,config):
+class error_feed(dict):
+    def __init__(self,config,message="feed not found."):
         self["entries"] = []
         self["feed"] = {
             "link":"http://example.com",
-            "title":"Feed not found!",
-            "description":"feed not found.",
+            "title":"Feed Error!",
+            "description":message ,
         }
 
 class norm_feed(dict):
@@ -158,8 +219,8 @@ def parse_param(text):
 
 class sns_feed(dict):
     def __init__(self,config):
-        cookiejar = cookielib.CookieJar()
-        self.cookie_processor = urllib2.HTTPCookieProcessor(cookiejar)
+        self.cookiejar = cookielib.CookieJar()
+        self.cookie_processor = urllib2.HTTPCookieProcessor(self.cookiejar)
         self.opener = urllib2.build_opener( self.cookie_processor )
 
         if "loginpost" in config:
@@ -179,33 +240,45 @@ class mixi_feed(sns_feed):
         sns_feed.__init__(self,config)
         self.update( self.parse(config["feed"]) )
 
+def default_feed(config):
+    if "login" in config  or  "loginpost" in config:
+        if "feed" in config:
+            return mixi_feed(config)
+    else:
+        if "feed" in config:
+            return norm_feed(config)
+    return error_feed(config)
+
 feed_class = {
     "feed":norm_feed ,
     "mixi":mixi_feed ,
+    "default":default_feed ,
 }
 
 def interpret( config ):
-    classname = config.get("class","feed")
-    if "@" in classname :
-        classname,plugin = classname.split("@",2)
-        execfile(plugin+".py",globals(),locals())
+    classname = config.get("class","default")
+    try:
+        if "@" in classname :
+            classname,plugin = classname.split("@",2)
+            execfile(plugin+".py",globals(),locals())
+        d = feed_class.get(classname, error_feed)( config )
+        if "feed" not in d  or "link" not in d["feed"]:
+            d = error_feed( config , "Can not find the feed." )
+    except IOError:
+        d = error_feed( config , "Can not load feed class '%s'" % classname )
 
-    d = feed_class.get(classname, feed_not_found)( config )
-
-    if "reject" in config:
-        reject(d,config["reject"])
+    if "exclude" in config:
+        exclude(d,config["exclude"])
 
     try:
         max_entries = int(config.get("max_entries","5"))
     except ValueError:
+        insert_message_as_feed(d,"Invalid Entry number '%s'" % config["max_entries"] )
         max_entries = 5
     del d["entries"][max_entries:]
 
     if "import" in config:
-        import_contents( d ,
-                         config.get("cache") ,
-                         config.get("htmlcode","utf8") ,
-                         config["import"] )
+        import_contents( d , config )
     http_output(d)
 
 def menu(config):
@@ -221,7 +294,7 @@ def menu(config):
             cgi.escape(e) ,
             cgi.escape(e)
         )
-    print "</ul></body></html>"
+    print "</ul><p>Generated by feedsnake.py %s</p></body></html>" % version
 
 def be_silent():
     print "Content-Type: text/html"

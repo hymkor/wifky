@@ -1,5 +1,3 @@
-# from feedcat import *
-
 class open_skip(sns_feed):
     def __init__(self,config):
         sns_feed.__init__(self,config)
