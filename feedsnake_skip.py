@@ -19,13 +19,15 @@ class open_skip(sns_feed):
             , re.DOTALL )
 
         entry_title_pattern = re.compile(
-            r'<div class="page_title">.*?<a href="(?P<url>[^"]+)"[^>]*>' +
-            r'(?P<title>[^<]*)</a>'
+            ur'<div class="page_title">.*?<a href="(?P<url>[^"]+)" ' +
+            u'title="\\[\u30B3\u30E1\u30F3\u30C8\\((?P<_comment_cnt>\\d+)\\)[^>]*>' +
+            ur'(?P<title>[^<]*)</a>'
             , re.DOTALL )
 
         feed_title_pattern = re.compile(
             r'<title>(.*?)</title>'
             , re.IGNORECASE )
+
 
         entries = []
         for block in entry_pattern.finditer(html):
@@ -37,30 +39,19 @@ class open_skip(sns_feed):
                 entry["author"] = m.group(1)
 
             m = entry_date_pattern.search(b)
-            if m :
-                md = m.groupdict()
-                dt = datetime.datetime(
-                    int(md.get("year",datetime.datetime.now().year) ),
-                    int(md["month"]) ,
-                    int(md["day"]) ,
-                    int(md.get("hour",0)),
-                    int(md.get("minute",0)) ,
-                    int(md.get("second",0)) )
-            else:
-                dt = datetime.datetime.now()
-            dt += datetime.timedelta( hours=-9 )
-            entry["updated"] = dt.isoformat()
-            entry["updated_parsed"] = (
-                dt.year , dt.month  , dt.day ,
-                dt.hour , dt.minute , dt.second ,
-                dt.microsecond )
+            stamp = match2stamp(m)
+            entry["updated"] = stamp.isoformat()
+            entry["updated_parsed"] = stamp.timetuple()
 
             m = entry_title_pattern.search(b)
             if m:
                 entry["link"] = entry["id"] = \
                     urlparse.urljoin(config["index"], m.group("url") )
                 entry["title"] = m.group("title")
-            entries.append(entry)
+                if "debug" in config:
+                    entry["title"] += " (Comment:%s)" % m.group("_comment_cnt") 
+                entry["_comment_cnt"] = m.group("_comment_cnt")
+                entries.append(entry)
 
         feed = { "link":config["index"] }
             
@@ -75,5 +66,10 @@ class open_skip(sns_feed):
 
         self["feed"] = feed
         self["entries"] = entries
+
+        if "import" not in config :
+            config["import"] = r'<div id="default_style_area"[^>]*>(.*?)</div>\s*<div id="source_style_area"'
+        if "comment" not in config :
+            config["comment"] = r'''<div class="board_entry_comment" id='(?P<id>[^']+).*?>(?P<author>[^<]*)</a><span style="font-size: 10px;?">\[(?P<year>\d\d\d\d)/(?P<month>\d\d)/(?P<day>\d\d)-(?P<hour>\d\d):(?P<minute>\d\d)\]</span>.*?<div class="hiki_style">(?P<content>.*?)</div>'''
 
 feed_class[ "skip" ] = open_skip

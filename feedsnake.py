@@ -17,7 +17,7 @@ import urlparse
 
 import feedparser
 
-version="0.1"
+version="0.2"
 
 def feedcat(d,fd):
     fd = codecs.getwriter('utf_8')(fd)
@@ -87,24 +87,69 @@ def http_output(d):
     sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
     feedcat(d,sys.stdout)
 
+def entry( title , link , author , content , updated ):
+    return {
+        "title":title ,
+        "id":link ,
+        "link":link , 
+        "author":author ,
+        "description":content ,
+        "content":[ {"value":content} ] ,
+        "updated": updated.isoformat() ,
+        "updated_parsed":updated.timetuple() ,
+    }
+
 error_cnt=0
 def insert_message_as_feed(d,message):
     global error_cnt
     error_cnt += 1
     d["entries"].insert(0,
-        {
-            "title":"Feed Error! [%d]" % error_cnt ,
-            "id":"http://example.com/#%d" % error_cnt ,
-            "author":"FeedSnake System" ,
-            "description": message ,
-            "content":[ {"value":message} ] ,
-        }
+        entry(
+            title="Feed Error! [%d]" % error_cnt ,
+            link="http://example.com/#%d" % error_cnt ,
+            author="FeedSnake System" ,
+            content=message ,
+            updated=datetime.datetime.now() ,
+        )
     )
+
+def rel2abs_paths( link , content ):
+    content = re.sub(
+        r'(<a[^>]+href=")([^."]*)"' ,
+        lambda m:m.group(1) +
+        urlparse.urljoin(link, m.group(2)) +
+        '"',
+        content
+    )
+    content = re.sub(
+        r'''(<img[^>]+src=['"])([^"']*)(["'])''' ,
+        lambda m:m.group(1) +
+        urlparse.urljoin(link, m.group(2)) +
+        m.group(3) ,
+        content
+    )
+    return content
+
+def match2stamp(matchObj):
+    if matchObj :
+        dic = matchObj.groupdict()
+        stamp = datetime.datetime(
+            int(dic.get("year",datetime.datetime.now().year) ),
+            int(dic["month"]) ,
+            int(dic["day"]) ,
+            int(dic.get("hour",0)),
+            int(dic.get("minute",0)) ,
+            int(dic.get("second",0)) )
+    else:
+        stamp = datetime.datetime.now()
+    stamp += datetime.timedelta( hours=-9 )
+    return stamp
 
 def import_contents(d, config):
     cachefn = config.get("cache") 
     coding  = config.get("htmlcode")
     pattern = config["import"]
+    comment  = config.get("comment")
 
     cache = {}
     new_cache = {}
@@ -120,54 +165,72 @@ def import_contents(d, config):
         pattern = re.compile(pattern,re.DOTALL)
     except:
         insert_message_as_feed(d,
-            "Invalid Regular Expression '%s'" % cgi.escape(pattern) 
+            "Invalid Regular Expression 'import=%s'" % cgi.escape(pattern) 
         )
         return
+    if comment:
+        try:
+            comment = re.compile(comment,re.DOTALL)
+        except:
+            insert_message_as_feed(d,
+                "Invalid Regular Expression 'comment=%s'" % cgi.escape(comment) 
+            )
+            comment = None
 
     cache_fail_cnt = 0
 
+    ext_entries=[]
     for e in d["entries"]:
         link = e["link"]
-        if link in cache:
-            content = cache[link]
+        if link in cache and cache.get((link,"mark"))==e.get("_comment_cnt") :
+            pageall = cache[link]
         else:
             cache_fail_cnt += 1
-            content = d.urlopen(link).read()
+            pageall = d.urlopen(link).read()
             try:
                 if coding is None:
-                    m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',content,re.IGNORECASE)
+                    m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',pageall,re.IGNORECASE)
                     if m:
                         coding = m.group(1).lower()
                     else:
                         coding = "utf8"
 
-                content = content.decode(coding)
-                m = pattern.search( content )
-                if m :
-                    content = m.group(1).strip()
-                else:
-                    continue
-                content = re.sub(
-                    r'(<a[^>]+href=")([^."]*)"' ,
-                    lambda m:m.group(1) +
-                    urlparse.urljoin(link, m.group(2)) +
-                    '"',
-                    content
-                )
-                content = re.sub(
-		    r'''(<img[^>]+src=['"])([^"']*)(["'])''' ,
-		    lambda m:m.group(1) +
-		    urlparse.urljoin(link, m.group(2)) +
-		    m.group(3) ,
-		    content
-                )
+                pageall = pageall.decode(coding)
             except UnicodeDecodeError:
                 content = u""
+        new_cache[link] = pageall
+        new_cache[link,"mark"] = e.get("_comment_cnt")
 
-        if content:
+        ### main contents ###
+        m = pattern.search( pageall )
+        if m :
+            content = rel2abs_paths( link , m.group(1).strip() )
             e.setdefault("content",[]).append({ "value":content })
             e["description"] = content
-            new_cache[link] = content
+
+        for i,m in enumerate(comment.finditer(pageall)):
+            ext_entries.append( 
+                entry(
+                    title="Comment #%d for %s" % ( 1+i , e.get("title","") ) ,
+                    link=link + "#" + m.group("id") ,
+                    author = m.group("author") ,
+                    content = m.group("content") ,
+                    updated = match2stamp(m) ,
+                )
+            )
+
+    d["entries"].extend(ext_entries)
+
+    if "debug" in config:
+        d["entries"].append(
+            entry(
+                title="FeedSnake Report" ,
+                link="#1" ,
+                author="FeedSnake" ,
+                content="cache fail count %d" % cache_fail_cnt ,
+                updated = match2stamp(None) ,
+            )
+        )
 
     if cache_fail_cnt > 0 and cachefn:
         try:
@@ -192,15 +255,15 @@ def exclude(d,pattern):
 
     d["entries"] = filter( lambda e:not pattern.search(e["title"]) , d["entries"] )
        
-
-class error_feed(dict):
-    def __init__(self,config,message="feed not found."):
-        self["entries"] = []
-        self["feed"] = {
+def error_feed(config,message="feed not found."):
+    return {
+        "entries":[],
+        "feed":{
             "link":"http://example.com",
             "title":"Feed Error!",
             "description":message ,
         }
+    }
 
 class norm_feed(dict):
     def __init__(self,config):
