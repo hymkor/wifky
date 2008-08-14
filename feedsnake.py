@@ -208,16 +208,17 @@ def import_contents(d, config):
             e.setdefault("content",[]).append({ "value":content })
             e["description"] = content
 
-        for i,m in enumerate(comment.finditer(pageall)):
-            ext_entries.append( 
-                entry(
-                    title="Comment #%d for %s" % ( 1+i , e.get("title","") ) ,
-                    link=link + "#" + m.group("id") ,
-                    author = m.group("author") ,
-                    content = m.group("content") ,
-                    updated = match2stamp(m) ,
-                )
-            )
+	if comment :
+	    for i,m in enumerate(comment.finditer(pageall)):
+		ext_entries.append( 
+		    entry(
+			title="Comment #%d for %s" % ( 1+i , e.get("title","") ) ,
+			link=link + "#" + m.group("id") ,
+			author = m.group("author") ,
+			content = m.group("content") ,
+			updated = match2stamp(m) ,
+		    )
+		)
 
     d["entries"].extend(ext_entries)
 
