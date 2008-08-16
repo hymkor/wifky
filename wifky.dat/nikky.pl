@@ -1,6 +1,6 @@
 package wifky::nikky;
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $wifky::nikky::template ||= '
     <div class="main">
@@ -22,7 +22,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='0.24_2';
+my $version='1.0.0_0';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
 my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
