@@ -235,16 +235,8 @@ def import_contents(d, config):
 
     d["entries"].extend(ext_entries)
 
-    if "debug" in config:
-        d["entries"].append(
-            entry(
-                title="FeedSnake Report" ,
-                link="#1" ,
-                author="FeedSnake" ,
-                content="cache fail count %d" % cache_fail_cnt ,
-                updated = match2stamp(None) ,
-            )
-        )
+    d["feed"]["description"] = "%s (cache failed %d times)" % (
+            d["feed"].get("description","") , cache_fail_cnt )
 
     if cache_fail_cnt > 0 and cachefn:
         try:
