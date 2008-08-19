@@ -150,7 +150,7 @@ def import_contents(d, config):
     cachefn = config.get("cache") 
     coding  = config.get("htmlcode")
     pattern = config["import"]
-    comment  = config.get("comment")
+    comment = config.get("comment")
 
     cache = {}
     new_cache = {}
@@ -190,17 +190,16 @@ def import_contents(d, config):
             u = d.urlopen(link)
             pageall = u.read()
             u.close()
+            if coding is None:
+                m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',pageall,re.IGNORECASE)
+                if m:
+                    coding = m.group(1).lower()
+                else:
+                    coding = "utf8"
             try:
-                if coding is None:
-                    m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',pageall,re.IGNORECASE)
-                    if m:
-                        coding = m.group(1).lower()
-                    else:
-                        coding = "utf8"
-
                 pageall = pageall.decode(coding)
             except UnicodeDecodeError:
-                content = u""
+                pageall = u""
         new_cache[link] = pageall
         new_cache[link,"mark"] = e.get("_comment_cnt")
 
@@ -249,16 +248,26 @@ def import_contents(d, config):
                 cgi.escape(cachefn)
             )
 
-def exclude(d,pattern,key):
-    try:
-        pattern = re.compile(pattern)
-    except:
-        insert_message_as_feed(d,
-            "Invalid Regular Expression '%s'" %
-                cgi.escape(pattern) 
-        )
-        return
-    d["entries"] = [ e for e in d["entries"] if not pattern.search(e[key]) ]
+def deny(d,key,patterns):
+    patterns = patterns.split()
+    newentry = []
+    for e in d["entries"]:
+        for p in patterns:
+            if p in e[key]:
+                break
+        else:
+            newentry.append( e )
+    d["entries"] = newentry
+
+def accept(d,key,patterns):
+    patterns = patterns.split()
+    newentry = []
+    for e in d["entries"]:
+        for p in patterns:
+            if p in e[key]:
+                newentry.append( e )
+                break
+    d["entries"] = newentry
        
 def error_feed(config,message="feed not found."):
     return {
@@ -335,9 +344,17 @@ def interpret( config ):
     except IOError:
         d = error_feed( config , "Can not load feed class '%s'" % classname )
 
-    if "exclude" in config:
-        exclude(d,config["exclude"],"title")
-
+    for key in "author", "title":
+        if key in config:
+            try:
+                accept(d,key,config[key].decode("utf8"))
+            except UnicodeDecodeError:
+                insert_message_as_feed(d,"UnicodeDecodeError on %s=.." % key)
+        if "x"+key in config:
+            try:
+                deny(d,key,config["x"+key].decode("utf8"))
+            except UnicodeDecodeError:
+                insert_message_as_feed(d,"UnicodeDecodeError on x%s=.." % key)
     try:
         max_entries = int(config.get("max_entries","5"))
     except ValueError:
@@ -376,7 +393,7 @@ def main(inifname=None,index=True):
     os.chdir( os.path.dirname(inifname) or "." )
     try:
         config.read( inifname )
-    except ConfigParser.ParsingError:
+    except (ConfigParser.ParsingError,ConfigParser.MissingSectionHeaderError):
         die("<b>%s</b>: Invalid configuration(not ini format?)" \
             % cgi.escape(inifname) )
         return
