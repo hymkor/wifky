@@ -19,6 +19,9 @@ import feedparser
 
 version="0.3"
 
+def cdata(s):
+    return '<![CDATA[%s]]>' % s.replace("]]>","]]]]><[!CDATA[>")
+
 def feedcat(d,fd):
     fd = codecs.getwriter('utf_8')(fd)
     def output(t):
@@ -73,11 +76,11 @@ def feedcat(d,fd):
             output("<category>%s</category>" % cgi.escape(t.term))
 
         if "description" in e:
-            output('<description><![CDATA[%s]]></description>' % e["description"] )
+            output('<description>%s</description>' % cdata(e["description"]) )
 
         for c in e.get("content",[]):
-            if c["value"]:
-                output('<content:encoded><![CDATA[%s]]></content:encoded>' % c["value"] )
+            if "value" in c:
+                output('<content:encoded>%s</content:encoded>' % cdata(c["value"]) )
 
         output('</item>')
 
@@ -93,7 +96,7 @@ def entry( title , link , author , content , updated=None ):
     return {
         "title":title ,
         "id":link ,
-        "link":link , 
+        "link":link ,
         "author":author ,
         "description":content ,
         "content":[ {"value":content} ] ,
@@ -166,7 +169,7 @@ def import_contents(d, config):
         pattern = re.compile(pattern,re.DOTALL)
     except:
         insert_message_as_feed(d,
-            "Invalid Regular Expression 'import=%s'" % cgi.escape(pattern) 
+            "Invalid Regular Expression 'import=%s'" % cgi.escape(pattern)
         )
         return
     if comment:
@@ -174,7 +177,7 @@ def import_contents(d, config):
             comment = re.compile(comment,re.DOTALL)
         except:
             insert_message_as_feed(d,
-                "Invalid Regular Expression 'comment=%s'" % cgi.escape(comment) 
+                "Invalid Regular Expression 'comment=%s'" % cgi.escape(comment)
             )
             comment = None
 
@@ -213,7 +216,7 @@ def import_contents(d, config):
 	if comment :
             try:
                 for i,m in enumerate(comment.finditer(pageall)):
-                    ext_entries.append( 
+                    ext_entries.append(
                         entry(
                             title="Comment #%d for %s" % ( 1+i , e.get("title","") ) ,
                             link=link + "#" + m.group("id") ,
@@ -268,7 +271,7 @@ def accept(d,key,patterns):
                 newentry.append( e )
                 break
     d["entries"] = newentry
-       
+
 def error_feed(config,message="feed not found."):
     return {
         "entries":[],
