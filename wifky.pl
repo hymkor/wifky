@@ -67,7 +67,9 @@ if( $0 eq __FILE__ ){
         eval{ alarm 0; };
     };
     if( $@ ){
-        print "Content-Type: text/html;\n\n<html><body>\n",&errmsg($@);
+        print $_,"\r\n" for @::http_header;
+        print "Content-Type: text/html;\r\n" unless grep(/^Content-Type:/i,@::http_header);
+        print "\r\n<html><body>\n",&errmsg($@);
         print $messages if $@ !~ /^!/;
         print "</body></html>\n";
     }
@@ -301,12 +303,14 @@ sub init_globals{
         &title2fname('CSS') => <<'HERE' ,
 p.centering,big{ font-size:200% }
 
-h2{background-color:#DDF}
+h2{background-color:#CCF}
 
-h3,table.bordered td,table.bordered th{
+h3,table.block td,table.block th{
 border-width:0px 1px 1px 0px;border-style:solid}
 
-dt,span.commentator,span.rssreader_subject{font-weight:bold}
+h4{border-width:0 0 0 3mm;border-style:solid;border-color:#BBF;padding-left:1mm}
+
+dt,span.commentator{font-weight:bold;padding:1mm}
 
 span.comment_date{font-style:italic}
 
@@ -1315,7 +1319,10 @@ sub action_view{
         title => $title ,
         main  => sub{
             &begin_day( $title );
-            &print_page( title=>$title , index=>1 , main=>1 )
+            unless( &print_page( title=>$title , index=>1 , main=>1 ) ){
+                push(@::http_header,'Status: 404 Page not found.');
+                &::puts( '<p>404 Page not found.</p>' );
+            }
             &end_day();
         }
     );
@@ -1325,7 +1332,10 @@ sub action_cat{
     my $attach=$::form{f};
     my $path=&title2fname($::form{p},$attach);
 
-    open(FP,$path) or die('Can not found the filename');
+    unless( open(FP,$path) ){
+        push(@::http_header,'Status: 404 Attachment not found.');
+        die('!404 Attachment not found!');
+    }
     binmode(FP);
     binmode(STDOUT);
 
