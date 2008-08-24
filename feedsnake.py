@@ -17,290 +17,299 @@ import urlparse
 
 import feedparser
 
-version="0.3"
+version="0.4"
 
-def cdata(s):
-    return '<![CDATA[%s]]>' % s.replace("]]>","]]]]><[!CDATA[>")
+class Feed(dict):
+    def __init__(self,*argv):
+        dict.__init__(self,*argv)
+        self.error_cnt = 0
 
-def feedcat(d,fd):
-    fd = codecs.getwriter('utf_8')(fd)
-    def output(t):
-        fd.write(t.strip()+"\r\n")
+    def feedcat(d,fd):
+        def cdata(s):
+            return '<![CDATA[%s]]>' % s.replace("]]>","]]]]><[!CDATA[>")
+        fd = codecs.getwriter('utf_8')(fd)
+        def output(t):
+            fd.write(t.strip()+"\r\n")
 
-    output('<?xml version="1.0" encoding="UTF-8" ?>')
-    output('<rdf:RDF')
-    output(' xmlns="http://purl.org/rss/1.0/"')
-    output(' xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"')
-    output(' xmlns:content="http://purl.org/rss/1.0/modules/content/"')
-    output(' xmlns:dc="http://purl.org/dc/elements/1.1/"')
-    output(' xml:lang="ja">')
-    output('<channel rdf:about="%s">' % cgi.escape(d["feed"]["link"]) )
-    for tag,key in (
-        ("title","title"),
-        ("link","link"),
-        ("description","description"),
-    ):
-        if key in d["feed"]:
-            output("<%s>%s</%s>" % ( tag, cgi.escape( d["feed"][key] ),tag ))
-
-    output('<items>')
-    output('<rdf:Seq>')
-
-    for e in d["entries"]:
-        id1 = e.get("id") or e.get("link")
-        if id1:
-            output('  <rdf:li rdf:resource="%s" />' % cgi.escape(id1))
-
-    output('</rdf:Seq>')
-    output('</items>')
-    output('</channel>')
-
-    for e in d["entries"]:
-        id1 = e.get("id") or e.get("link")
-        if id1 is None:
-            continue
-        output( '<item rdf:about="%s">' % cgi.escape(id1) )
+        output('<?xml version="1.0" encoding="UTF-8" ?>')
+        output('<rdf:RDF')
+        output(' xmlns="http://purl.org/rss/1.0/"')
+        output(' xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"')
+        output(' xmlns:content="http://purl.org/rss/1.0/modules/content/"')
+        output(' xmlns:dc="http://purl.org/dc/elements/1.1/"')
+        output(' xml:lang="ja">')
+        output('<channel rdf:about="%s">' % cgi.escape(d["feed"]["link"]) )
         for tag,key in (
-            ("title","title") ,
-            ("link","link") ,
-            ("lastBuildDate","updated") ,
-            ("author","author") ,
-            ("dc:author","author") ,
-            ("dc:creator","author") ,
-            ("dc:date","updated"),
+            ("title","title"),
+            ("link","link"),
+            ("description","description"),
         ):
-            if key in e :
-                output("<%s>%s</%s>" % (tag,cgi.escape(e[key]),tag))
+            if key in d["feed"]:
+                output("<%s>%s</%s>" % ( tag, cgi.escape( d["feed"][key] ),tag ))
 
-        for t in e.get("tags") or e.get("category") or []:
-            output("<category>%s</category>" % cgi.escape(t.term))
+        output('<items>')
+        output('<rdf:Seq>')
 
-        if "description" in e:
-            output('<description>%s</description>' % cdata(e["description"]) )
+        for e in d["entries"]:
+            id1 = e.get("id") or e.get("link")
+            if id1:
+                output('  <rdf:li rdf:resource="%s" />' % cgi.escape(id1))
 
-        for c in e.get("content",[]):
-            if "value" in c:
-                output('<content:encoded>%s</content:encoded>' % cdata(c["value"]) )
+        output('</rdf:Seq>')
+        output('</items>')
+        output('</channel>')
 
-        output('</item>')
+        for e in d["entries"]:
+            id1 = e.get("id") or e.get("link")
+            if id1 is None:
+                continue
+            output( '<item rdf:about="%s">' % cgi.escape(id1) )
+            for tag,key in (
+                ("title","title") ,
+                ("link","link") ,
+                ("lastBuildDate","updated") ,
+                ("author","author") ,
+                ("dc:author","author") ,
+                ("dc:creator","author") ,
+                ("dc:date","updated"),
+            ):
+                if key in e :
+                    output("<%s>%s</%s>" % (tag,cgi.escape(e[key]),tag))
 
-    output("</rdf:RDF>")
+            for t in e.get("tags") or e.get("category") or []:
+                output("<category>%s</category>" % cgi.escape(t.term))
 
-def http_output(d):
-    sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
-    feedcat(d,sys.stdout)
+            if "description" in e:
+                output('<description>%s</description>' % cdata(e["description"]) )
 
-def entry( title , link , author , content , updated=None ):
-    if updated is None:
-        updated = datetime.utcnow()
-    return {
-        "title":title ,
-        "id":link ,
-        "link":link ,
-        "author":author ,
-        "description":content ,
-        "content":[ {"value":content} ] ,
-        "updated": updated.isoformat() ,
-        "updated_parsed":updated.timetuple() ,
-    }
+            for c in e.get("content",[]):
+                if "value" in c:
+                    output('<content:encoded>%s</content:encoded>' %
+                        cdata(c["value"]) )
 
-error_cnt=0
-def insert_message_as_feed(d,message):
-    global error_cnt
-    error_cnt += 1
-    d["entries"].insert(0,
-        entry(
-            title="Feed Error! [%d]" % error_cnt ,
-            link="http://example.com/#%d" % error_cnt ,
-            author="FeedSnake System" ,
-            content=message ,
-        )
-    )
+            output('</item>')
 
-def rel2abs_paths( link , content ):
-    content = re.sub(
-        r'(<a[^>]+href=")([^."]*)"' ,
-        lambda m:m.group(1) +
-        urlparse.urljoin(link, m.group(2)) +
-        '"',
-        content
-    )
-    content = re.sub(
-        r'''(<img[^>]+src=['"])([^"']*)(["'])''' ,
-        lambda m:m.group(1) +
-        urlparse.urljoin(link, m.group(2)) +
-        m.group(3) ,
-        content
-    )
-    return content
+        output("</rdf:RDF>")
 
-def match2stamp(matchObj):
-    if matchObj :
-        dic = matchObj.groupdict()
-        stamp = datetime.datetime(
-            int(dic.get("year",datetime.datetime.now().year) ),
-            int(dic["month"]) ,
-            int(dic["day"]) ,
-            int(dic.get("hour",0)),
-            int(dic.get("minute",0)) ,
-            int(dic.get("second",0)) )
-    else:
-        stamp = datetime.datetime.now()
-    stamp += datetime.timedelta( hours=-9 )
-    return stamp
+    def http_output(self):
+        sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
+        self.feedcat(sys.stdout)
 
-def feednm2cachefn(feedname):
-    return feedname + ".cache"
+    @staticmethod
+    def entry( title , link , author , content , updated=None ):
+        if updated is None:
+            updated = datetime.datetime.utcnow()
+        return {
+            "title":title ,
+            "id":link ,
+            "link":link ,
+            "author":author ,
+            "description":content ,
+            "content":[ {"value":content} ] ,
+            "updated": updated.isoformat() ,
+            "updated_parsed":updated.timetuple() ,
+        }
 
-def import_contents(d, config):
-    cachefn = feednm2cachefn(config["feedname"])
-    coding  = config.get("htmlcode")
-    pattern = config["import"]
-    comment = config.get("comment")
-
-    cache = {}
-    new_cache = {}
-
-    try:
-        fd = file(cachefn)
-        cache = pickle.load( fd )
-        fd.close()
-    except:
-        pass
-    try:
-        pattern = re.compile(pattern,re.DOTALL)
-    except:
-        insert_message_as_feed(d,
-            "Invalid Regular Expression 'import=%s'" % cgi.escape(pattern)
-        )
-        return
-    if comment:
-        try:
-            comment = re.compile(comment,re.DOTALL)
-        except:
-            insert_message_as_feed(d,
-                "Invalid Regular Expression 'comment=%s'" % cgi.escape(comment)
+    def insert_message(d,message):
+        d.error_cnt += 1
+        d["entries"].insert(0,
+            Feed.entry(
+                title="Feed Error! [%d]" % d.error_cnt ,
+                link="http://example.com/#%d" % d.error_cnt ,
+                author="FeedSnake System" ,
+                content=message ,
             )
-            comment = None
+        )
 
-    cache_fail_cnt = 0
+    @staticmethod
+    def rel2abs_paths( link , content ):
+        content = re.sub(
+            r'(<a[^>]+href=")([^."]*)"' ,
+            lambda m:m.group(1) +
+            urlparse.urljoin(link, m.group(2)) +
+            '"',
+            content
+        )
+        content = re.sub(
+            r'''(<img[^>]+src=['"])([^"']*)(["'])''' ,
+            lambda m:m.group(1) +
+            urlparse.urljoin(link, m.group(2)) +
+            m.group(3) ,
+            content
+        )
+        return content
 
-    ext_entries=[]
-    for e in d.get("entries") or []:
-        link = e["link"]
-        if link in cache and cache.get((link,"mark"))==e.get("_comment_cnt") :
-            pageall = cache[link]
+    @staticmethod
+    def match2stamp(matchObj):
+        if matchObj :
+            dic = matchObj.groupdict()
+            stamp = datetime.datetime(
+                int(dic.get("year",datetime.datetime.now().year) ),
+                int(dic["month"]) ,
+                int(dic["day"]) ,
+                int(dic.get("hour",0)),
+                int(dic.get("minute",0)) ,
+                int(dic.get("second",0)) )
         else:
-            cache_fail_cnt += 1
-            u = d.urlopen(link)
-            pageall = u.read()
-            u.close()
-            if coding is None:
-                m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',pageall,re.IGNORECASE)
-                if m:
-                    coding = m.group(1).lower()
-                else:
-                    coding = "utf8"
-            try:
-                pageall = pageall.decode(coding)
-            except UnicodeDecodeError:
-                pageall = u""
-        new_cache[link] = pageall
-        new_cache[link,"mark"] = e.get("_comment_cnt")
+            stamp = datetime.datetime.now()
+        stamp += datetime.timedelta( hours=-9 )
+        return stamp
 
-        ### main contents ###
-        m = pattern.search( pageall )
-        if m :
-            content = rel2abs_paths( link , m.group(1).strip() )
-            e.setdefault("content",[]).append({ "value":content })
-            e["description"] = content
+    @staticmethod
+    def feednm2cachefn(feedname):
+        return feedname + ".cache"
 
-	if comment :
+    def import_contents(d, config):
+        cachefn = Feed.feednm2cachefn(config["feedname"])
+        coding  = config.get("htmlcode")
+        pattern = config["import"]
+        comment = config.get("comment")
+
+        cache = {}
+        new_cache = {}
+
+        try:
+            fd = file(cachefn)
+            cache = pickle.load( fd )
+            fd.close()
+        except:
+            pass
+        try:
+            pattern = re.compile(pattern,re.DOTALL)
+        except:
+            d.insert_message(
+                "Invalid Regular Expression 'import=%s'" % 
+                                cgi.escape(pattern) )
+            return
+        if comment:
             try:
-                for i,m in enumerate(comment.finditer(pageall)):
-                    ext_entries.append(
-                        entry(
-                            title="Comment #%d for %s" % ( 1+i , e.get("title","") ) ,
-                            link=link + "#" + m.group("id") ,
-                            author = m.group("author") ,
-                            content = m.group("content") ,
-                            updated = match2stamp(m) ,
-                        )
-                    )
-            except IndexError:
-                insert_message_as_feed(d,
-                    cgi.escape(
-                        "Invalid regular-expression(IndexError) for comment: "
-                        "It needs (?P<id>..) , (?P<content>..) , "
-                        "(?P<author>..) , (?P<month>..) , and (?<day>..)"
-                    )
+                comment = re.compile(comment,re.DOTALL)
+            except:
+                d.insert_message(
+                    "Invalid Regular Expression 'comment=%s'" %
+                    cgi.escape(comment)
                 )
                 comment = None
 
-    d["entries"].extend(ext_entries)
+        cache_fail_cnt = 0
 
-    d["feed"]["description"] = "%s (cache failed %d times)" % (
-            d["feed"].get("description","") , cache_fail_cnt )
+        ext_entries=[]
+        for e in d.get("entries") or []:
+            link = e["link"]
+            if link in cache and cache.get((link,"mark"))==e.get("_comment_cnt") :
+                pageall = cache[link]
+            else:
+                cache_fail_cnt += 1
+                u = d.urlopen(link)
+                pageall = u.read()
+                u.close()
+                if coding is None:
+                    m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',pageall,re.IGNORECASE)
+                    if m:
+                        coding = m.group(1).lower()
+                    else:
+                        coding = "utf8"
+                try:
+                    pageall = pageall.decode(coding)
+                except UnicodeDecodeError:
+                    pageall = u""
+            new_cache[link] = pageall
+            new_cache[link,"mark"] = e.get("_comment_cnt")
 
-    if cache_fail_cnt > 0 and cachefn:
-        try:
-            fd = file(cachefn,"w")
-            pickle.dump( new_cache , fd )
-            fd.close()
-        except IOError:
-            insert_message_as_feed(d,
-                "could not update cache file '%s'" %
-                cgi.escape(cachefn)
-            )
+            ### main contents ###
+            m = pattern.search( pageall )
+            if m :
+                content = Feed.rel2abs_paths( link , m.group(1).strip() )
+                e.setdefault("content",[]).append({ "value":content })
+                e["description"] = content
 
-def deny(d,key,patterns):
-    patterns = patterns.split()
-    newentry = []
-    for e in d["entries"]:
-        for p in patterns:
-            if p in e[key]:
-                break
-        else:
-            newentry.append( e )
-    d["entries"] = newentry
+            if comment :
+                try:
+                    for i,m in enumerate(comment.finditer(pageall)):
+                        ext_entries.append(
+                            Feed.entry(
+                                title="Comment #%d for %s" % ( 1+i , e.get("title","") ) ,
+                                link=link + "#" + m.group("id") ,
+                                author = m.group("author") ,
+                                content = m.group("content") ,
+                                updated = Feed.match2stamp(m) ,
+                            )
+                        )
+                except IndexError:
+                    d.insert_message(
+                        cgi.escape(
+                            "Invalid regular-expression(IndexError) for comment: "
+                            "It needs (?P<id>..) , (?P<content>..) , "
+                            "(?P<author>..) , (?P<month>..) , and (?<day>..)"
+                        )
+                    )
+                    comment = None
 
-def accept(d,key,patterns):
-    patterns = patterns.split()
-    newentry = []
-    for e in d["entries"]:
-        for p in patterns:
-            if p in e[key]:
+        d["entries"].extend(ext_entries)
+
+        d["feed"]["description"] = "%s (cache failed %d times)" % (
+                d["feed"].get("description","") , cache_fail_cnt )
+
+        if cache_fail_cnt > 0 and cachefn:
+            try:
+                fd = file(cachefn,"w")
+                pickle.dump( new_cache , fd )
+                fd.close()
+            except IOError:
+                d.insert_message(
+                    "could not update cache file '%s'" %
+                    cgi.escape(cachefn)
+                )
+
+    def deny(d,key,patterns):
+        patterns = patterns.split()
+        newentry = []
+        for e in d["entries"]:
+            for p in patterns:
+                if p in e[key]:
+                    break
+            else:
                 newentry.append( e )
-                break
-    d["entries"] = newentry
+        d["entries"] = newentry
 
-def error_feed(config,message="feed not found."):
-    return {
-        "entries":[],
-        "feed":{
+    def accept(d,key,patterns):
+        patterns = patterns.split()
+        newentry = []
+        for e in d["entries"]:
+            for p in patterns:
+                if p in e[key]:
+                    newentry.append( e )
+                    break
+        d["entries"] = newentry
+
+class error_feed(Feed):
+    def __init__(self,config,message="feed not found."):
+        Feed.__init__(self)
+        self["entries"] = []
+        self["feed"] = {
             "link":"http://example.com",
             "title":"Feed Error!",
             "description":message ,
         }
-    }
 
-class norm_feed(dict):
+class norm_feed(Feed):
     def __init__(self,config):
-        dict.__init__(self,feedparser.parse( config["feed"] ) )
+        Feed.__init__(self,feedparser.parse( config["feed"] ) )
     def urlopen(self, *url ):
         return urllib.urlopen( *url )
 
-def parse_param(text):
-    loginpost = re.split(r"[\s\;\&\?]+",text)
-    url = loginpost.pop(0)
-    param = {}
-    for e in loginpost:
-        p = e.split("=",2)
-        param[ p[0] ] = p[1]
-    return url,param
-
-class sns_feed(dict):
+class sns_feed(Feed):
     def __init__(self,config):
+        def parse_param(text):
+            loginpost = re.split(r"[\s\;\&\?]+",text)
+            url = loginpost.pop(0)
+            param = {}
+            for e in loginpost:
+                p = e.split("=",2)
+                param[ p[0] ] = p[1]
+            return url,param
+
+        Feed.__init__(self)
         self.cookiejar = cookielib.CookieJar()
         self.cookie_processor = urllib2.HTTPCookieProcessor(self.cookiejar)
         self.opener = urllib2.build_opener( self.cookie_processor )
@@ -352,24 +361,24 @@ def interpret( config ):
     for key in "author", "title":
         if key in config:
             try:
-                accept(d,key,config[key].decode("utf8"))
+                d.accept(key,config[key].decode("utf8"))
             except UnicodeDecodeError:
-                insert_message_as_feed(d,"UnicodeDecodeError on %s=.." % key)
+                d.insert_message("UnicodeDecodeError on %s=.." % key)
         if "x"+key in config:
             try:
-                deny(d,key,config["x"+key].decode("utf8"))
+                d.deny(key,config["x"+key].decode("utf8"))
             except UnicodeDecodeError:
-                insert_message_as_feed(d,"UnicodeDecodeError on x%s=.." % key)
+                d.insert_message("UnicodeDecodeError on x%s=.." % key)
     try:
         max_entries = int(config.get("max_entries","5"))
     except ValueError:
-        insert_message_as_feed(d,"Invalid Entry number '%s'" % config["max_entries"] )
+        d.insert_message("Invalid Entry number '%s'" % config["max_entries"] )
         max_entries = 5
     del d["entries"][max_entries:]
 
     if "import" in config:
-        import_contents( d , config )
-    http_output(d)
+        d.import_contents( config )
+    d.http_output()
 
 def menu(config):
     print "Content-Type: text/html"
@@ -408,7 +417,7 @@ def main(inifname=None,index=True):
 
     feedname = os.getenv("QUERY_STRING")
     if feedname and feedname[0] == '-' :
-        cachefn = feednm2cachefn(feedname[1:])
+        cachefn = Feed.feednm2cachefn(feedname[1:])
         if configall.has_section(feedname[1:]) and os.path.exists(cachefn):
             os.remove(cachefn)
         feedname = None

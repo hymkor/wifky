@@ -39,7 +39,7 @@ class open_skip(sns_feed):
                 entry["author"] = m.group(1)
 
             m = entry_date_pattern.search(b)
-            stamp = match2stamp(m)
+            stamp = Feed.match2stamp(m)
             entry["updated"] = stamp.isoformat()
             entry["updated_parsed"] = stamp.timetuple()
 
