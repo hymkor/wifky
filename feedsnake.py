@@ -408,7 +408,7 @@ class InlineFeed(NormFeed):
                 continue
             else:
                 link = None
-                id_ = md5.new( content ).hexdigest()
+                id_ = md5.new( content.encode(coding) ).hexdigest()
 
             entries.append(
                 Feed.entry( 
