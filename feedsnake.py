@@ -407,7 +407,7 @@ class InlineFeed(NormFeed):
             elif not content:
                 continue
             else:
-                link = None
+                link = index
                 id_ = md5.new( content.encode(coding) ).hexdigest()
 
             entries.append(
