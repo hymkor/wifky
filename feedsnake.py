@@ -8,6 +8,7 @@ import codecs
 import cookielib
 import datetime
 import inspect
+import md5
 import os
 import re
 import sys
@@ -99,12 +100,12 @@ class Feed(dict):
         self.feedcat(sys.stdout)
 
     @staticmethod
-    def entry( title , link , content=None , updated=None , author=None ):
+    def entry( title , link=None , id_=None ,content=None , updated=None , author=None ):
         if updated is None:
             updated = datetime.datetime.utcnow()
         return {
             "title":title ,
-            "id":link ,
+            "id":id_ or link ,
             "link":link ,
             "author":author ,
             "description":content ,
@@ -362,6 +363,8 @@ class InlineFeed(NormFeed):
         m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',html,re.IGNORECASE|re.DOTALL)
         if m :
             coding=m.group(1).lower()
+        elif "htmlcode" in config:
+            coding=config["htmlcode"]
         else :
             coding="utf8"
         html = html.decode( coding )
@@ -370,7 +373,7 @@ class InlineFeed(NormFeed):
         if "feed_title" in config:
             title = config["feed_title"]
         else :
-            m = re.search(r'<title>(.*?)</title>',html)
+            m = re.search(r'<title>(.*?)</title>',html,re.DOTALL|re.IGNORECASE)
             if m:
                 title = m.group(1)
             else :
@@ -390,17 +393,29 @@ class InlineFeed(NormFeed):
         re_pattern = re.compile( pattern_str , re.DOTALL|re.IGNORECASE )
         
         for m in re_pattern.finditer( html ):
+            title = re.sub(r'<[^>]*>','',m.group("title"))
+            if not title :
+                continue
+
             if u"(?P<content>" in pattern_str:
                 content = Feed.rel2abs_paths( index , m.group("content") )
             else:
                 content = None
-            title = re.sub(r'<[^>]*>','',m.group("title"))
-            if not title : continue
+
+            if "(?P<url>" in pattern_str:
+                id_ = link = urlparse.urljoin( index , m.group("url") )
+            elif not content:
+                continue
+            else:
+                link = None
+                id_ = md5.new( content ).hexdigest()
+
             entries.append(
                 Feed.entry( 
-                    link=urlparse.urljoin( index , m.group("url") ) ,
-                    title=title ,
-                    content=content
+                    id_ = id_ ,
+                    link = link ,
+                    title = title ,
+                    content = content
                 )
             )
 
