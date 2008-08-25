@@ -44,8 +44,9 @@ class Feed(dict):
             ("link","link"),
             ("description","description"),
         ):
-            if key in d["feed"]  and  d["feed"][key]:
-                output("<%s>%s</%s>" % ( tag, cgi.escape( d["feed"][key] ),tag ))
+            value = d["feed"].get(key)
+            if value :
+                output("<%s>%s</%s>" % ( tag, cgi.escape(value),tag ))
 
         output('<items>')
         output('<rdf:Seq>')
@@ -300,7 +301,7 @@ class NormFeed(Feed):
     def urlopen(self, *url ):
         return urllib.urlopen( *url )
 
-class sns_feed(Feed):
+class SnsFeed(Feed):
     def __init__(self,config):
         def parse_param(text):
             loginpost = re.split(r"[\s\;\&\?]+",text)
@@ -328,15 +329,17 @@ class sns_feed(Feed):
     def parse(self, url):
         return feedparser.parse(url,handlers=[self.cookie_processor])
 
-class LoginFeed(sns_feed):
+class LoginFeed(SnsFeed):
     def __init__(self,config):
-        sns_feed.__init__(self,config)
+        SnsFeed.__init__(self,config)
         self.update( self.parse(config["feed"]) )
 
 def DefaultFeed(config):
     if "login" in config  or  "loginpost" in config:
         if "feed" in config:
             return LoginFeed(config)
+        elif "index" in config:
+            return LoginInlineFeed(config)
     else:
         if "feed" in config:
             return NormFeed(config)
@@ -347,7 +350,7 @@ def DefaultFeed(config):
 class InlineFeed(NormFeed):
     def __init__(self,config):
         index = config["index"]
-        fd = urllib.urlopen(index)
+        fd = self.urlopen(index)
         html = fd.read()
         m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',html,re.IGNORECASE|re.DOTALL)
         if m :
@@ -366,6 +369,12 @@ class InlineFeed(NormFeed):
             else :
                 title = "Feed of " + index
 
+        self["feed"] = {
+            "link":index ,
+            "title":title ,
+            "description":"" ,
+        }
+
         entries = []
         pattern_str = config.get(
             'inline' ,
@@ -378,20 +387,22 @@ class InlineFeed(NormFeed):
                 content = Feed.rel2abs_paths( index , m.group("content") )
             else:
                 content = None
+            title = re.sub(r'<[^>]*>','',m.group("title"))
+            if not title : continue
             entries.append(
                 Feed.entry( 
                     link=urlparse.urljoin( index , m.group("url") ) ,
-                    title=re.sub(r'<[^>]*>','',m.group("title")) ,
+                    title=title ,
                     content=content
                 )
             )
 
         self["entries"] = entries
-        self["feed"] = {
-            "link":index ,
-            "title":title ,
-            "description":"" ,
-        }
+
+class LoginInlineFeed(SnsFeed,InlineFeed):
+    def __init__(self,config):
+        SnsFeed.__init__(self,config)
+        InlineFeed.__init__(self,config)
 
 feed_class = {
     "feed":NormFeed ,
