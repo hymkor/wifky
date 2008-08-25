@@ -127,7 +127,7 @@ class Feed(dict):
     @staticmethod
     def rel2abs_paths( link , content ):
         content = re.sub(
-            r'(<a[^>]+href=")([^."]*)"' ,
+            r'(<a[^>]+href=")([^"]*)"' ,
             lambda m:m.group(1) +
             urlparse.urljoin(link, m.group(2)) +
             '"',
