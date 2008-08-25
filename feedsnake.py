@@ -163,6 +163,13 @@ class Feed(dict):
         return feedname + ".cache"
 
     def import_contents(d, config):
+        try:
+            max_entries = int(config.get("max_entries","5"))
+        except ValueError:
+            d.insert_message("Invalid Entry number '%s'" % config["max_entries"] )
+            max_entries = 5
+        del d["entries"][max_entries:]
+
         cachefn = Feed.feednm2cachefn(config["feedname"])
         coding  = config.get("htmlcode")
         pattern = config["import"]
@@ -436,12 +443,6 @@ def interpret( config ):
                 d.deny(key,config["x"+key].decode("utf8"))
             except UnicodeDecodeError:
                 d.insert_message("UnicodeDecodeError on x%s=.." % key)
-    try:
-        max_entries = int(config.get("max_entries","5"))
-    except ValueError:
-        d.insert_message("Invalid Entry number '%s'" % config["max_entries"] )
-        max_entries = 5
-    del d["entries"][max_entries:]
 
     if "import" in config:
         d.import_contents( config )
