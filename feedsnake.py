@@ -44,7 +44,7 @@ class Feed(dict):
             ("link","link"),
             ("description","description"),
         ):
-            if key in d["feed"]:
+            if key in d["feed"]  and  d["feed"][key]:
                 output("<%s>%s</%s>" % ( tag, cgi.escape( d["feed"][key] ),tag ))
 
         output('<items>')
@@ -73,19 +73,21 @@ class Feed(dict):
                 ("dc:creator","author") ,
                 ("dc:date","updated"),
             ):
-                if key in e :
+                value = e.get(key)
+                if value:
                     output("<%s>%s</%s>" % (tag,cgi.escape(e[key]),tag))
 
             for t in e.get("tags") or e.get("category") or []:
                 output("<category>%s</category>" % cgi.escape(t.term))
 
-            if "description" in e:
-                output('<description>%s</description>' % cdata(e["description"]) )
+            value = e.get("description")
+            if value:
+                output('<description>%s</description>' % cdata(value) )
 
             for c in e.get("content",[]):
-                if "value" in c:
-                    output('<content:encoded>%s</content:encoded>' %
-                        cdata(c["value"]) )
+                value = c.get("value")
+                if value:
+                    output('<content:encoded>%s</content:encoded>' % cdata(value) )
 
             output('</item>')
 
@@ -96,7 +98,7 @@ class Feed(dict):
         self.feedcat(sys.stdout)
 
     @staticmethod
-    def entry( title , link , author , content , updated=None ):
+    def entry( title , link , content=None , updated=None , author=None ):
         if updated is None:
             updated = datetime.datetime.utcnow()
         return {
@@ -292,7 +294,7 @@ class error_feed(Feed):
             "description":message ,
         }
 
-class norm_feed(Feed):
+class NormFeed(Feed):
     def __init__(self,config):
         Feed.__init__(self,feedparser.parse( config["feed"] ) )
     def urlopen(self, *url ):
@@ -310,8 +312,8 @@ class sns_feed(Feed):
             return url,param
 
         Feed.__init__(self)
-        self.cookiejar = cookielib.CookieJar()
-        self.cookie_processor = urllib2.HTTPCookieProcessor(self.cookiejar)
+        cookiejar = cookielib.CookieJar()
+        self.cookie_processor = urllib2.HTTPCookieProcessor(cookiejar)
         self.opener = urllib2.build_opener( self.cookie_processor )
 
         if "loginpost" in config:
@@ -326,24 +328,76 @@ class sns_feed(Feed):
     def parse(self, url):
         return feedparser.parse(url,handlers=[self.cookie_processor])
 
-class mixi_feed(sns_feed):
+class LoginFeed(sns_feed):
     def __init__(self,config):
         sns_feed.__init__(self,config)
         self.update( self.parse(config["feed"]) )
 
-def default_feed(config):
+def DefaultFeed(config):
     if "login" in config  or  "loginpost" in config:
         if "feed" in config:
-            return mixi_feed(config)
+            return LoginFeed(config)
     else:
         if "feed" in config:
-            return norm_feed(config)
+            return NormFeed(config)
+        elif "index" in config:
+            return InlineFeed(config)
     return error_feed(config)
 
+class InlineFeed(NormFeed):
+    def __init__(self,config):
+        index = config["index"]
+        fd = urllib.urlopen(index)
+        html = fd.read()
+        m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',html,re.IGNORECASE|re.DOTALL)
+        if m :
+            coding=m.group(1).lower()
+        else :
+            coding="utf8"
+        html = html.decode( coding )
+        fd.close()
+
+        if "feed_title" in config:
+            title = config["feed_title"]
+        else :
+            m = re.search(r'<title>(.*?)</title>',html)
+            if m:
+                title = m.group(1)
+            else :
+                title = "Feed of " + index
+
+        entries = []
+        pattern_str = config.get(
+            'inline' ,
+            r'<a[^>]+?href="(?P<url>[^"]*)"[^>]*>(?P<title>.*?)</a>'
+        ).decode("utf8")
+        re_pattern = re.compile( pattern_str , re.DOTALL|re.IGNORECASE )
+        
+        for m in re_pattern.finditer( html ):
+            if u"(?P<content>" in pattern_str:
+                content = Feed.rel2abs_paths( index , m.group("content") )
+            else:
+                content = None
+            entries.append(
+                Feed.entry( 
+                    link=urlparse.urljoin( index , m.group("url") ) ,
+                    title=re.sub(r'<[^>]*>','',m.group("title")) ,
+                    content=content
+                )
+            )
+
+        self["entries"] = entries
+        self["feed"] = {
+            "link":index ,
+            "title":title ,
+            "description":"" ,
+        }
+
 feed_class = {
-    "feed":norm_feed ,
-    "mixi":mixi_feed ,
-    "default":default_feed ,
+    "feed":NormFeed ,
+    "mixi":LoginFeed ,
+    "index":InlineFeed ,
+    "default":DefaultFeed ,
 }
 
 def interpret( config ):
@@ -356,7 +410,9 @@ def interpret( config ):
         if "feed" not in d  or "link" not in d["feed"]:
             d = error_feed( config , "Can not find the feed." )
     except IOError:
-        d = error_feed( config , "Can not load feed class '%s'" % classname )
+        d = error_feed( config , "Can not load feed class '%s'" % cgi.escape(classname) )
+    except Exception,e:
+        d = error_feed( config , cgi.escape(str(e)) )
 
     for key in "author", "title":
         if key in config:
@@ -381,12 +437,15 @@ def interpret( config ):
     d.http_output()
 
 def menu(config):
-    print "Content-Type: text/html"
-    print ""
-    print "<html>"
-    print "<title>FeedSnake Come On!</title>"
-    print "<body><h1>FeedSnake Come On!</h1>"
-    print "<ul>"
+    print 'Content-Type: text/html; charset=utf-8'
+    print ''
+    print '<html>'
+    print '<head>'
+    print '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">'
+    print '<title>FeedSnake Come On!</title>'
+    print '</head>'
+    print '<body><h1>FeedSnake Come On!</h1>'
+    print '<ul>'
     for e in config.sections():
         print '<li><a href="%s?%s" rel="nofollow">%s</a> ' \
               ' <small>[<a href="%s?-%s" rel="nofollow">x</a>]</small></li>' % (
@@ -396,7 +455,7 @@ def menu(config):
             os.getenv("SCRIPT_NAME") ,
             cgi.escape(e) ,
         )
-    print "</ul><p>Generated by feedsnake.py %s</p></body></html>" % version
+    print '</ul><p>Generated by feedsnake.py %s</p></body></html>' % version
 
 def die(message=""):
     print "Content-Type: text/html"
