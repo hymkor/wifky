@@ -1,6 +1,6 @@
-class open_skip(sns_feed):
+class open_skip(SnsFeed):
     def __init__(self,config):
-        sns_feed.__init__(self,config)
+        SnsFeed.__init__(self,config)
         u = self.urlopen(config["index"])
         html = u.read().decode("utf8")
         u.close()
