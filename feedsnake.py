@@ -1,7 +1,6 @@
 #!/usr/local/bin/python
 
 import ConfigParser
-import cPickle as pickle
 import cgi
 import cgitb ; cgitb.enable()
 import codecs
@@ -17,6 +16,11 @@ import urllib2
 import urlparse
 
 import feedparser
+
+try:
+    import sqlite3 as sqlite
+except:
+    from pysqlite2 import dbapi2 as sqlite
 
 version="0.4"
 
@@ -95,8 +99,8 @@ def http_output(d):
     feedcat(d,sys.stdout)
 
 def entry( title , link=None , id_=None ,content=None , updated=None , author=None ):
-    if updated is None:
-        updated = datetime.datetime.utcnow()
+    if updated is None: updated = datetime.datetime.utcnow()
+    if content :        content = content.strip()
     return {
         "title":title ,
         "id":id_ or link ,
@@ -154,7 +158,7 @@ def match2stamp(matchObj):
 def feednm2cachefn(feedname):
     return feedname + ".cache"
 
-def import_contents(browser , d , config):
+def import_contents(browser , d , config , conn ):
     try:
         max_entries = int(config.get("max_entries","5"))
     except ValueError:
@@ -162,20 +166,12 @@ def import_contents(browser , d , config):
         max_entries = 5
     del d["entries"][max_entries:]
 
-    cachefn = feednm2cachefn(config["feedname"])
     coding  = config.get("htmlcode")
     pattern = config["import"]
     comment = config.get("comment")
 
-    cache = {}
-    new_cache = {}
+    cursor = conn.cursor()
 
-    try:
-        fd = file(cachefn)
-        cache = pickle.load( fd )
-        fd.close()
-    except:
-        pass
     try:
         pattern = re.compile(pattern,re.DOTALL)
     except:
@@ -198,9 +194,11 @@ def import_contents(browser , d , config):
     ext_entries=[]
     for e in d.get("entries") or []:
         link = e["link"]
-        if link in cache and cache.get((link,"mark"))==e.get("_comment_cnt") :
-            pageall = cache[link]
-        else:
+        pageall = None
+        for rs in select_cache(cursor,link):
+            pageall = rs[1]
+
+        if pageall is None:
             cache_fail_cnt += 1
             u = browser.opener(link)
             pageall = u.read()
@@ -215,8 +213,9 @@ def import_contents(browser , d , config):
                 pageall = pageall.decode(coding)
             except UnicodeDecodeError:
                 pageall = u""
-        new_cache[link] = pageall
-        new_cache[link,"mark"] = e.get("_comment_cnt")
+            
+            insert_cache(cursor,link,pageall)
+            conn.commit()
 
         ### main contents ###
         m = pattern.search( pageall )
@@ -251,17 +250,6 @@ def import_contents(browser , d , config):
 
     d["feed"]["description"] = "%s (cache failed %d times)" % (
             d["feed"].get("description","") , cache_fail_cnt )
-
-    if cache_fail_cnt > 0 and cachefn:
-        try:
-            fd = file(cachefn,"w")
-            pickle.dump( new_cache , fd )
-            fd.close()
-        except IOError:
-            insert_message(d,
-                "could not update cache file '%s'" %
-                cgi.escape(cachefn)
-            )
 
 def deny(d,key,patterns):
     patterns = patterns.split()
@@ -330,19 +318,65 @@ def login(config):
         (b.opener)( "%s?%s" % ( url , urllib.urlencode( param )) ).close()
     return b
 
-def html2feed(browser,config):
+def ymdhms():
+    return datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+
+def select_cache(cursor,url):
+    for rs in cursor.execute("select * from t_cache where url=?",(url,)):
+        yield rs
+
+def update_cache(cursor,url,html):
+    cursor.execute("update t_cache set content=? , update_dt=? where url = ?" ,
+        (html,ymdhms(),url) 
+    )
+def insert_cache(cursor,url,html):
+    cursor.execute("insert into t_cache values(?,?,?)" ,
+        (url,html,ymdhms() )
+    )
+
+def keep_cache(cursor,url,html):
+    pass
+
+def html2feed(browser,config,conn):
     index = config["index"]
-    fd    = browser.opener(index)
-    html  = fd.read()
-    m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',html,re.IGNORECASE|re.DOTALL)
-    if m :
-        coding=m.group(1).lower()
-    elif "htmlcode" in config:
-        coding=config["htmlcode"]
-    else :
-        coding="utf8"
-    html = html.decode( coding )
-    fd.close()
+
+    cursor = conn.cursor()
+
+    cache_fail_cnt = 0
+    cache_action = insert_cache
+    update_dt = ymdhms()
+    prev_html = ""
+    for rs in select_cache(cursor,index):
+        if rs[2] > ( datetime.datetime.utcnow() - datetime.timedelta(hours=1) \
+                   ).strftime("%Y%m%d%H%M%S"):
+            ### Cache is new enough ###
+            html = rs[1]
+            update_dt = rs[2]
+            cache_action = keep_cache
+            break
+        else:
+            ### Cache is Old ###
+            prev_html = rs[1]
+            update_dt = rs[2]
+            cache_action = update_cache
+    else:
+        ### Cache does not hit. ###
+        cache_fail_cnt += 1
+        fd    = browser.opener(index)
+        html  = fd.read()
+        fd.close()
+
+        m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',html,re.IGNORECASE|re.DOTALL)
+        if m :
+            coding=m.group(1).lower()
+        elif "htmlcode" in config:
+            coding=config["htmlcode"]
+        else :
+            coding="utf8"
+        html = html.decode( coding )
+
+    if html != prev_html :
+        update_dt = ymdhms()
 
     if "feed_title" in config:
         title = config["feed_title"]
@@ -357,7 +391,7 @@ def html2feed(browser,config):
         "feed":{
             "link":index ,
             "title":title ,
-            "description":"" ,
+            "description":"(cache failed %d times)" % cache_fail_cnt
         }
     }
 
@@ -384,17 +418,22 @@ def html2feed(browser,config):
             continue
         else:
             link = index
-            id_ = md5.new( content.encode(coding) ).hexdigest()
+            id_ = md5.new( content.encode("utf8") ).hexdigest()
 
         entries.append(
             entry( 
                 id_ = id_ ,
                 link = link ,
                 title = title ,
-                content = content
+                content = content ,
+                updated = datetime.datetime.strptime(update_dt,"%Y%m%d%H%M%S")
             )
         )
     d["entries"] = entries
+
+    cache_action(cursor,index,html)
+    conn.commit()
+
     return d
 
 feed_processor_list = {}
@@ -408,6 +447,8 @@ def interpret( config ):
         browser = login(config)
     else:
         browser = nologin()
+
+    conn = sqlite.connect("feedsnake.db")
 
     if "class" in config:
         classname = config["class"]
@@ -423,7 +464,7 @@ def interpret( config ):
     elif "feed" in config:
         d = browser.parser(config["feed"])
     elif "index" in config:
-        d = html2feed(browser,config)
+        d = html2feed(browser,config,conn)
     else:
         d = error_feed()
 
@@ -443,7 +484,10 @@ def interpret( config ):
                 insert_message(d,"UnicodeDecodeError on x%s=.." % key)
 
     if "import" in config:
-        import_contents(browser , d, config )
+        import_contents(browser , d, config , conn)
+
+    conn.close()
+
     http_output(d)
 
 def menu(config):
