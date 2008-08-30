@@ -200,7 +200,7 @@ def import_contents(browser , d , config , conn ):
 
         if pageall is None:
             cache_fail_cnt += 1
-            u = browser.opener(link)
+            u = browser(link)
             pageall = u.read()
             u.close()
             if coding is None:
@@ -282,15 +282,6 @@ def error_feed(message="feed not found."):
         }
     }
 
-class Browser(object):
-    def __init__( self , opener , parser ):
-        self.opener = opener
-        self.parser = parser 
-
-def nologin():
-    return Browser( opener = urllib.urlopen   ,
-                    parser = feedparser.parse )
-
 def login(config):
     def parse_param(text):
         loginpost = re.split(r"[\s\;\&\?]+",text)
@@ -303,20 +294,16 @@ def login(config):
 
     cookiejar = cookielib.CookieJar()
     cookie_processor = urllib2.HTTPCookieProcessor(cookiejar)
-    opener = urllib2.build_opener( cookie_processor )
-
-    b = Browser(
-        opener = lambda *url:opener.open(*url) ,
-        parser = lambda url:feedparser.parse(url,handlers=[cookie_processor])
-    )
+    opener  = urllib2.build_opener( cookie_processor )
+    browser = lambda *url:opener.open(*url)
 
     if "loginpost" in config:
         url,param = parse_param(config["loginpost"])
-        (b.opener)( url , urllib.urlencode( param ) ).close()
+        browser( url , urllib.urlencode( param ) ).close()
     elif "login" in config:
         url,param = parse_param(config["login"])
-        (b.opener)( "%s?%s" % ( url , urllib.urlencode( param )) ).close()
-    return b
+        browser( "%s?%s" % ( url , urllib.urlencode( param )) ).close()
+    return browser
 
 def ymdhms():
     return datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
@@ -337,6 +324,11 @@ def insert_cache(cursor,url,html):
 def keep_cache(cursor,url,html):
     pass
 
+def is_enough_new(dt):
+    return dt > ( datetime.datetime.utcnow() 
+                - datetime.timedelta(hours=1)
+                ).strftime("%Y%m%d%H%M%S")
+
 def html2feed(browser,config,conn):
     index = config["index"]
 
@@ -347,9 +339,7 @@ def html2feed(browser,config,conn):
     update_dt = ymdhms()
     prev_html = ""
     for rs in select_cache(cursor,index):
-        if rs[2] > ( datetime.datetime.utcnow() - datetime.timedelta(hours=1) \
-                   ).strftime("%Y%m%d%H%M%S"):
-            ### Cache is new enough ###
+        if is_enough_new(rs[2]):
             html = rs[1]
             update_dt = rs[2]
             cache_action = keep_cache
@@ -362,7 +352,7 @@ def html2feed(browser,config,conn):
     else:
         ### Cache does not hit. ###
         cache_fail_cnt += 1
-        fd    = browser.opener(index)
+        fd    = browser(index)
         html  = fd.read()
         fd.close()
 
@@ -436,6 +426,27 @@ def html2feed(browser,config,conn):
 
     return d
 
+def read_feed( conn , browser , url ):
+    cursor = conn.cursor()
+    for rs in select_cache( cursor , url ):
+        if is_enough_new(rs[2]) :
+            xml = rs[1].decode("base64")
+        else:
+            fd = browser( url )
+            xml = fd.read()
+            fd.close()
+            update_cache( cursor , url , xml.encode("base64") )
+            conn.commit()
+        break
+    else:
+        ### Cache does not hit ###
+        fd = browser( url )
+        xml = fd.read()
+        fd.close()
+        insert_cache( cursor , url , xml.encode("base64") )
+        conn.commit()
+    return xml
+
 feed_processor_list = {}
 
 def feed_processor(func):
@@ -446,7 +457,7 @@ def interpret( config ):
     if "login" in config  or  "loginpost" in config:
         browser = login(config)
     else:
-        browser = nologin()
+        browser = urllib.urlopen
 
     conn = sqlite.connect("feedsnake.db")
 
@@ -462,7 +473,8 @@ def interpret( config ):
         except Exception,e:
             d = error_feed( cgi.escape(str(e)) )
     elif "feed" in config:
-        d = browser.parser(config["feed"])
+        xml = read_feed( conn , browser , config["feed"] )
+        d = feedparser.parse( xml )
     elif "index" in config:
         d = html2feed(browser,config,conn)
     else:
