@@ -305,8 +305,18 @@ def login(config):
         browser( "%s?%s" % ( url , urllib.urlencode( param )) ).close()
     return browser
 
-def ymdhms():
-    return datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+def date2str(dt=None):
+    return (dt or datetime.datetime.utcnow()).strftime("%Y%m%d%H%M%S")
+
+def str2date(dt): ### for Python 2.4 which does not have no datetime.strptime() ###
+    return datetime.datetime(
+        year   = int(dt[ 0: 4].lstrip("0")) ,
+        month  = int(dt[ 4: 6].lstrip("0")) ,
+        day    = int(dt[ 6: 8].lstrip("0")) ,
+        hour   = int(dt[ 8:10].lstrip("0")) ,
+        minute = int(dt[10:12].lstrip("0")) ,
+        second = int(dt[12:14].lstrip("0")) ,
+    )
 
 def select_cache(cursor,url):
     for rs in cursor.execute("select * from t_cache where url=?",(url,)):
@@ -314,11 +324,11 @@ def select_cache(cursor,url):
 
 def update_cache(cursor,url,html):
     cursor.execute("update t_cache set content=? , update_dt=? where url = ?" ,
-        (html,ymdhms(),url) 
+        (html,date2str(),url) 
     )
 def insert_cache(cursor,url,html):
     cursor.execute("insert into t_cache values(?,?,?)" ,
-        (url,html,ymdhms() )
+        (url,html,date2str() )
     )
 
 def keep_cache(cursor,url,html):
@@ -336,7 +346,7 @@ def html2feed(browser,config,conn):
 
     cache_fail_cnt = 0
     cache_action = insert_cache
-    update_dt = ymdhms()
+    update_dt = date2str()
     prev_html = ""
     for rs in select_cache(cursor,index):
         if is_enough_new(rs[2]):
@@ -366,7 +376,7 @@ def html2feed(browser,config,conn):
         html = html.decode( coding )
 
     if html != prev_html :
-        update_dt = ymdhms()
+        update_dt = date2str()
 
     if "feed_title" in config:
         title = config["feed_title"]
@@ -416,7 +426,7 @@ def html2feed(browser,config,conn):
                 link = link ,
                 title = title ,
                 content = content ,
-                updated = datetime.datetime.strptime(update_dt,"%Y%m%d%H%M%S")
+                updated = str2date( update_dt )
             )
         )
     d["entries"] = entries
