@@ -426,7 +426,7 @@ def html2feed(browser,config,conn):
 
     return d
 
-def read_feed( conn , browser , url ):
+def read_feed( browser , url , conn ):
     cursor = conn.cursor()
     for rs in select_cache( cursor , url ):
         if is_enough_new(rs[2]) :
@@ -467,21 +467,25 @@ def interpret( config ):
             classname,plugin = classname.split("@",2)
             execfile(plugin+".py",globals(),locals())
         try:
-            d = feed_processor_list[ classname ](browser,config)
+            d = feed_processor_list[ classname ](browser,config,conn)
         except IOError:
             d = error_feed( "Can not load feed class '%s'" % cgi.escape(classname) )
+            conn.rollback()
         except Exception,e:
             d = error_feed( cgi.escape(str(e)) )
+            conn.rollback()
     elif "feed" in config:
-        xml = read_feed( conn , browser , config["feed"] )
+        xml = read_feed( browser , config["feed"] , conn )
         d = feedparser.parse( xml )
     elif "index" in config:
         d = html2feed(browser,config,conn)
     else:
         d = error_feed()
+        conn.rollback()
 
     if "feed" not in d  or "link" not in d["feed"]:
         d = error_feed( "Can not find the feed." )
+        conn.rollback()
 
     for key in "author", "title":
         if key in config:
@@ -498,6 +502,13 @@ def interpret( config ):
     if "import" in config:
         import_contents(browser , d, config , conn)
 
+    conn.execute("delete from t_cache where update_dt < ?" ,
+        ( 
+            ( datetime.datetime.utcnow() - datetime.timedelta(days=3) 
+            ).strftime("%Y%m%d%h%m%s"),
+        ),
+    )
+    conn.commit()
     conn.close()
 
     http_output(d)

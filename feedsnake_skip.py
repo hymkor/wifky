@@ -1,6 +1,6 @@
 @feed_processor
-def skip(browser,config):
-    http = browser.opener(config["index"])
+def skip(browser,config,conn):
+    http = browser(config["index"])
     html = http.read().decode("utf8")
     http.close()
 
