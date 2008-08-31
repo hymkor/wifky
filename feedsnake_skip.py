@@ -1,8 +1,19 @@
 @feed_processor
 def skip(browser,config,conn):
-    http = browser(config["index"])
-    html = http.read().decode("utf8")
-    http.close()
+    url = config["index"]
+    cursor = conn.cursor()
+    for rs in cursor.execute(
+        "select * from t_cache where url=? and update_dt > ?" , 
+        ( url , (datetime.utcnow()-timedelta(hours=1)).strftime("%Y%m%d%H%M%S") )
+    ):
+        html = rs[1]
+    else:
+        http = browser(url)
+        html = http.read().decode("utf8")
+        http.close()
+        cursor.execute( "insert or replace into t_cache values(?,?,?)" ,
+          ( url , html , datetime.utcnow().strftime("%Y%M%d%H%M%S") )
+        )
 
     entry_pattern = re.compile(
         r'<div class="page_line">(.*?</div>)\s*</div>'
@@ -71,5 +82,7 @@ def skip(browser,config,conn):
         config["import"] = r'<div id="default_style_area"[^>]*>(.*?)</div>\s*<div id="source_style_area"'
     if "comment" not in config :
         config["comment"] = r'''<div class="board_entry_comment" id='(?P<id>[^']+).*?>(?P<author>[^<]*)</a><span style="font-size: 10px;?">\[(?P<year>\d\d\d\d)/(?P<month>\d\d)/(?P<day>\d\d)-(?P<hour>\d\d):(?P<minute>\d\d)\]</span>.*?<div class="hiki_style">(?P<content>.*?)</div>'''
+
+    conn.commit
 
     return d

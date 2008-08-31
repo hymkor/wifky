@@ -5,7 +5,7 @@ import cgi
 import cgitb ; cgitb.enable()
 import codecs
 import cookielib
-import datetime
+from datetime import datetime,timedelta
 import inspect
 import md5
 import os
@@ -99,7 +99,7 @@ def http_output(d):
     feedcat(d,sys.stdout)
 
 def entry( title , link=None , id_=None ,content=None , updated=None , author=None ):
-    if updated is None: updated = datetime.datetime.utcnow()
+    if updated is None: updated = datetime.utcnow()
     if content :        content = content.strip()
     return {
         "title":title ,
@@ -143,16 +143,27 @@ def rel2abs_paths( link , content ):
 def match2stamp(matchObj):
     if matchObj :
         dic = matchObj.groupdict()
-        stamp = datetime.datetime(
-            int(dic.get("year",datetime.datetime.now().year) ),
-            int(dic["month"]) ,
-            int(dic["day"]) ,
-            int(dic.get("hour",0)),
-            int(dic.get("minute",0)) ,
-            int(dic.get("second",0)) )
+        try:
+            stamp = datetime(
+                int(dic.get("year",datetime.now().year) ),
+                int(dic["month"]) ,
+                int(dic["day"]) ,
+                int(dic.get("hour",0)),
+                int(dic.get("minute",0)) ,
+                int(dic.get("second",0)) )
+            if stamp > datetime.now() + timedelta(days=1) :
+                stamp = datetime(
+                    int(dic.get("year",datetime.now().year) )-1,
+                    int(dic["month"]) ,
+                    int(dic["day"]) ,
+                    int(dic.get("hour",0)),
+                    int(dic.get("minute",0)) ,
+                    int(dic.get("second",0)) )
+        except KeyError:
+            stamp = datetime.now()
     else:
-        stamp = datetime.datetime.now()
-    stamp += datetime.timedelta( hours=-9 )
+        stamp = datetime.now()
+    stamp += timedelta( hours=-9 )
     return stamp
 
 def import_contents(browser , d , config , conn ):
@@ -191,11 +202,9 @@ def import_contents(browser , d , config , conn ):
     ext_entries=[]
     for e in d.get("entries") or []:
         link = e["link"]
-        pageall = None
-        for rs in select_cache(cursor,link):
+        for rs in cursor.execute("select * from t_cache where url=?" , (link,) ):
             pageall = rs[1]
-
-        if pageall is None:
+        else:
             cache_fail_cnt += 1
             u = browser(link)
             pageall = u.read()
@@ -211,7 +220,9 @@ def import_contents(browser , d , config , conn ):
             except UnicodeDecodeError:
                 pageall = u""
             
-            insert_cache(cursor,link,pageall)
+            cursor.execute("insert or replace into t_cache values(?,?,?)" ,
+                ( link , pageall , datetime.utcnow().strftime("%Y%m%d%H%M%S") )
+            )
             conn.commit()
 
         ### main contents ###
@@ -312,39 +323,15 @@ class login(object):
                 ).close()
         return self.opener.open(*url)
 
-def date2str(dt=None):
-    return (dt or datetime.datetime.utcnow()).strftime("%Y%m%d%H%M%S")
-
-def str2date(dt): ### for Python 2.4 which does not have no datetime.strptime() ###
-    return datetime.datetime(
+def ymdhms2datetime(dt): ### for Python 2.4 which does not have no datetime.strptime() ###
+    return datetime(
         year   = int(dt[ 0: 4].lstrip("0")) ,
         month  = int(dt[ 4: 6].lstrip("0")) ,
         day    = int(dt[ 6: 8].lstrip("0")) ,
-        hour   = int(dt[ 8:10].lstrip("0")) ,
-        minute = int(dt[10:12].lstrip("0")) ,
-        second = int(dt[12:14].lstrip("0")) ,
+        hour   = int(dt[ 8:10].lstrip("0") or 0) ,
+        minute = int(dt[10:12].lstrip("0") or 0) ,
+        second = int(dt[12:14].lstrip("0") or 0) ,
     )
-
-def select_cache(cursor,url):
-    for rs in cursor.execute("select * from t_cache where url=?",(url,)):
-        yield rs
-
-def update_cache(cursor,url,html):
-    cursor.execute("update t_cache set content=? , update_dt=? where url = ?" ,
-        (html,date2str(),url) 
-    )
-def insert_cache(cursor,url,html):
-    cursor.execute("insert into t_cache values(?,?,?)" ,
-        (url,html,date2str() )
-    )
-
-def keep_cache(cursor,url,html):
-    pass
-
-def is_enough_new(dt):
-    return dt > ( datetime.datetime.utcnow() 
-                - datetime.timedelta(hours=1)
-                ).strftime("%Y%m%d%H%M%S")
 
 def html2feed(browser,config,conn):
     index = config["index"]
@@ -352,20 +339,13 @@ def html2feed(browser,config,conn):
     cursor = conn.cursor()
 
     cache_fail_cnt = 0
-    cache_action = insert_cache
-    update_dt = date2str()
     prev_html = ""
-    for rs in select_cache(cursor,index):
-        if is_enough_new(rs[2]):
-            html = rs[1]
-            update_dt = rs[2]
-            cache_action = keep_cache
-            break
-        else:
-            ### Cache is Old ###
-            prev_html = rs[1]
-            update_dt = rs[2]
-            cache_action = update_cache
+    for rs in cursor.execute(
+        "select * from t_cache where url=? and update_dt > ?" ,
+            (index , (datetime.utcnow()-timedelta(hours=1)).strftime("%Y%m%d%H%M%S"))
+    ):
+        html = rs[1]
+        update_dt = rs[2]
     else:
         ### Cache does not hit. ###
         cache_fail_cnt += 1
@@ -382,8 +362,10 @@ def html2feed(browser,config,conn):
             coding="utf8"
         html = html.decode( coding )
 
-    if html != prev_html :
-        update_dt = date2str()
+        cursor.execute("insert or replace into t_cache values (?,?,?)" ,
+            (index , html , datetime.utcnow().strftime("%Y%m%d%H%M%S") )
+        )
+        update_dt = datetime.utcnow().strftime("%Y%m%d%H%M%S")
 
     if "feed_title" in config:
         title = config["feed_title"]
@@ -433,34 +415,28 @@ def html2feed(browser,config,conn):
                 link = link ,
                 title = title ,
                 content = content ,
-                updated = str2date( update_dt )
+                updated = match2stamp(m) ,
             )
         )
     d["entries"] = entries
 
-    cache_action(cursor,index,html)
     conn.commit()
 
     return d
 
 def read_feed( browser , url , conn ):
     cursor = conn.cursor()
-    for rs in select_cache( cursor , url ):
-        if is_enough_new(rs[2]) :
-            xml = rs[1].decode("base64")
-        else:
-            fd = browser( url )
-            xml = fd.read()
-            fd.close()
-            update_cache( cursor , url , xml.encode("base64") )
-            conn.commit()
-        break
+    for rs in cursor.execute("select * from t_cache where url=? and update_dt > ?" ,
+        ( url , (datetime.utcnow()-timedelta(hours=1)).strftime("%Y%m%d%H%M%S") )
+    ) :
+        xml = rs[1].decode("base64")
     else:
-        ### Cache does not hit ###
         fd = browser( url )
         xml = fd.read()
         fd.close()
-        insert_cache( cursor , url , xml.encode("base64") )
+        cursor.execute("insert or replace into t_cache values (?,?,?)" ,
+            ( url , xml.encode("base64") , datetime.utcnow() )
+        )
         conn.commit()
     return xml
 
@@ -529,8 +505,7 @@ def interpret( config ):
 
     conn.execute("delete from t_cache where update_dt < ?" ,
         ( 
-            ( datetime.datetime.utcnow() - datetime.timedelta(days=3) 
-            ).strftime("%Y%m%d%h%m%s"),
+            ( datetime.utcnow() - timedelta(days=3) ).strftime("%Y%m%d%h%m%s"),
         ),
     )
     conn.commit()
