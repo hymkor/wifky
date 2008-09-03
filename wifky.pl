@@ -124,6 +124,8 @@ sub init_globals{
         'bq'       => sub{ '&#96;' },
         'null'     => sub{ '' } ,
         'outline'  => \&plugin_outline ,
+	'cnt'      => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
+	'ref'      => sub{ &verb( sub{$::ref{$_[1]||0} || ''}) } ,
     );
 
     %::action_plugin = (
@@ -251,7 +253,6 @@ sub init_globals{
         '900_footer'         => \&call_footnote ,
     );
     %::final_plugin = (
-        '500_write_later'  => \&final_write_later ,
         '900_verbatim' => \&unverb ,
     );
     %::form_list = (
@@ -1426,15 +1427,16 @@ sub print_page{
     1;
 }
 
-sub verb{
-    "\a".unpack('h*',$_[0])."\a";
-}
-sub unverb{
-    ${$_[0]} =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
+sub unverb_textonly{
+    ${$_[0]} =~ s/\a\((\d+)\)/
+	  $1 > $#::later 
+	  ? "(code '$1' not found)"
+	  : ref($::later[$1]) eq 'CODE' ? $&
+	  : $::later[$1]/ge;
 }
 sub strip_tag{
     my $text=shift;
-    &unverb( \$text );
+    &unverb_textonly( \$text );
     $text =~ s/\r?\n/ /g;
     $text =~ s/\<[^\>]*\>//g;
     $text;
@@ -1518,19 +1520,23 @@ sub call_footnote{
     delete $session->{footnotes};
 }
 
-sub final_write_later{
-    ${$_[0]} =~ s/\x1B\((\d+)\)/
-	  $1<=$#::later ? $::later[$1]->() : "(code '$1' not found)" /ge;
-}
-
-sub write_later{
+sub verb{
     my $cnt=scalar(@::later);
     push( @::later , $_[0] );
-    "\x1B(${cnt})";
+    "\a(${cnt})";
 }
 
+sub unverb{
+    ${$_[0]} =~ s/\a\((\d+)\)/
+	  $1 > $#::later 
+	  ? "(code '$1' not found)"
+	  : ref($::later[$1]) eq 'CODE' ? $::later[$1]->()
+	  : $::later[$1]/ge  for(1..2);
+}
+
+
 sub plugin_outline{
-    &write_later(
+    &verb(
 	sub{
 	    my $depth=-2;
 	    my $ss='';
