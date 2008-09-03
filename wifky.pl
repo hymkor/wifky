@@ -251,7 +251,7 @@ sub init_globals{
         '900_footer'         => \&call_footnote ,
     );
     %::final_plugin = (
-        '500_outline'  => \&final_outline ,
+        '500_write_later'  => \&final_write_later ,
         '900_verbatim' => \&unverb ,
     );
     %::form_list = (
@@ -1518,33 +1518,42 @@ sub call_footnote{
     delete $session->{footnotes};
 }
 
-sub plugin_outline{
-    "\x1B(outline)";
+sub final_write_later{
+    ${$_[0]} =~ s/\x1B\((\d+)\)/
+	  $1<=$#::later ? $::later[$1]->() : "(code '$1' not found)" /ge;
 }
 
-sub final_outline{
-    my ($print)=@_;
-    my $depth=-2;
-    my $ss='';
-    foreach my $p( @::outline ){
-        next if $p->{title} eq 'Header' ||
-                $p->{title} eq 'Footer' ||
-                $p->{title} eq 'Sidebar' ;
+sub write_later{
+    my $cnt=scalar(@::later);
+    push( @::later , $_[0] );
+    "\x1B(${cnt})";
+}
 
-        my $diff=$p->{depth} - $depth;
-        if( $diff > 0 ){
-            $ss .= '<ul><li>' x $diff ;
-        }else{
-            $diff < 0    and $ss .= "</li></ul>\n" x -$diff;
-            $depth >= 0  and $ss .= "</li>\n" ;
-            $ss .= '<li>';
-        }
-        $ss .= &anchor( $p->{text}, { p=>$p->{title} }, undef, $p->{sharp} );
-        $depth=$p->{depth};
-    }
-    $ss .= '</li></ul>' x ($depth+2);
+sub plugin_outline{
+    &write_later(
+	sub{
+	    my $depth=-2;
+	    my $ss='';
+	    foreach my $p( @::outline ){
+		next if $p->{title} eq 'Header' ||
+			$p->{title} eq 'Footer' ||
+			$p->{title} eq 'Sidebar' ;
 
-    $$print =~ s/\x1B\(outline\)/$ss/g;
+		my $diff=$p->{depth} - $depth;
+		if( $diff > 0 ){
+		    $ss .= '<ul><li>' x $diff ;
+		}else{
+		    $diff < 0    and $ss .= "</li></ul>\n" x -$diff;
+		    $depth >= 0  and $ss .= "</li>\n" ;
+		    $ss .= '<li>';
+		}
+		$ss .= &anchor( $p->{text}, { p=>$p->{title} }, undef, $p->{sharp} );
+		$depth=$p->{depth};
+	    }
+	    $ss .= '</li></ul>' x ($depth+2);
+	    $ss;
+	}
+    );
 }
 
 sub ls_core{
