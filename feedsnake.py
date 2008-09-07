@@ -10,6 +10,7 @@ import inspect
 import md5
 import os
 import re
+import StringIO
 import sys
 import urllib
 import urllib2
@@ -22,12 +23,12 @@ try:
 except:
     from pysqlite2 import dbapi2 as sqlite
 
-version="0.4"
+version="0.5"
+user_agents='FeedSnake.py/%s' % version 
 
 def feedcat(d,fd):
     def cdata(s):
         return '<![CDATA[%s]]>' % s.replace("]]>","]]]]><[!CDATA[>")
-    fd = codecs.getwriter('utf_8')(fd)
     def output(t):
         fd.write(t.strip()+"\r\n")
 
@@ -93,10 +94,6 @@ def feedcat(d,fd):
         output('</item>')
 
     output("</rdf:RDF>")
-
-def http_output(d):
-    sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
-    feedcat(d,sys.stdout)
 
 def entry( title , link=None , id_=None ,content=None , updated=None , author=None ):
     if updated is None: updated = datetime.utcnow()
@@ -166,7 +163,7 @@ def match2stamp(matchObj):
     stamp += timedelta( hours=-9 )
     return stamp
 
-def import_contents(browser , d , config , conn ):
+def import_contents(browser , d , config , cursor ):
     try:
         max_entries = int(config.get("max_entries","5"))
     except ValueError:
@@ -177,8 +174,6 @@ def import_contents(browser , d , config , conn ):
     coding  = config.get("htmlcode")
     pattern = config["import"]
     comment = config.get("comment")
-
-    cursor = conn.cursor()
 
     try:
         pattern = re.compile(pattern,re.DOTALL)
@@ -221,9 +216,8 @@ def import_contents(browser , d , config , conn ):
                 pageall = u""
             
             cursor.execute("insert or replace into t_cache values(?,?,?)" ,
-                ( link , pageall , datetime.utcnow().strftime("%Y%m%d%H%M%S") )
+                ( link , pageall , hoursago(0) )
             )
-            conn.commit()
 
         ### main contents ###
         m = pattern.search( pageall )
@@ -256,7 +250,7 @@ def import_contents(browser , d , config , conn ):
 
     d["entries"].extend(ext_entries)
 
-    d["feed"]["description"] = "%s (cache failed %d times)" % (
+    d["feed"]["description"] = "%s\nnew %d articles imported" % (
             d["feed"].get("description","") , cache_fail_cnt )
 
 def deny(d,key,patterns):
@@ -290,10 +284,7 @@ def error_feed(message="feed not found."):
         }
     }
 
-class login(object):
-    """ function-object to open the site with cookie.
-    """
-    @staticmethod
+def login(config):
     def parse_param(text):
         loginpost = re.split(r"[\s\;\&\?]+",text)
         url = loginpost.pop(0)
@@ -302,70 +293,57 @@ class login(object):
             p = e.split("=",2)
             param[ p[0] ] = p[1]
         return url,param
-    def __init__(self,config):
-        self.config = config
-        self.opener = None
-    def __call__(self,*url):
-        if self.opener is None :
-            cookiejar = cookielib.CookieJar()
-            cookie_processor = urllib2.HTTPCookieProcessor(cookiejar)
-            self.opener  = urllib2.build_opener( cookie_processor )
+    cookiejar = cookielib.CookieJar()
+    cookie_processor = urllib2.HTTPCookieProcessor( cookiejar )
+    opener = urllib2.build_opener( cookie_processor )
+    opener.addheaders = [ ('User-agent', user_agents )]
 
-            if "loginpost" in self.config:
-                loginurl,param = login.parse_param( self.config["loginpost"])
-                self.opener.open( 
-                    loginurl , urllib.urlencode( param ) 
-                ).close()
-            elif "login" in self.config:
-                loginurl,param = login.parse_param( self.config["login"])
-                self.opener.open( 
-                    "%s?%s" % ( loginurl , urllib.urlencode( param )) 
-                ).close()
-        return self.opener.open(*url)
+    if "loginpost" in config:
+        loginurl,param = parse_param( config["loginpost"])
+        opener.open(
+            loginurl , urllib.urlencode( param )
+        ).close()
+    elif "login" in config:
+        loginurl,param = parse_param( config["login"])
+        opener.open( 
+            "%s?%s" % ( loginurl , urllib.urlencode( param )) 
+        ).close()
+    return lambda *url:opener.open(*url)
+
+def nologin(config):
+    opener = urllib2.build_opener()
+    opener.addheaders = [ ('User-agent', user_agents )]
+    return lambda *url:opener.open(*url)
+
+def hoursago(n=0):
+    dt = datetime.utcnow()
+    if n:
+        dt -= timedelta(hours=n)
+    return dt.strftime("%Y%m%d%H%M%S")
 
 def ymdhms2datetime(dt): ### for Python 2.4 which does not have no datetime.strptime() ###
     return datetime(
-        year   = int(dt[ 0: 4].lstrip("0")) ,
-        month  = int(dt[ 4: 6].lstrip("0")) ,
-        day    = int(dt[ 6: 8].lstrip("0")) ,
-        hour   = int(dt[ 8:10].lstrip("0") or 0) ,
-        minute = int(dt[10:12].lstrip("0") or 0) ,
-        second = int(dt[12:14].lstrip("0") or 0) ,
+        year   = int(dt[ 0: 4],10) ,
+        month  = int(dt[ 4: 6],10) ,
+        day    = int(dt[ 6: 8],10) ,
+        hour   = int(dt[ 8:10],10) ,
+        minute = int(dt[10:12],10) ,
+        second = int(dt[12:14],10) ,
     )
 
-def html2feed(browser,config,conn):
+def html2feed(browser,config):
     index = config["index"]
+    html = browser(index).read()
 
-    cursor = conn.cursor()
-
-    cache_fail_cnt = 0
-    prev_html = ""
-    for rs in cursor.execute(
-        "select * from t_cache where url=? and update_dt > ?" ,
-            (index , (datetime.utcnow()-timedelta(hours=1)).strftime("%Y%m%d%H%M%S"))
-    ):
-        html = rs[1]
-        update_dt = rs[2]
+    if "htmlcode" in config:
+        coding = config["htmlcode"]
     else:
-        ### Cache does not hit. ###
-        cache_fail_cnt += 1
-        fd    = browser(index)
-        html  = fd.read()
-        fd.close()
-
         m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',html,re.IGNORECASE|re.DOTALL)
         if m :
             coding=m.group(1).lower()
-        elif "htmlcode" in config:
-            coding=config["htmlcode"]
         else :
             coding="utf8"
-        html = html.decode( coding )
-
-        cursor.execute("insert or replace into t_cache values (?,?,?)" ,
-            (index , html , datetime.utcnow().strftime("%Y%m%d%H%M%S") )
-        )
-        update_dt = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    html = html.decode( coding )
 
     if "feed_title" in config:
         title = config["feed_title"]
@@ -380,7 +358,7 @@ def html2feed(browser,config,conn):
         "feed":{
             "link":index ,
             "title":title ,
-            "description":"(cache failed %d times)" % cache_fail_cnt
+            "description":"",
         }
     }
 
@@ -419,26 +397,7 @@ def html2feed(browser,config,conn):
             )
         )
     d["entries"] = entries
-
-    conn.commit()
-
     return d
-
-def read_feed( browser , url , conn ):
-    cursor = conn.cursor()
-    for rs in cursor.execute("select * from t_cache where url=? and update_dt > ?" ,
-        ( url , (datetime.utcnow()-timedelta(hours=1)).strftime("%Y%m%d%H%M%S") )
-    ) :
-        xml = rs[1].decode("base64")
-    else:
-        fd = browser( url )
-        xml = fd.read()
-        fd.close()
-        cursor.execute("insert or replace into t_cache values (?,?,?)" ,
-            ( url , xml.encode("base64") , datetime.utcnow() )
-        )
-        conn.commit()
-    return xml
 
 feed_processor_list = {}
 
@@ -446,24 +405,58 @@ def feed_processor(func):
     feed_processor_list[ func.func_name ] = func
     return func
 
-def interpret( config ):
-    if "login" in config  or  "loginpost" in config:
-        browser = login(config)
-    else:
-        browser = urllib.urlopen
-
-    conn = sqlite.connect("feedsnake.db")
-    cursor = conn.cursor()
+def ddl( cursor ):
     try:
         cursor.execute("""
             create table t_cache ( 
                 url       text primary key ,
                 content   text ,
-                update_dt text
+                update_dt text not null
             )
         """)
     except sqlite.OperationalError:
         pass
+    try:
+        cursor.execute("""
+            create table t_output ( 
+                feedname  text primary key ,
+                content   text ,
+                update_dt text not null
+            )
+        """)
+    except sqlite.OperationalError:
+        pass
+    try:
+        cursor.execute("""
+            create table t_siteinfo (
+                feedname    text primary key , 
+                url         text not null ,
+                title       text ,
+                description text
+            );
+        """)
+    except sqlite.OperationalError:
+        pass
+
+def interpret( conn , config ):
+    cursor = conn.cursor()
+    ddl(cursor)
+    conn.commit()
+
+    for rs in cursor.execute(
+        "select content from t_output where feedname = ?  and update_dt > ?" ,
+        ( config["feedname"] , hoursago(1) )
+    ):
+        sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
+        sys.stdout.write( rs[0].encode("utf8") )
+        cursor.close()
+        conn.close()
+        return
+
+    if "login" in config  or  "loginpost" in config:
+        browser = login(config)
+    else:
+        browser = nologin(config)
 
     if "class" in config:
         classname = config["class"]
@@ -476,10 +469,10 @@ def interpret( config ):
             d = error_feed( "Can not load feed class '%s'" % cgi.escape(classname) )
             conn.rollback()
     elif "feed" in config:
-        xml = read_feed( browser , config["feed"] , conn )
+        xml = browser( config["feed"] ).read()
         d = feedparser.parse( xml )
     elif "index" in config:
-        d = html2feed(browser,config,conn)
+        d = html2feed(browser,config)
     else:
         d = error_feed()
         conn.rollback()
@@ -501,19 +494,43 @@ def interpret( config ):
                 insert_message(d,"UnicodeDecodeError on x%s=.." % key)
 
     if "import" in config:
-        import_contents(browser , d, config , conn)
+        import_contents(browser , d, config , cursor)
 
-    conn.execute("delete from t_cache where update_dt < ?" ,
-        ( 
-            ( datetime.utcnow() - timedelta(days=3) ).strftime("%Y%m%d%h%m%s"),
-        ),
+    ### Expire cache ###
+    expire_dt = hoursago(7*24) 
+    cursor.execute("delete from t_cache  where update_dt < ?" ,(expire_dt,))
+    cursor.execute("delete from t_output where update_dt < ?" ,(expire_dt,))
+
+    ### update site info ###
+    cursor.execute("insert or replace into t_siteinfo values(?,?,?,?)" ,
+        ( config["feedname"] ,
+          d["feed"]["link"] ,
+          d["feed"].get("title","no title") ,
+          d["feed"].get("description","") ,
+        )
     )
+
+    ### Save feed into cache ###
+    buffer = StringIO.StringIO()
+    feedcat( d , buffer )
+    buffer = buffer.getvalue()
+    cursor.execute("insert or replace into t_output values(?,?,?)" ,
+        ( config["feedname"] , buffer , hoursago(0) )
+    )
+
     conn.commit()
-    conn.close()
+    sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
+    sys.stdout.write( buffer.encode("utf8") )
 
-    http_output(d)
+def menu( conn , config):
+    cursor = conn.cursor()
+    ddl(cursor)
+    conn.commit()
+    siteinfo = {}
+    for rs in cursor.execute("select feedname,title from t_siteinfo"):
+        siteinfo[ rs[0] ] = rs[1]
+    cursor.close()
 
-def menu(config):
     print 'Content-Type: text/html; charset=utf-8'
     print ''
     print '<html>'
@@ -523,16 +540,24 @@ def menu(config):
     print '</head>'
     print '<body><h1>FeedSnake Come On!</h1>'
     print '<ul>'
-    for e in config.sections():
+    for e in sorted( config.sections() ):
         print '<li><a href="%s?%s" rel="nofollow">%s</a></li>' % (
-            os.getenv("SCRIPT_NAME") , cgi.escape(e) , cgi.escape(e)
+            os.getenv("SCRIPT_NAME") , cgi.escape(e) , 
+            cgi.escape( siteinfo.get( e , "("+e+")" ).encode("utf8") )
         )
     print '</ul><p>Generated by feedsnake.py %s</p></body></html>' % version
 
-def die(message=""):
+def die(message="",status=""):
+    if status:
+        print "Status:",status
     print "Content-Type: text/html"
     print ""
-    print "<html><body>%s</body></html>" % message
+    print "<html><body>"
+    if status:
+        print "<h1>%s</h1>" % cgi.escape(status)
+    if message:
+        print cgi.escape(message)
+    print "</body></html>"
 
 def main(inifname=None,index=True):
     configall = ConfigParser.ConfigParser()
@@ -542,20 +567,32 @@ def main(inifname=None,index=True):
     try:
         configall.read( inifname )
     except (ConfigParser.ParsingError,ConfigParser.MissingSectionHeaderError):
-        die("<b>%s</b>: Invalid configuration(not ini format?)" \
-            % cgi.escape(inifname) )
+        die( message="<b>%s</b>: Invalid configuration(not ini format?)"
+                % cgi.escape(inifname) ,
+            status="500 Internal Server Error"
+        )
         return
 
     feedname = os.getenv("QUERY_STRING")
 
-    if feedname and configall.has_section(feedname) :
-        config = dict( configall.items(feedname) )
-        config[ "feedname" ] = feedname
-        interpret( config )
+    conn = sqlite.connect("feedsnake.db")
+    if feedname:
+        if configall.has_section(feedname) :
+            config = dict( configall.items(feedname) )
+            config[ "feedname" ] = feedname
+            try:
+                interpret( conn , config )
+            except urllib2.URLError,e:
+                die(status="502 Bad Gateway", message=repr(e))
+            except IOError,e:
+                die(status="500 Internal Server Error" , message=repr(e) )
+        else:
+            die(status="404 Not Found")
     elif index:
-        menu(configall)
+        menu( conn , configall)
     else:
-        die()
+        die(status="403 Forbidden")
+    conn.close()
 
 if __name__ == '__main__':
     main()
