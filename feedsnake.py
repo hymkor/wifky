@@ -573,9 +573,23 @@ def main(inifname=None,index=True):
         )
         return
 
+    conn = sqlite.connect("feedsnake.db")
+    if not os.getenv("SCRIPT_NAME")  and  len(sys.argv) >= 2 :
+        cursor = conn.cursor()
+        for feedname in sys.argv[1:]:
+            cursor.execute(
+                "delete from t_output where feedname = ?" ,
+                (feedname,)
+            )
+            print "Content-Type: text/plain"
+            print ""
+            print "%s: deleted %d record(s)" % (feedname , cursor.rowcount)
+        conn.commit()
+        cursor.close()
+        return
+
     feedname = os.getenv("QUERY_STRING")
 
-    conn = sqlite.connect("feedsnake.db")
     if feedname:
         if configall.has_section(feedname) :
             config = dict( configall.items(feedname) )
