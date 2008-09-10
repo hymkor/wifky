@@ -3,16 +3,16 @@ def skip(browser,config,conn):
     url = config["index"]
     cursor = conn.cursor()
     for rs in cursor.execute(
-        "select * from t_cache where url=? and update_dt > ?" , 
+        "select content from t_cache where url=? and update_dt > ?" , 
         ( url , (datetime.utcnow()-timedelta(hours=1)).strftime("%Y%m%d%H%M%S") )
     ):
-        html = rs[1]
+        html = rs[0]
     else:
         http = browser(url)
         html = http.read().decode("utf8")
         http.close()
-        cursor.execute( "insert or replace into t_cache values(?,?,?)" ,
-          ( url , html , datetime.utcnow().strftime("%Y%M%d%H%M%S") )
+        cursor.execute( "insert or replace into t_cache values(?,?,?,?)" ,
+          ( url , config["feedname"] , html , datetime.utcnow().strftime("%Y%M%d%H%M%S") )
         )
 
     entry_pattern = re.compile(

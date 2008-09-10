@@ -197,8 +197,9 @@ def import_contents(browser , d , config , cursor ):
     ext_entries=[]
     for e in d.get("entries") or []:
         link = e["link"]
-        for rs in cursor.execute("select * from t_cache where url=?" , (link,) ):
-            pageall = rs[1]
+        cursor.execute("select content from t_cache where url=?" , (link,) )
+        for rs in cursor.fetchall():
+            pageall = rs[0]
         else:
             cache_fail_cnt += 1
             u = browser(link)
@@ -215,8 +216,8 @@ def import_contents(browser , d , config , cursor ):
             except UnicodeDecodeError:
                 pageall = u""
             
-            cursor.execute("insert or replace into t_cache values(?,?,?)" ,
-                ( link , pageall , hoursago(0) )
+            cursor.execute("insert or replace into t_cache values(?,?,?,?)" ,
+                ( link , config["feedname"] , pageall , hoursago(0) )
             )
 
         ### main contents ###
@@ -350,7 +351,8 @@ def html2feed(browser,config):
     else :
         m = re.search(r'<title>(.*?)</title>',html,re.DOTALL|re.IGNORECASE)
         if m:
-            title = m.group(1)
+            title = m.group(1).replace("&lt;","<")\
+                    .replace("&gt;",">").replace("&amp;","&")
         else :
             title = "Feed of " + index
 
@@ -380,7 +382,7 @@ def html2feed(browser,config):
             content = None
 
         if "(?P<url>" in pattern_str:
-            id_ = link = urlparse.urljoin( index , m.group("url") )
+            id_ = link = urlparse.urljoin(index , m.group("url")).replace("&amp;","&")
         elif not content:
             continue
         else:
@@ -410,6 +412,7 @@ def ddl( cursor ):
         cursor.execute("""
             create table t_cache ( 
                 url       text primary key ,
+                feedname  text ,
                 content   text ,
                 update_dt text not null
             )
@@ -443,10 +446,11 @@ def interpret( conn , config ):
     ddl(cursor)
     conn.commit()
 
-    for rs in cursor.execute(
+    cursor.execute(
         "select content from t_output where feedname = ?  and update_dt > ?" ,
         ( config["feedname"] , hoursago(1) )
-    ):
+    )
+    for rs in cursor.fetchall() :
         sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
         sys.stdout.write( rs[0].encode("utf8") )
         cursor.close()
@@ -527,7 +531,8 @@ def menu( conn , config):
     ddl(cursor)
     conn.commit()
     siteinfo = {}
-    for rs in cursor.execute("select feedname,title from t_siteinfo"):
+    cursor.execute("select feedname,title from t_siteinfo")
+    for rs in cursor.fetchall():
         siteinfo[ rs[0] ] = rs[1]
     cursor.close()
 
@@ -577,13 +582,18 @@ def main(inifname=None,index=True):
     if not os.getenv("SCRIPT_NAME")  and  len(sys.argv) >= 2 :
         cursor = conn.cursor()
         for feedname in sys.argv[1:]:
+            print "Content-Type: text/plain"
+            print ""
             cursor.execute(
                 "delete from t_output where feedname = ?" ,
                 (feedname,)
             )
-            print "Content-Type: text/plain"
-            print ""
-            print "%s: deleted %d record(s)" % (feedname , cursor.rowcount)
+            print "%s: t_output deleted %d record(s)" % (feedname , cursor.rowcount)
+            cursor.execute(
+                "delete from t_cache where feedname = ?" ,
+                (feedname,)
+            )
+            print "%s: t_cache deleted %d record(s)" % (feedname , cursor.rowcount)
         conn.commit()
         cursor.close()
         return
