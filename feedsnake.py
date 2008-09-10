@@ -197,7 +197,7 @@ def import_contents(browser , d , config , cursor ):
     ext_entries=[]
     for e in d.get("entries") or []:
         link = e["link"]
-        cursor.execute("select content from t_cache where url=?" , (link,) )
+        cursor.execute("select content from t_cache where url=:url" , (link,) )
         for rs in cursor.fetchall():
             pageall = rs[0]
         else:
@@ -216,7 +216,8 @@ def import_contents(browser , d , config , cursor ):
             except UnicodeDecodeError:
                 pageall = u""
             
-            cursor.execute("insert or replace into t_cache values(?,?,?,?)" ,
+            cursor.execute("insert or replace into t_cache "
+                           "values(:url,:feedname,:content,:update_dt)" ,
                 ( link , config["feedname"] , pageall , hoursago(0) )
             )
 
@@ -502,11 +503,12 @@ def interpret( conn , config ):
 
     ### Expire cache ###
     expire_dt = hoursago(7*24) 
-    cursor.execute("delete from t_cache  where update_dt < ?" ,(expire_dt,))
-    cursor.execute("delete from t_output where update_dt < ?" ,(expire_dt,))
+    cursor.execute("delete from t_cache  where update_dt < :expire_dt" ,(expire_dt,))
+    cursor.execute("delete from t_output where update_dt < :expire_dt" ,(expire_dt,))
 
     ### update site info ###
-    cursor.execute("insert or replace into t_siteinfo values(?,?,?,?)" ,
+    cursor.execute("insert or replace into t_siteinfo "
+                   "values(:feedname,:url,:title,:description)" ,
         ( config["feedname"] ,
           d["feed"]["link"] ,
           d["feed"].get("title","no title") ,
@@ -518,7 +520,8 @@ def interpret( conn , config ):
     buffer = StringIO.StringIO()
     feedcat( d , buffer )
     buffer = buffer.getvalue()
-    cursor.execute("insert or replace into t_output values(?,?,?)" ,
+    cursor.execute("insert or replace into t_output "
+                   "values(:feedname,:content,:update_dt)" ,
         ( config["feedname"] , buffer , hoursago(0) )
     )
 
@@ -585,12 +588,12 @@ def main(inifname=None,index=True):
             print "Content-Type: text/plain"
             print ""
             cursor.execute(
-                "delete from t_output where feedname = ?" ,
+                "delete from t_output where feedname = :feedname" ,
                 (feedname,)
             )
             print "%s: t_output deleted %d record(s)" % (feedname , cursor.rowcount)
             cursor.execute(
-                "delete from t_cache where feedname = ?" ,
+                "delete from t_cache where feedname = :feedname" ,
                 (feedname,)
             )
             print "%s: t_cache deleted %d record(s)" % (feedname , cursor.rowcount)
