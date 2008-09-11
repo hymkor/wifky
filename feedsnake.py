@@ -121,15 +121,20 @@ def insert_message(d,message):
     )
 
 def rel2abs_paths( link , content ):
-    content = re.sub(
-        r'(<a[^>]+href=")([^"]*)"' ,
+    ahref_pattern = re.compile(
+        r'(<a[^>]+href=")([^"]*)"' , re.DOTALL | re.IGNORECASE
+    )
+    imgsrc_pattern = re.compile(
+        r'''(<img[^>]+src=['"])([^"']*)(["'])''' ,
+        re.DOTALL | re.IGNORECASE
+    )
+    content = ahref_pattern.sub(
         lambda m:m.group(1) +
         urlparse.urljoin(link, m.group(2)) +
         '"',
         content
     )
-    content = re.sub(
-        r'''(<img[^>]+src=['"])([^"']*)(["'])''' ,
+    content = imgsrc_pattern.sub(
         lambda m:m.group(1) +
         urlparse.urljoin(link, m.group(2)) +
         m.group(3) ,
