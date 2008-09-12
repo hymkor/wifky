@@ -306,8 +306,7 @@ p.centering,big{ font-size:200% }
 
 h2{background-color:#CCF}
 
-h3,table.block td,table.block th{
-border-width:0px 1px 1px 0px;border-style:solid}
+h3{border-width:0px 1px 1px 0px;border-style:solid}
 
 h4{border-width:0 0 0 3mm;border-style:solid;border-color:#BBF;padding-left:1mm}
 
@@ -325,7 +324,9 @@ a:hover{ text-decoration:underline }
 
 blockquote{ background-color:#DDF }
 
-table.block{ margin-left:1cm }
+table.block{ margin-left:1cm ; border-collapse: collapse;}
+
+table.block th,table.block td{ border:solid 1px gray;padding:1pt}
 
 pre{
  background-color:#DDF;
