@@ -10,6 +10,7 @@ import inspect
 import md5
 import os
 import re
+import string
 import StringIO
 import sys
 import urllib
@@ -178,8 +179,10 @@ def import_contents(browser , d , config , cursor ):
 
     coding  = config.get("htmlcode")
     pattern = config["import"]
+    template_re = string.Template( pattern )
     comment = config.get("comment")
 
+    """
     try:
         pattern = re.compile(pattern,re.DOTALL)
     except:
@@ -187,6 +190,7 @@ def import_contents(browser , d , config , cursor ):
             "Invalid Regular Expression 'import=%s'" % 
                             cgi.escape(pattern) )
         return
+    """
     if comment:
         try:
             comment = re.compile(comment,re.DOTALL)
@@ -202,6 +206,7 @@ def import_contents(browser , d , config , cursor ):
     ext_entries=[]
     for e in d.get("entries") or []:
         link = e["link"]
+
         cursor.execute("select content from t_cache where url=:url" , (link,) )
         for rs in cursor.fetchall():
             pageall = rs[0]
@@ -227,11 +232,29 @@ def import_contents(browser , d , config , cursor ):
             )
 
         ### main contents ###
-        m = pattern.search( pageall )
-        if m :
-            content = rel2abs_paths( link , m.group(1).strip() )
-            e.setdefault("content",[]).append({ "value":content })
-            e["description"] = content
+
+        parsed_link = urlparse.urlparse(link)
+        pattern1 = template_re.safe_substitute( 
+                        { 
+                            "url":link ,
+                            "scheme":parsed_link[0] ,
+                            "netloc":parsed_link[1] ,
+                            "path":parsed_link[2] ,
+                            "parameters":parsed_link[3],
+                            "query":parsed_link[4] ,
+                            "fragment":parsed_link[5] ,
+                        }
+        )
+        try:
+            m = re.search( pattern1 , pageall , re.DOTALL )
+            if m :
+                content = rel2abs_paths( link , m.group(1).strip() )
+                e.setdefault("content",[]).append({ "value":content })
+                e["description"] = content
+            else :
+                e["description"] = cgi.escape(pattern1)
+        except:
+            e["description"] = "Invalid Regular Expression: %s" % cgi.escape(pattern1)
 
         if comment :
             try:
