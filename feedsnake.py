@@ -173,33 +173,21 @@ def import_contents(browser , d , config , cursor ):
     try:
         max_entries = int(config.get("max_entries","5"))
     except ValueError:
-        insert_message(d,"Invalid Entry number '%s'" % config["max_entries"] )
-        max_entries = 5
+        raise ConfigError("Invalid Entry number '%s'" % config["max_entries"] )
     del d["entries"][max_entries:]
 
-    coding  = config.get("htmlcode")
     pattern = config["import"]
     template_re = string.Template( pattern )
     comment = config.get("comment")
 
-    """
-    try:
-        pattern = re.compile(pattern,re.DOTALL)
-    except:
-        insert_message(d,
-            "Invalid Regular Expression 'import=%s'" % 
-                            cgi.escape(pattern) )
-        return
-    """
     if comment:
         try:
             comment = re.compile(comment,re.DOTALL)
         except:
-            insert_message(d,
+            raise ConfigError(
                 "Invalid Regular Expression 'comment=%s'" %
                 cgi.escape(comment)
             )
-            comment = None
 
     cache_fail_cnt = 0
 
@@ -208,23 +196,13 @@ def import_contents(browser , d , config , cursor ):
         link = e["link"]
 
         cursor.execute("select content from t_cache where url=:url" , (link,) )
-        for rs in cursor.fetchall():
+        for rs in cursor:
             pageall = rs[0]
         else:
             cache_fail_cnt += 1
             u = browser(link)
-            pageall = u.read()
+            pageall = guess_coding(config,u.read())
             u.close()
-            if coding is None:
-                m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',pageall,re.IGNORECASE)
-                if m:
-                    coding = m.group(1).lower()
-                else:
-                    coding = "utf8"
-            try:
-                pageall = pageall.decode(coding)
-            except UnicodeDecodeError:
-                pageall = u""
             
             cursor.execute("insert or replace into t_cache "
                            "values(:url,:feedname,:content,:update_dt)" ,
@@ -252,9 +230,10 @@ def import_contents(browser , d , config , cursor ):
                 e.setdefault("content",[]).append({ "value":content })
                 e["description"] = content
             else :
-                e["description"] = cgi.escape(pattern1)
+                e["description"] = "not found: " + cgi.escape(pattern1)
         except:
-            e["description"] = "Invalid Regular Expression: %s" % cgi.escape(pattern1)
+            raise ConfigError("Invalid Regular Expression: %s"
+                                    % cgi.escape(pattern1))
 
         if comment :
             try:
@@ -269,14 +248,11 @@ def import_contents(browser , d , config , cursor ):
                         )
                     )
             except IndexError:
-                insert_message(d,
-                    cgi.escape(
+                raise ConfigError(
                         "Invalid regular-expression(IndexError) for comment: "
                         "It needs (?P<id>..) , (?P<content>..) , "
                         "(?P<author>..) , (?P<month>..) , and (?<day>..)"
                     )
-                )
-                comment = None
 
     d["entries"].extend(ext_entries)
 
@@ -304,15 +280,23 @@ def accept(d,key,patterns):
                 break
     d["entries"] = newentry
 
-def error_feed(message="feed not found."):
-    return {
-        "entries":[],
-        "feed":{
-            "link":"http://example.com",
-            "title":"Feed Error!",
-            "description":message ,
+class FeedError(Exception):
+    def __init__(self, description , link=None , title="Feed Error!"):
+        self.dummyfeed = {
+            "entries":[],
+            "feed":{
+                "link":link or "http://%s%s" %
+                    (os.getenv("HTTP_HOST"),os.getenv("SCRIPT_NAME"))   ,
+                "title":title ,
+                "description":description 
+            }
         }
-    }
+    def __getitem__(self,key):
+        return self.dummyfeed[key]
+
+class ConfigError(FeedError):
+    def __init__(self,message):
+        FeedError.__init__(self,title="Configuration Error",description=message)
 
 def login(config):
     def parse_param(text):
@@ -361,19 +345,34 @@ def ymdhms2datetime(dt): ### for Python 2.4 which does not have no datetime.strp
         second = int(dt[12:14],10) ,
     )
 
-def html2feed(browser,config):
-    index = config["index"]
-    html = browser(index).read()
-
+def guess_coding(config,html):
     if "htmlcode" in config:
         coding = config["htmlcode"]
+        try:
+            return html.decode( coding )
+        except UnicodeDecodeError:
+            raise ConfigError("HTML is not written with '%s'" % coding)
     else:
         m = re.search(r'<meta[^>]*?\bcharset=([^"]+)"',html,re.IGNORECASE|re.DOTALL)
         if m :
             coding=m.group(1).lower()
+            try:
+                return html.decode( coding )
+            except UnicodeDecodeError:
+                raise FeedError(title="HTML Error" ,
+                    description="HTML is not written with '%s'."
+                                  " meta tag is wrong." % coding)
         else :
             coding="utf8"
-    html = html.decode( coding )
+            try:
+                return html.decode( coding )
+            except UnicodeDecodeError:
+                raise FeedError(title="HTML Error" ,
+                    description="not found meta tag. need htmlcode= in feedsnake.ini")
+
+def html2feed(browser,config):
+    index = config["index"]
+    html = guess_coding( config , browser(index).read() )
 
     if "feed_title" in config:
         title = config["feed_title"]
@@ -479,70 +478,77 @@ def interpret( conn , config ):
         "select content from t_output where feedname = ?  and update_dt > ?" ,
         ( config["feedname"] , hoursago(1) )
     )
-    for rs in cursor.fetchall() :
+    for rs in cursor :
         sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
         sys.stdout.write( rs[0].encode("utf8") )
         cursor.close()
         conn.close()
         return
 
-    if "login" in config  or  "loginpost" in config:
-        browser = login(config)
-    else:
-        browser = nologin(config)
+    try:
+        if "login" in config  or  "loginpost" in config:
+            browser = login(config)
+        else:
+            browser = nologin(config)
 
-    if "class" in config:
-        classname = config["class"]
-        if "@" in classname :
-            classname,plugin = classname.split("@",2)
-            execfile(plugin+".py",globals(),locals())
-        try:
-            d = feed_processor_list[ classname ](browser,config,conn)
-        except IOError:
-            d = error_feed( "Can not load feed class '%s'" % cgi.escape(classname) )
-            conn.rollback()
-    elif "feed" in config:
-        xml = browser( config["feed"] ).read()
-        d = feedparser.parse( xml )
-    elif "index" in config:
-        d = html2feed(browser,config)
-    else:
-        d = error_feed()
-        conn.rollback()
-
-    if "feed" not in d  or "link" not in d["feed"]:
-        d = error_feed( "Can not find the feed." )
-        conn.rollback()
-
-    for key in "author", "title":
-        if key in config:
+        if "class" in config:
+            classname = config["class"]
+            if "@" in classname :
+                classname,plugin = classname.split("@",2)
+                execfile(plugin+".py",globals(),locals())
             try:
-                accept(d,key,config[key].decode("utf8"))
-            except UnicodeDecodeError:
-                insert_message(d,"UnicodeDecodeError on %s=.." % key)
-        if "x"+key in config:
-            try:
-                deny(d,key,config["x"+key].decode("utf8"))
-            except UnicodeDecodeError:
-                insert_message(d,"UnicodeDecodeError on x%s=.." % key)
+                d = feed_processor_list[ classname ](browser,config,conn)
+            except IOError:
+                raise ConfigError("Can not load feed class '%s'" % cgi.escape(classname) )
+        elif "feed" in config:
+            xml = browser( config["feed"] ).read()
+            d = feedparser.parse( xml )
+        elif "index" in config:
+            d = html2feed(browser,config)
+        else:
+            raise ConfigError("not found item feed= or index=")
 
-    if "import" in config:
-        import_contents(browser , d, config , cursor)
+        if "feed" not in d  or "link" not in d["feed"]:
+            raise ConfigError("Can not find the feed.")
 
-    ### Expire cache ###
-    expire_dt = hoursago(7*24) 
-    cursor.execute("delete from t_cache  where update_dt < :expire_dt" ,(expire_dt,))
-    cursor.execute("delete from t_output where update_dt < :expire_dt" ,(expire_dt,))
+        for key in "author", "title":
+            if key in config:
+                try:
+                    accept(d,key,config[key].decode("utf8"))
+                except UnicodeDecodeError:
+                    raise ConfigError("UnicodeDecodeError on %s=.." % key)
+            if "x"+key in config:
+                try:
+                    deny(d,key,config["x"+key].decode("utf8"))
+                except UnicodeDecodeError:
+                    raise ConfigError("UnicodeDecodeError on x%s=.." % key)
 
-    ### update site info ###
-    cursor.execute("insert or replace into t_siteinfo "
-                   "values(:feedname,:url,:title,:description)" ,
-        ( config["feedname"] ,
-          d["feed"]["link"] ,
-          d["feed"].get("title","no title") ,
-          d["feed"].get("description","") ,
+        if "import" in config:
+            import_contents(browser , d, config , cursor)
+
+        ### Expire cache ###
+        expire_dt = hoursago(7*24) 
+        cursor.execute("delete from t_cache  where update_dt < :expire_dt" ,(expire_dt,))
+        cursor.execute("delete from t_output where update_dt < :expire_dt" ,(expire_dt,))
+
+        ### update site info ###
+        cursor.execute("insert or replace into t_siteinfo "
+                       "values(:feedname,:url,:title,:description)" ,
+            ( config["feedname"] ,
+              d["feed"]["link"] ,
+              d["feed"].get("title","no title") ,
+              d["feed"].get("description","") ,
+            )
         )
-    )
+    except FeedError,err:
+        conn.rollback()
+        sys.stdout.write(
+            "Status: 500 Internal Server Error\r\n"
+            "Content-Type: application/xml; charset=utf-8\r\n"
+            "\r\n"
+        )
+        feedcat( err , sys.stdout )
+        return
 
     ### Save feed into cache ###
     buffer = StringIO.StringIO()
@@ -552,7 +558,6 @@ def interpret( conn , config ):
                    "values(:feedname,:content,:update_dt)" ,
         ( config["feedname"] , buffer , hoursago(0) )
     )
-
     conn.commit()
     sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
     sys.stdout.write( buffer.encode("utf8") )
@@ -563,7 +568,7 @@ def menu( conn , config):
     conn.commit()
     siteinfo = {}
     cursor.execute("select feedname,title from t_siteinfo")
-    for rs in cursor.fetchall():
+    for rs in cursor:
         siteinfo[ rs[0] ] = rs[1]
     cursor.close()
 
