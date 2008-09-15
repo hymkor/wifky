@@ -225,7 +225,10 @@ def import_contents(browser , d , config , cursor ):
             pageall = rs[0]
         else:
             cache_fail_cnt += 1
-            u = browser(link)
+            try:
+                u = browser(re.sub(r"#[^#]*$","",link))
+            except urllib2.URLError,err:
+                raise SiteError("%s: url cound not open(%s)" % (link,str(err)))
             pageall = guess_coding(config,u.read())
             u.close()
 
@@ -377,7 +380,10 @@ def guess_coding(config,html):
 
 def html2feed(browser,config):
     index = config["index"]
-    html = guess_coding( config , browser(index).read() )
+    try:
+        html = guess_coding( config , browser(index).read() )
+    except urllib2.URLError,err:
+        raise SiteError("%s: url cound not open(%s)" % (index,str(err)))
 
     if "feed_title" in config:
         title = config["feed_title"]
@@ -506,7 +512,10 @@ def interpret( conn , config ):
         except IOError:
             raise ConfigError("Can not load feed class '%s'" % classname )
     elif "feed" in config:
-        xml = browser( config["feed"] ).read()
+        try:
+            xml = browser( config["feed"] ).read()
+        except urllib2.URLError,err:
+            raise SiteError("%s: url cound not open(%s)" % (config["feed"],str(err)))
         d = feedparser.parse( xml )
     elif "index" in config:
         d = html2feed(browser,config)
@@ -615,6 +624,7 @@ def _main(inifname=None,menuSwitch=True):
                     (feedname,)
                 )
                 print "%s: t_cache deleted %d record(s)" % (feedname , cursor.rowcount)
+                conn.commit()
                 return
             else:
                 raise Die(status="404 Not Found",message="section: "+feedname)
@@ -634,8 +644,6 @@ def _main(inifname=None,menuSwitch=True):
 def main(*arg):
     try:
         _main(*arg)
-    except urllib2.URLError,err:
-        SiteError(repr(err)).die()
     except Die,err:
         err.die()
 
