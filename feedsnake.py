@@ -59,9 +59,12 @@ class SiteError(Die):
     def __init__(self,message):
         Die.__init__(self, status="502 Bad Gateway" , message=message)
 
+re_script = re.compile(r"<script[^>]*>.*?</script>",re.DOTALL|re.IGNORECASE)
+def cdata(s):
+    return '<![CDATA[%s]]>' % \
+        re_script.sub("",s).replace("]]>","]]]]><[!CDATA[>")
+
 def feedcat(d,fd):
-    def cdata(s):
-        return '<![CDATA[%s]]>' % s.replace("]]>","]]]]><[!CDATA[>")
     def output(t):
         fd.write(t.strip()+"\r\n")
 
@@ -153,25 +156,15 @@ def insert_message(d,message):
         )
     )
 
+re_ahref  = re.compile(r'(<a[^>]+href=")([^"]*)"', re.DOTALL | re.IGNORECASE)
+re_imgsrc = re.compile(r'''(<img[^>]+src=['"])([^"']*)(["'])''',re.DOTALL|re.IGNORECASE)
+
 def rel2abs_paths( link , content ):
-    ahref_pattern = re.compile(
-        r'(<a[^>]+href=")([^"]*)"' , re.DOTALL | re.IGNORECASE
+    content = re_ahref.sub(
+        lambda m:m.group(1) + urlparse.urljoin(link, m.group(2)) + '"', content
     )
-    imgsrc_pattern = re.compile(
-        r'''(<img[^>]+src=['"])([^"']*)(["'])''' ,
-        re.DOTALL | re.IGNORECASE
-    )
-    content = ahref_pattern.sub(
-        lambda m:m.group(1) +
-        urlparse.urljoin(link, m.group(2)) +
-        '"',
-        content
-    )
-    content = imgsrc_pattern.sub(
-        lambda m:m.group(1) +
-        urlparse.urljoin(link, m.group(2)) +
-        m.group(3) ,
-        content
+    content = re_imgsrc.sub(
+        lambda m:m.group(1) + urlparse.urljoin(link, m.group(2)) + m.group(3) , content
     )
     return content
 
@@ -682,9 +675,8 @@ def main(**kwarg):
 class MyHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         save_stdout = sys.stdout
+        sys.stdout = buffer = StringIO.StringIO()
         try:
-            sys.stdout = StringIO.StringIO()
-            sys.stdin = self.rfile
             q_pos = self.path.find("?")
             if q_pos >= 0 :
                 q_str = self.path[q_pos+1:]
@@ -693,7 +685,7 @@ class MyHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             try:
                 _main(query_string=q_str)
                 self.send_response(200, "Script output follows")
-                self.wfile.write( sys.stdout.getvalue() )
+                self.wfile.write( buffer.getvalue() )
             except Die,err:
                 status = err.info["Status"].split()
                 self.send_response(int(status[0]), " ".join(status[1:]))
@@ -701,6 +693,7 @@ class MyHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 err.die()
         finally:
             sys.stdout = save_stdout
+            buffer.close()
 
 def daemon_mode(portno):
     httpd = BaseHTTPServer.HTTPServer(
