@@ -390,7 +390,7 @@ def html2feed(browser,config):
     if "feed_title" in config:
         title = config["feed_title"]
     else :
-        m = re.search(r'<title>(.*?)</title>',html,re.DOTALL|re.IGNORECASE)
+        m = re.search(r'<title[^>]*>(.*?)</title>',html,re.DOTALL|re.IGNORECASE)
         if m:
             title = m.group(1).replace("&lt;","<")\
                     .replace("&gt;",">").replace("&amp;","&")
@@ -413,7 +413,10 @@ def html2feed(browser,config):
     re_pattern = re.compile( pattern_str , re.DOTALL|re.IGNORECASE )
 
     for m in re_pattern.finditer( html ):
-        title = re.sub(r'<[^>]*>','',m.group("title"))
+        try:
+            title = re.sub(r'<[^>]*>','',m.group("title"))
+        except IndexError:
+            raise ConfigError("(?P<title>...) is undefined in inline=...")
         if not title :
             continue
 
