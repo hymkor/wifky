@@ -677,6 +677,10 @@ def main(**kwarg):
 
 class MyHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
+	if self.path == "/favicon.ico" :
+	    self.send_response(404, "Not Found.")
+	    return
+	    
         save_stdout = sys.stdout
         sys.stdout = buffer = StringIO.StringIO()
         try:
