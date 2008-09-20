@@ -684,13 +684,16 @@ def main(**kwarg):
 
 class MyHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
+	if self.path == "/favicon.ico" :
+	    self.send_response(404, "Not Found.")
+	    return
+	    
         save_stdout = sys.stdout
         sys.stdout = buffer = StringIO.StringIO()
         try:
-            q_pos = self.path.index("?")
-            if q_pos >= 0 :
-                q_str = self.path[q_pos+1:]
-            else:
+            try:
+                q_str = self.path[self.path.index("?")+1:]
+            except ValueError:
                 q_str = ""
             try:
                 _main(query_string=q_str)
