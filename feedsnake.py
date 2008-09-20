@@ -48,16 +48,17 @@ class Die(Exception):
         }
         for key,val in kwarg.iteritems():
             self.info[ key.capitalize() ] = val
-    def die(self):
-        for key,val in self.info.iteritems():
-            print("%s: %s" % (key,val))
-        print("")
-        print("<html><body>")
+    def die(self,start_response):
+        start_response( 
+            self.info.get("Status","200 OK") ,
+            self.info.items()
+        )
+        yield "<html><body>"
         if "Status" in self.info:
-            print("<h1>%s</h1>" % cgi.escape(self.info["Status"]))
+            yield "<h1>%s</h1>" % cgi.escape(self.info["Status"])
         if self.message:
-            print(cgi.escape(self.message))
-        print("</body></html>")
+            yield cgi.escape(self.message)
+        yield "</body></html>"
 
 class ConfigError(Die):
     def __init__(self,message):
@@ -71,18 +72,18 @@ def cdata(s):
     return '<![CDATA[%s]]>' % \
         re_script.sub("",s).replace("]]>","]]]]><[!CDATA[>")
 
-def feedcat(d,fd):
+def feedcat(d):
     def output(t):
         fd.write(t.strip()+"\r\n")
 
-    output('<?xml version="1.0" encoding="UTF-8" ?>')
-    output('<rdf:RDF')
-    output(' xmlns="http://purl.org/rss/1.0/"')
-    output(' xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"')
-    output(' xmlns:content="http://purl.org/rss/1.0/modules/content/"')
-    output(' xmlns:dc="http://purl.org/dc/elements/1.1/"')
-    output(' xml:lang="ja">')
-    output('<channel rdf:about="%s">' % cgi.escape(d["feed"]["link"]) )
+    yield '<?xml version="1.0" encoding="UTF-8" ?>'
+    yield '<rdf:RDF'
+    yield ' xmlns="http://purl.org/rss/1.0/"'
+    yield ' xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"'
+    yield ' xmlns:content="http://purl.org/rss/1.0/modules/content/"'
+    yield ' xmlns:dc="http://purl.org/dc/elements/1.1/"'
+    yield ' xml:lang="ja">'
+    yield '<channel rdf:about="%s">' % cgi.escape(d["feed"]["link"])
     for tag,key in (
         ("title","title"),
         ("link","link"),
@@ -90,25 +91,25 @@ def feedcat(d,fd):
     ):
         value = d["feed"].get(key)
         if value :
-            output("<%s>%s</%s>" % ( tag, cgi.escape(value),tag ))
+            yield "<%s>%s</%s>" % ( tag, cgi.escape(value),tag )
 
-    output('<items>')
-    output('<rdf:Seq>')
+    yield '<items>'
+    yield '<rdf:Seq>'
 
     for e in d["entries"]:
         id1 = e.get("id") or e.get("link")
         if id1:
-            output('  <rdf:li rdf:resource="%s" />' % cgi.escape(id1))
+            yield '  <rdf:li rdf:resource="%s" />' % cgi.escape(id1)
 
-    output('</rdf:Seq>')
-    output('</items>')
-    output('</channel>')
+    yield '</rdf:Seq>'
+    yield '</items>'
+    yield '</channel>'
 
     for e in d["entries"]:
         id1 = e.get("id") or e.get("link")
         if id1 is None:
             continue
-        output( '<item rdf:about="%s">' % cgi.escape(id1) )
+        yield '<item rdf:about="%s">' % cgi.escape(id1)
         for tag,key in (
             ("title","title") ,
             ("link","link") ,
@@ -120,23 +121,23 @@ def feedcat(d,fd):
         ):
             value = e.get(key)
             if value:
-                output("<%s>%s</%s>" % (tag,cgi.escape(e[key]),tag))
+                yield "<%s>%s</%s>" % (tag,cgi.escape(e[key]),tag)
 
         for t in e.get("tags") or e.get("category") or []:
-            output("<category>%s</category>" % cgi.escape(t.term))
+            yield "<category>%s</category>" % cgi.escape(t.term)
 
         value = e.get("description")
         if value:
-            output('<description>%s</description>' % cdata(value) )
+            yield('<description>%s</description>' % cdata(value) )
 
         for c in e.get("content",[]):
             value = c.get("value")
             if value:
-                output('<content:encoded>%s</content:encoded>' % cdata(value) )
+                yield '<content:encoded>%s</content:encoded>' % cdata(value)
 
-        output('</item>')
+        yield '</item>'
 
-    output("</rdf:RDF>")
+    yield "</rdf:RDF>"
 
 def entry( title , link=None , id_=None ,content=None , updated=None , author=None ):
     if updated is None: updated = datetime.utcnow()
@@ -492,7 +493,7 @@ def ddl( cursor ):
     except sqlite.OperationalError:
         pass
 
-def interpret( conn , config ):
+def interpret( conn , config , start_response ):
     if "forward" in config:
         raise Die(
             status="304 Moved." ,
@@ -509,8 +510,11 @@ def interpret( conn , config ):
         ( config["feedname"] , hoursago(1) )
     )
     for rs in cursor :
-        sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
-        sys.stdout.write( rs[0].encode("utf8") )
+        start_response(
+            "200 OK" ,
+            [ ("Content-Type","application/xml; charset=utf-8") ]
+        )
+        yield rs[0].encode("utf8")
         cursor.close()
         conn.close()
         return
@@ -584,17 +588,22 @@ def interpret( conn , config ):
 
     ### Save feed into cache ###
     buffer = StringIO.StringIO()
-    feedcat( d , buffer )
+    for line in feedcat( d ):
+        buffer.write( line.strip() + "\r\n" )
     buffer = buffer.getvalue()
     cursor.execute("insert or replace into t_output "
                    "values(:feedname,:content,:update_dt)" ,
         ( config["feedname"] , buffer , hoursago(0) )
     )
     conn.commit()
-    sys.stdout.write("Content-Type: application/xml; charset=utf-8\r\n\r\n")
-    sys.stdout.write( buffer.encode("utf8") )
 
-def menu( conn , config):
+    start_response(
+        '200 OK' ,
+        [ ("Content-Type","application/xml; charset=utf-8") ]
+    )
+    yield buffer.encode("utf8")
+
+def menu( environ , start_response , conn , config):
     cursor = conn.cursor()
     ddl(cursor)
     conn.commit()
@@ -604,109 +613,130 @@ def menu( conn , config):
         siteinfo[ rs[0] ] = rs[1]
     cursor.close()
 
-    print('''Content-Type: text/html; charset=utf-8
-
-<html>
+    start_response(
+        "200 OK" ,
+        [ ('Content-Type','text/html; charset=utf-8') ]
+    )
+    yield '''<html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <title>FeedSnake Come On!</title>
 </head>
 <body><h1>FeedSnake Come On!</h1>
-<ul>''')
+<ul>'''
     for e in sorted( config.sections() ):
-        print('<li><a href="%s?%s" rel="nofollow">%s</a>' % (
-                os.getenv("SCRIPT_NAME") or "/" , cgi.escape(e) ,
-                cgi.escape( siteinfo.get( e , "("+e+")" ).encode("utf8")) ))
-        print('<a href="%s?-%s" rel="nofollow">[x]</a></li>' % (
-                os.getenv("SCRIPT_NAME") or "/" , cgi.escape(e) ))
-    print('</ul><p>Generated by feedsnake.py %s</p></body></html>' % version)
+        yield '<li><a href="%s?%s" rel="nofollow">%s</a>' % (
+                environ.get("SCRIPT_NAME") , cgi.escape(e) ,
+                cgi.escape( siteinfo.get( e , "("+e+")" ).encode("utf8")) )
+        yield '<a href="%s?-%s" rel="nofollow">[x]</a></li>' % (
+                environ.get("SCRIPT_NAME") , cgi.escape(e) )
+    yield '</ul><p>Generated by feedsnake.py %s</p></body></html>' % version
 
-def _main(inifname=None,menuSwitch=True,query_string=None):
-    configall = ConfigParser.ConfigParser()
-    if inifname is None:
-        inifname = re.sub( r"\.py$", ".ini" , inspect.getfile(_main) )
-    os.chdir( os.path.dirname(inifname) or "." )
+def cacheoff( environ , start_response , conn , configall , feedname ):
+    if configall.has_section(feedname):
+        start_response(
+            "200 OK" ,
+            [ ("Content-Type","text/html") ]
+        )
+        cursor = conn.cursor()
+        cursor.execute(
+            "delete from t_output where feedname = :feedname" ,
+            (feedname,)
+        )
+        yield "<html><head>"
+        yield '<meta http-equiv="refresh" content="1;URL=%s" />' % \
+            environ.get("SCRIPT_NAME")
+        yield "</head><body><ul>"
+        yield "<li>%s: t_output deleted %d record(s)</li>" %  \
+            (feedname , cursor.rowcount) 
+        cursor.execute(
+            "delete from t_cache where feedname = :feedname" ,
+            (feedname,)
+        )
+        yield "<li>%s: t_cache deleted %d record(s)</li>" % \
+            (feedname , cursor.rowcount)
+        yield "</ul></body></html>"
+        conn.commit()
+        return
+    else:
+        raise Die(status="404 Not Found",message="section: "+feedname)
+
+def application(
+    environ , start_response , 
+    inifname=None,
+    menuSwitch=True
+):
     try:
-        configall.read( inifname )
-    except (ConfigParser.ParsingError,ConfigParser.MissingSectionHeaderError):
-        raise ConfigError(repr(err()))
+        configall = ConfigParser.ConfigParser()
+        if inifname is None:
+            inifname = re.sub( r"\.py$", ".ini" , inspect.getfile(application) )
+        os.chdir( os.path.dirname(inifname) or "." )
+        try:
+            configall.read( inifname )
+        except (ConfigParser.ParsingError,ConfigParser.MissingSectionHeaderError):
+            raise ConfigError(repr(err()))
 
-    conn = sqlite.connect("feedsnake.db")
-    feedname = query_string or os.getenv("QUERY_STRING")
+        conn = sqlite.connect("feedsnake.db")
+        feedname = environ.get("QUERY_STRING")
 
-    if feedname:
-        if feedname[0] == "-" :
-            feedname = feedname[1:]
-            if configall.has_section(feedname):
-                print("Content-Type: text/html")
-                print("")
-                cursor = conn.cursor()
-                cursor.execute(
-                    "delete from t_output where feedname = :feedname" ,
-                    (feedname,)
-                )
-                print("<html><head>")
-                print('<meta http-equiv="refresh" content="1;URL=%s" />' %
-                    (os.getenv("SCRIPT_NAME") or "/" ,) )
-                print("</head><body><ul>")
-                print("<li>%s: t_output deleted %d record(s)</li>" % 
-                    (feedname , cursor.rowcount) )
-                cursor.execute(
-                    "delete from t_cache where feedname = :feedname" ,
-                    (feedname,)
-                )
-                print("<li>%s: t_cache deleted %d record(s)</li>" % \
-                    (feedname , cursor.rowcount))
-                print("</ul></body></html>")
-                conn.commit()
-                return
+        if feedname:
+            if feedname[0] == "-" :
+                for line in cacheoff( environ , start_response , 
+                                      conn , configall , feedname[1:] ):
+                    yield line
+            elif configall.has_section(feedname) :
+                config = dict( configall.items(feedname) )
+                config[ "feedname" ] = feedname
+                for line in interpret( conn , config , start_response ):
+                    yield line
             else:
                 raise Die(status="404 Not Found",message="section: "+feedname)
-
-        if configall.has_section(feedname) :
-            config = dict( configall.items(feedname) )
-            config[ "feedname" ] = feedname
-            interpret( conn , config )
+        elif menuSwitch:
+            for line in menu( environ , start_response , conn , configall):
+                yield line
         else:
-            raise Die(status="404 Not Found",message="section: "+feedname)
-    elif menuSwitch:
-        menu( conn , configall)
-    else:
-        raise Die(status="403 Forbidden")
-    conn.close()
+            raise Die(status="403 Forbidden")
+        conn.close()
+    except Die:
+        for line in err().die(start_response):
+            yield line
 
 def main(**kwarg):
-    try:
-        cgitb.enable()
-        _main(**kwarg)
-    except Die:
-        err().die()
+    """ interface for CGI """
+    def _start_response(status,headers):
+        print "Status:",status
+        for key,val in headers:
+            print(key+": "+val)
+        print("")
+
+    cgitb.enable()
+    for line in application(os.environ,start_response=_start_response,**kwarg):
+        print line
 
 class MyHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
 	if self.path == "/favicon.ico" :
 	    self.send_response(404, "Not Found.")
 	    return
+
+        def _start_response(status,headers):
+            pair = status.split()
+            self.send_response(int(pair[0])," ".join(pair[1:]))
+            for key,val in headers:
+                self.wfile.write(key+": "+val+"\n")
+            self.wfile.write("\n")
 	    
-        save_stdout = sys.stdout
-        sys.stdout = buffer = StringIO.StringIO()
+        param = self.path.split("?") + [""]
+        environ = {
+            "SCRIPT_NAME":param[0] ,
+            "QUERY_STRING":param[1] ,
+        }
         try:
-            try:
-                q_str = self.path[self.path.index("?")+1:]
-            except ValueError:
-                q_str = ""
-            try:
-                _main(query_string=q_str)
-                self.send_response(200, "Script output follows")
-                self.wfile.write( buffer.getvalue() )
-            except Die:
-                status = err().info["Status"].split()
-                self.send_response(int(status[0]), " ".join(status[1:]))
-                sys.stdout = self.wfile
-                err().die()
-        finally:
-            sys.stdout = save_stdout
-            buffer.close()
+            for line in application(environ,_start_response):
+                self.wfile.write( line + "\n" )
+        except Die:
+            for line in err().die(_start_response):
+                self.wfile.write( line + "\n" )
 
 def daemon_mode(portno):
     httpd = BaseHTTPServer.HTTPServer(
