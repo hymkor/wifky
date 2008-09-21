@@ -22,6 +22,12 @@ import urllib2
 import urlparse
 
 try:
+    import wsgiref.simple_server
+    has_wsgiref = True
+except:
+    has_wsgiref = False
+
+try:
     import feedparser
     has_feedparser = True
 except:
@@ -702,7 +708,6 @@ def application(
             yield line
 
 def main(**kwarg):
-    """ interface for CGI """
     def _start_response(status,headers):
         print "Status:",status
         for key,val in headers:
@@ -713,40 +718,15 @@ def main(**kwarg):
     for line in application(os.environ,start_response=_start_response,**kwarg):
         print line
 
-class MyHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-    def do_GET(self):
-	if self.path == "/favicon.ico" :
-	    self.send_response(404, "Not Found.")
-	    return
-
-        def _start_response(status,headers):
-            pair = status.split()
-            self.send_response(int(pair[0])," ".join(pair[1:]))
-            for key,val in headers:
-                self.wfile.write(key+": "+val+"\n")
-            self.wfile.write("\n")
-	    
-        param = self.path.split("?") + [""]
-        environ = {
-            "SCRIPT_NAME":param[0] ,
-            "QUERY_STRING":param[1] ,
-        }
-        try:
-            for line in application(environ,_start_response):
-                self.wfile.write( line + "\n" )
-        except Die:
-            for line in err().die(_start_response):
-                self.wfile.write( line + "\n" )
-
-def daemon_mode(portno):
-    httpd = BaseHTTPServer.HTTPServer(
-        ("",portno) ,
-        MyHTTPHandler,
-    )
-    httpd.serve_forever()
-
 if __name__ == '__main__':
-    if len(sys.argv) >= 2 and re.match("^\d+$",sys.argv[1]):
-        daemon_mode(int(sys.argv[1]))
-    else:
+    try:
+        portno = int(sys.argv[1])
+    except (ValueError,IndexError):
         main()
+    else:
+        if has_wsgiref:
+            wsgiref.simple_server.make_server(
+                "",portno,application
+            ).serve_forever()
+        else:
+            main()
