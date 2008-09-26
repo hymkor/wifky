@@ -1,10 +1,8 @@
 #!/usr/local/bin/python
 
-import BaseHTTPServer
 import ConfigParser
 import cgi
 import cgitb
-import codecs
 import cookielib
 from datetime import datetime,timedelta
 import inspect

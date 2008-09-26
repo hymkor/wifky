@@ -9,10 +9,11 @@ $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'EUC-JP';
 %::form     = %::forms = ();
-$::me       = $::postme = $ENV{SCRIPT_NAME};
+$::me       = $::postme = $ENV{SCRIPT_NAME} || (split(/[\\\/]/,$0))[-1];
 $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 %::flag     = ();
+%::cnt      = ();
 
 my $messages = '';
 
@@ -31,7 +32,7 @@ if( $0 eq __FILE__ ){
                 $messages .= '<div>'.&enc($msg)."</div>\n" ;
                 my $i=0;
                 while( my (undef,$fn,$lno,$subnm)=caller($i++) ){
-                    $messages .= sprintf('<div> &nbsp; on %s at %s line %d.</div>' ,
+                    $messages .= sprintf("<div> &nbsp; on %s at %s line %d.</div>\n" ,
                                 &enc($subnm),&enc($fn),$lno );
                 }
             }
@@ -99,6 +100,7 @@ sub init_globals{
     %::inline_plugin = (
         'adminmenu'=> \&plugin_menubar ,
         'menubar'  => \&plugin_menubar ,
+        'nomenubar'=> sub{ $::flag{menubar_printed}=1;'' } ,
         'pagename' => \&plugin_pagename ,
         'recent'   =>
             sub{ '<ul>'.&ls('-r','-t',map("-$_",@_[1..$#_])) . '</ul>' } ,
@@ -124,8 +126,7 @@ sub init_globals{
         'bq'       => sub{ '&#96;' },
         'null'     => sub{ '' } ,
         'outline'  => \&plugin_outline ,
-	'cnt'      => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
-	'ref'      => sub{ &verb( sub{$::ref{$_[1]||0} || ''}) } ,
+        'cnt'      => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
     );
 
     %::action_plugin = (
@@ -1273,18 +1274,14 @@ sub print_template{
         header=>sub{
             &::print_page( title=>'Header' );
             $::flag{userheader} = 1;
+            &puts(&plugin({},'menubar')) unless $::flag{menubar_printed};
         },
         message=>sub{
             $::config{debugmode} && $messages ? $messages : '';
         },
         copyright => sub{ join('',@::copyright); },
         menubar => sub {
-            if( $::flag{menubar_printed} ){
-                "";
-            }else{
-                $::flag{menubar_printed} = 1;
-                &plugin({},'menubar');
-            }
+            $::flag{menubar_printed} ? "" : &plugin({},'menubar');
         },
     );
     &print_header( userheader=>'template' );
@@ -1430,10 +1427,10 @@ sub print_page{
 
 sub unverb_textonly{
     ${$_[0]} =~ s/\a\((\d+)\)/
-	  $1 > $#::later 
-	  ? "(code '$1' not found)"
-	  : ref($::later[$1]) eq 'CODE' ? $&
-	  : $::later[$1]/ge;
+          $1 > $#::later
+          ? "(code '$1' not found)"
+          : ref($::later[$1]) eq 'CODE' ? $&
+          : $::later[$1]/ge;
 }
 sub strip_tag{
     my $text=shift;
@@ -1529,37 +1526,37 @@ sub verb{
 
 sub unverb{
     ${$_[0]} =~ s/\a\((\d+)\)/
-	  $1 > $#::later 
-	  ? "(code '$1' not found)"
-	  : ref($::later[$1]) eq 'CODE' ? $::later[$1]->()
-	  : $::later[$1]/ge  for(1..2);
+          $1 > $#::later
+          ? "(code '$1' not found)"
+          : ref($::later[$1]) eq 'CODE' ? $::later[$1]->()
+          : $::later[$1]/ge  for(1..2);
 }
 
 
 sub plugin_outline{
     &verb(
-	sub{
-	    my $depth=-2;
-	    my $ss='';
-	    foreach my $p( @::outline ){
-		next if $p->{title} eq 'Header' ||
-			$p->{title} eq 'Footer' ||
-			$p->{title} eq 'Sidebar' ;
+        sub{
+            my $depth=-2;
+            my $ss='';
+            foreach my $p( @::outline ){
+                next if $p->{title} eq 'Header' ||
+                        $p->{title} eq 'Footer' ||
+                        $p->{title} eq 'Sidebar' ;
 
-		my $diff=$p->{depth} - $depth;
-		if( $diff > 0 ){
-		    $ss .= '<ul><li>' x $diff ;
-		}else{
-		    $diff < 0    and $ss .= "</li></ul>\n" x -$diff;
-		    $depth >= 0  and $ss .= "</li>\n" ;
-		    $ss .= '<li>';
-		}
-		$ss .= &anchor( $p->{text}, { p=>$p->{title} }, undef, $p->{sharp} );
-		$depth=$p->{depth};
-	    }
-	    $ss .= '</li></ul>' x ($depth+2);
-	    $ss;
-	}
+                my $diff=$p->{depth} - $depth;
+                if( $diff > 0 ){
+                    $ss .= '<ul><li>' x $diff ;
+                }else{
+                    $diff < 0    and $ss .= "</li></ul>\n" x -$diff;
+                    $depth >= 0  and $ss .= "</li>\n" ;
+                    $ss .= '<li>';
+                }
+                $ss .= &anchor( $p->{text}, { p=>$p->{title} }, undef, $p->{sharp} );
+                $depth=$p->{depth};
+            }
+            $ss .= '</li></ul>' x ($depth+2);
+            $ss;
+        }
     );
 }
 
@@ -1746,12 +1743,12 @@ sub attach2tag{
 
     if( exists $session->{attachment}->{$nm} ){
         if( $nm =~ /\.png$/i || $nm =~ /\.gif$/i  || $nm =~ /\.jpe?g$/i ){
-            &img(   $label ,{ p=>$p , f=>$f } , { class=>'inline' } );
+            &img( $label ,{ p=>$p , f=>$f } , { class=>'inline' } );
         }else{
             &anchor($label ,{ p=>$p , f=>$f } , { title=>$label } )
         }
     }else{
-        qq(<blink class="attachment_not_found">$nm</blink>);
+        &verb(sub{$::ref{$nm} || qq(<blink class="attachment_not_found">$nm</blink>)});
     }
 }
 
