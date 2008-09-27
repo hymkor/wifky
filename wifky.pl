@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $::version  = '1.3.3_0';
 
@@ -126,7 +126,7 @@ sub init_globals{
         'bq'       => sub{ '&#96;' },
         'null'     => sub{ '' } ,
         'outline'  => \&plugin_outline ,
-        'cnt'      => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
+        '#'        => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
     );
 
     %::action_plugin = (
