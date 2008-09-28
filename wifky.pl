@@ -1382,8 +1382,13 @@ sub object_exists{
 }
 
 sub list_attachment{
+    my $fname=&title2fname(shift);
     &cache_update();
-    map{ $_ && /^__/ ? &fname2title($') : () } @{$::dir_cache{&title2fname(shift)}};
+    if( exists $::dir_cache{$fname} ){
+        map{ $_ && /^__/ ? &fname2title($') : () } @{$::dir_cache{$fname}};
+    }else{
+        ();
+    }
 }
 
 sub print_page{
