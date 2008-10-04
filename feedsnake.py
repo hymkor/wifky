@@ -578,7 +578,7 @@ def interpret( conn , config , wsgi ):
     if "feed" not in d  or "link" not in d["feed"]:
         raise ConfigError("Can not find the feed.")
 
-    for key in "author", "title":
+    for key in "author","title","link":
         if key in config:
             try:
                 accept(d,key,config[key].decode("utf8"))
