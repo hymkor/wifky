@@ -38,6 +38,7 @@ except:
 
 version="0.5"
 user_agents='FeedSnake.py/%s' % version
+config_default={}
 
 def err():
     """ for compatibility between Python 2.4 and 3.0"""
@@ -418,7 +419,7 @@ def html2feed(browser,config):
         raise SiteError("%s: url cound not open(%s)" % (index,str(err())))
 
     if "feed_title" in config:
-        title = config["feed_title"]
+        title = config["feed_title"].decode("utf8")
     else :
         m = re.search(r'<title[^>]*>(.*?)</title>',html,re.DOTALL|re.IGNORECASE)
         if m:
@@ -735,7 +736,6 @@ def main(**kwarg):
         print line
 
 if __name__ == '__main__':
-    config_default={}
     portno = None
     if len(sys.argv) >= 2:
         for e in sys.argv[1:]:
