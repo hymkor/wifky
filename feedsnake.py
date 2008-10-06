@@ -644,6 +644,12 @@ def menu( wsgi , conn , config):
 <body><h1>FeedSnake Come On!</h1>
 <ul>''' )
     for e in sorted( config.sections() ):
+        try:
+            if config.getboolean( e , "hidden" ):
+                continue
+        except (ValueError,ConfigParser.NoOptionError):
+            pass
+
         wsgi.write( '<li><a href="%s?%s" rel="nofollow">%s</a>\n' % (
                 wsgi.get("SCRIPT_NAME") or "/" , cgi.escape(e) ,
                 cgi.escape( siteinfo.get( e , "("+e+")" ).encode("utf8")) ) )
@@ -687,7 +693,7 @@ def application(
 ):
     wsgi = WSGI(environ,start_response)
     try:
-        configall = ConfigParser.ConfigParser()
+        configall = ConfigParser.ConfigParser(config_default)
         if inifname is None:
             inifname = re.sub( r"\.py$", ".ini" , inspect.getfile(application) )
         os.chdir( os.path.dirname(inifname) or "." )
@@ -729,14 +735,18 @@ def main(**kwarg):
         print line
 
 if __name__ == '__main__':
-    try:
-        portno = int(sys.argv[1])
-    except (ValueError,IndexError):
-        main()
+    config_default={}
+    portno = None
+    if len(sys.argv) >= 2:
+        for e in sys.argv[1:]:
+            pair = e.split("=",1)
+            if len(pair) >= 2 :
+                config_default[ pair[0] ] = pair[1]
+            elif re.search(r"^\d+$",e):
+                portno = int(e)
+    if portno and has_wsgiref:
+        wsgiref.simple_server.make_server(
+            "",portno,application
+        ).serve_forever()
     else:
-        if has_wsgiref:
-            wsgiref.simple_server.make_server(
-                "",portno,application
-            ).serve_forever()
-        else:
-            main()
+        main()
