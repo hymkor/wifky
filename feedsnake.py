@@ -39,6 +39,20 @@ except:
 version="0.5"
 user_agents='FeedSnake.py/%s' % version
 config_default={}
+option_handler={}
+
+def option(func):
+    option_handler[ func.func_name ] = func
+    return func
+
+@option
+def shrink(d):
+    new_entries=[]
+    re_filter = re.compile(r"<[^>]*>")
+    d["entries"] = [ 
+        e for e in d["entries"]
+           if re_filter.sub("",e.get("description","")).strip()
+    ]
 
 def err():
     """ for compatibility between Python 2.4 and 3.0"""
@@ -593,6 +607,13 @@ def interpret( conn , config , wsgi ):
 
     if "import" in config:
         import_contents(browser , d, config , cursor)
+
+    if "option" in config:
+        for e in config["option"].split():
+            try:
+                option_handler[e](d)
+            except IndexError:
+                pass
 
     ### Expire cache ###
     expire_dt = hoursago(7*24)
