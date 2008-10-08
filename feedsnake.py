@@ -190,17 +190,6 @@ def entry( title , link=None , id_=None ,content=None , updated=None , author=No
         "updated_parsed":updated.timetuple() ,
     }
 
-def insert_message(d,message):
-    error_cnt = d["error_cnt"] = d.get("error_cnt",0) + 1
-    d["entries"].insert(0,
-        entry(
-            title="Feed Error! [%d]" % error_cnt ,
-            link="http://example.com/#%d" % error_cnt ,
-            author="FeedSnake System" ,
-            content=message ,
-        )
-    )
-
 re_ahref  = re.compile(r'(<a[^>]+href=")([^"]*)"', re.DOTALL | re.IGNORECASE)
 re_imgsrc = re.compile(r'''(<img[^>]+src=['"])([^"']*)(["'])''',re.DOTALL|re.IGNORECASE)
 
@@ -390,16 +379,6 @@ def hoursago(n=0):
     if n:
         dt -= timedelta(hours=n)
     return dt.strftime("%Y%m%d%H%M%S")
-
-def ymdhms2datetime(dt): ### for Python 2.4 which does not have no datetime.strptime() ###
-    return datetime(
-        year   = int(dt[ 0: 4],10) ,
-        month  = int(dt[ 4: 6],10) ,
-        day    = int(dt[ 6: 8],10) ,
-        hour   = int(dt[ 8:10],10) ,
-        minute = int(dt[10:12],10) ,
-        second = int(dt[12:14],10) ,
-    )
 
 def guess_coding(config,html):
     if "htmlcode" in config:
