@@ -1,8 +1,8 @@
 #!/usr/local/bin/perl
 
-# use strict; use warnings;
+use strict; use warnings;
 
-$::version  = '1.3.3_0';
+$::version  = '1.3.4_0';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -249,6 +249,7 @@ sub init_globals{
     );
     %::call_syntax_plugin = (
         '100_verbatim'       => \&call_verbatim ,
+        '200_blockquote'     => \&call_blockquote ,
         '500_block_syntax'   => \&call_block ,
         '800_close_sections' => \&call_close_sections ,
         '900_footer'         => \&call_footnote ,
@@ -1453,6 +1454,18 @@ sub call_verbatim{
     : "\n\n<pre>".&verb(defined($1) ? $1 : $2)."</pre>\n\n"
     !gesm;
 }
+
+sub call_blockquote{
+    ${$_[0]} =~
+    s!(?:&lt;blockquote&gt;|6&lt;)(.*?)(?:&lt;/blockquote&gt;|&gt;9)!&call_blockquote_sub($1,$_[1])!gesm;
+}
+
+sub call_blockquote_sub{
+    local $::print='';
+    &::syntax_engine( $_[0] , $_[1] );
+    '<blockquote class="block">'.&::verb($::print).'</blockquote>';
+}
+
 
 sub inner_link{
     my ($session,$symbol,$title,$sharp)

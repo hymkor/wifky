@@ -47,7 +47,6 @@ def option(func):
 
 @option
 def shrink(d):
-    new_entries=[]
     re_filter = re.compile(r"<[^>]*>")
     d["entries"] = [ 
         e for e in d["entries"]
@@ -509,6 +508,17 @@ def ddl( cursor ):
     except sqlite.OperationalError:
         pass
 
+def strip_scripts(d):
+    re_strip_scripts = re.compile(r"<script[^>]*>.*?</script>",re.IGNORECASE|re.DOTALL)
+    for e in d["entries"]:
+        if "description" in e :
+            e["description"] = re_strip_scripts.sub("",e["description"])
+        if "content" in e:
+            e["content"] = [
+                { "value":re_strip_scripts.sub("",c["value"]) } 
+                for c in e["content"]
+            ]
+
 def interpret( conn , config , wsgi ):
     if "forward" in config:
         raise Die(
@@ -593,6 +603,8 @@ def interpret( conn , config , wsgi ):
                 option_handler[e](d)
             except IndexError:
                 pass
+
+    strip_scripts(d)
 
     ### Expire cache ###
     expire_dt = hoursago(7*24)
