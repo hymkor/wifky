@@ -1463,7 +1463,7 @@ sub call_blockquote{
 sub call_blockquote_sub{
     local $::print='';
     &::syntax_engine( $_[0] , $_[1] );
-    '<blockquote class="block">'.&::verb($::print).'</blockquote>';
+    qq(\n\n<blockquote class="block">).&::verb($::print)."</blockquote>\n\n";
 }
 
 
