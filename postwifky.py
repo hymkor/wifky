@@ -7,6 +7,7 @@ import urllib
 import email
 
 class WifkyFormNotFound(Exception):pass
+class WifkyPostFail(Exception):pass
 
 class remote_wifky(object):
     def __init__(self,url,pwd=""):
@@ -63,16 +64,17 @@ class remote_wifky(object):
         )
         response = http.read()
         http.close()
-        return response
+        if "Moving..." not in response:
+            raise WifkyPostFail()
 
     def add(self,text,title=None):
         orgsrc = self.get(title)
-        return self.put( text=(orgsrc[0].strip() + "\n\n" + text).strip() ,
+        self.put( text=(orgsrc[0].strip() + "\n\n" + text).strip() ,
                   orgsrc=orgsrc[1] ,
                   title=title )
 
 def subject(head):
-    head = re.compile(r"=\?ISO-2022-JP\?B\?(.*)\?\=",re.IGNORECASE).sub(
+    head = re.compile(r"=\?ISO-2022-JP\?B\?(.*?)\?\=",re.IGNORECASE).sub(
         lambda m:m.group(1).decode("base64") , head 
     ).decode("iso2022jp")
 
@@ -91,7 +93,7 @@ def postwifky( fd , url , pwd ):
     if title:
         body = u"<<%s>>\n\n%s" % (title,body)
 
-    return remote_wifky( url , pwd ).add( body.encode("euc-jp") )
+    remote_wifky( url , pwd ).add( body.encode("euc-jp") )
 
 if __name__ == "__main__":
     if len(sys.argv) == 3 :
