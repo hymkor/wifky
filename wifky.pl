@@ -622,7 +622,7 @@ sub print_header{
 
     &puts('<style type="text/css"><!--');
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
-        if( my $css =&read_object($p) ){
+        if( my $css =&read_text($p) ){
             $css =~ s/\<\<\{([^\}]+)\}/&myurl( { p=>$p , f=>$1 } )/ge;
             $css =~ s/[<>&]//g;
             $css =~ s|/\*.*?\*/||gs;
@@ -695,15 +695,23 @@ sub check_frozen{
     }
 }
 sub check_conflict{
-    my $current_source = &read_object($::form{p});
+    my $current_source = &read_text($::form{p});
     my $before_source  = $::form{orgsrc_t};
     if( $current_source ne $before_source ){
         die( "!Someone else modified this page after you began to edit."  );
     }
 }
 
-sub read_object{
+sub read_text{ # for text
     &read_file(&title2fname(@_));
+}
+
+sub read_object{ # for binary
+    &read_file(&title2fname(@_));
+}
+
+sub read_textfile{ # for text
+    &read_file;
 }
 
 sub read_file{
@@ -755,7 +763,7 @@ sub action_new{
 }
 
 sub load_config{
-    for(split(/\n/,&read_file('index.cgi'))){
+    for(split(/\n/,&read_textfile('index.cgi'))){
         $::config{$1}=&deyen($2) if /^\#?([^\#\!\t ]+)\t(.*)$/;
     }
 }
@@ -764,13 +772,17 @@ sub is_signed{
     if( defined($::signed) ){
         return $::signed;
     }
-    if( exists $::form{signing}  &&  &auth_check() ){
-        &touch_session();
-        return $::signed=1;
+    if( exists $::form{signing} ){
+        if( &auth_check() ){
+            &touch_session();
+            return $::signed=1;
+        }else{
+
+        }
     }
 
     # time(TAB)ip(TAB)key
-    for( split(/\n/,&read_file('session.cgi') ) ){
+    for( split(/\n/,&read_textfile('session.cgi') ) ){
         $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ && $1>time-24*60*60;
     }
 
@@ -1249,8 +1261,7 @@ sub action_edit{
         Title => 'Edit' ,
         main  => sub {
             &begin_day( $title );
-            my $fn=&title2fname($title);
-            my $source=&read_file($fn);
+            my $source=&read_text($title);
             &print_form( $title , \$source , \$source );
             &end_day();
 
@@ -1395,7 +1406,7 @@ sub list_attachment{
 sub print_page{
     my %args=( @_ );
     my $title=$args{title};
-    my $html =&enc( exists $args{source} ? ${$args{source}} : &read_object($title));
+    my $html =&enc( exists $args{source} ? ${$args{source}} : &read_text($title));
     return 0 unless $html;
 
     push(@::outline,
@@ -1666,7 +1677,7 @@ sub plugin_comment{
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
                 $caption );
-    for(split(/\r?\n/,read_object($::form{p} , "comment.$comid"))){
+    for(split(/\r?\n/,read_text($::form{p} , "comment.$comid"))){
         my ($dt,$who,$say) = split(/\t/,$_,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
         $buf .= sprintf('<p><span class="commentator">%s</span>'.
