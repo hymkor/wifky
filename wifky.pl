@@ -398,7 +398,7 @@ sub read_form{
         $::cookie{$`}=$' if /=/;
     }
     if( exists $ENV{REQUEST_METHOD} && $ENV{REQUEST_METHOD} eq 'POST' ){
-        $ENV{CONTENT_LENGTH} > 1024*1024 and die('Too large form data');
+        $ENV{CONTENT_LENGTH} > 10*1024*1024 and die('Too large form data');
         my $query_string;
         read(STDIN, $query_string, $ENV{CONTENT_LENGTH});
         if( $query_string =~ /\A(--.*?)\r?\n/ ){
@@ -606,8 +606,7 @@ sub print_form{
 
 sub flush_header{
     print join("\r\n",@::http_header);
-    print qq(\r\n\r\n<?xml version="1.0" encoding="$::charset"?>);
-    print qq(\r\n<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">);
+    print qq(\r\n\r\n<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">);
     print qq(\r\n<html lang="ja"><head>\r\n);
     print join("\r\n",@::html_header),"\r\n";
 }
