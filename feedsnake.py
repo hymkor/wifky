@@ -53,6 +53,17 @@ def shrink(d):
            if re_filter.sub("",e.get("description","")).strip()
     ]
 
+@option
+def uniq(d):
+    checked = set()
+    entries = []
+    for e in d["entries"]:
+        link = e["link"]
+        if link not in checked:
+            entries.append( e )
+        checked.add(link)
+    d["entries"] = entries
+
 def err():
     """ for compatibility between Python 2.4 and 3.0"""
     return sys.exc_info()[1]
