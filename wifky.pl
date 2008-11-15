@@ -893,7 +893,7 @@ sub action_preview{
 }
 
 sub action_passwd{
-    goto &signin unless is_signed();
+    goto &action_signin unless is_signed();
 
     my ($p1,$p2) = ( $::form{p1} , $::form{p2} );
     die('!New signs differ from each other!') if $p1 ne $p2;
@@ -1044,7 +1044,7 @@ sub tools_change_sign{
 }
 
 sub action_rename{
-    goto &signin unless &is_signed();
+    goto &action_signin unless &is_signed();
 
     my $newtitle = $::form{newtitle};
     my $title    = $::form{p};
