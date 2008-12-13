@@ -5,7 +5,7 @@ package wifky::pluginmgr;
 
 #use strict;use warnings; 
 
-my $version='0.8';
+my $version='0.9';
 
 -d 'plugins' or mkdir('plugins',0755) or die('can not mkdir plugins directory');
 
@@ -50,7 +50,9 @@ closedir(DIR);
 unless( $::form{a} && ($::form{a} =~ /^pluginmgr/ || $::form{a} eq 'signin') ){
     foreach my $p ( grep( $::config{$_->{key}} , @plugins) ){
         package main;
-        do $p->{path} ; die($@) if $@;
+        if( $p->{path} =~ /^([\/\w\.]+)$/ ){
+            do "./$1" ; die($@) if $@;
+        }
     }
 }
 
@@ -115,7 +117,7 @@ $::action_plugin{'pluginmgr_erase'} = sub {
     my $fn=$::form{target};
     $fn =~ /^([0-9a-f][0-9a-f])+$/ or die("!Invalied plugin-filename $fn!");
     -f "./plugins/$fn" or die('!Remove not exists plugin!');
-    unlink "./plugins/$fn";
+    unlink "./plugins/$&";
     &::transfer_url( "$::me?a=pluginmgr" );
 };
 
