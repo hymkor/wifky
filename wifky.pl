@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/bin/perl -T
 
 use strict; use warnings;
 
@@ -41,13 +41,13 @@ if( $0 eq __FILE__ ){
 
         &read_form;
         &change_directory;
-        foreach my $pl (sort grep(/\.plg$/,&directory) ){
-            do $pl; die($@) if $@;
+        foreach my $pl (sort map(/^([\w\.]+\.plg)$/ ? $1 : () ,&directory) ){
+            do "./$pl"; die($@) if $@;
         }
         &load_config;
         &init_globals;
-        foreach my $pl (sort grep(/\.pl$/,&directory) ){
-            do $pl; die($@) if $@;
+        foreach my $pl (sort map(/^([\w\.]+\.pl)$/ ? $1 : (),&directory) ){
+            do "./$pl"; die($@) if $@;
         }
 
         if( $::form{a} && $::action_plugin{$::form{a}} ){
@@ -499,7 +499,12 @@ sub fname2title{
     pack('h*',$_[0]);
 }
 sub title2fname{
-    join('__',map(unpack('h*',$_),@_) );
+    my $fn=join('__',map(unpack('h*',$_),@_) );
+    if( $fn =~ /^(\w+)$/ ){
+        $1;
+    }else{
+        die("$fn: invalid filename");
+    }
 }
 sub percent{
     my $s = shift;
@@ -1208,8 +1213,12 @@ sub do_submit{
         &archive();
     }
     if( &lockdo( sub{ &write_file( $fn , \$::form{text_t} ) },$::form{p} )){
-        chmod 0444,$fn if $::form{to_freeze};
-        utime($sagetime,$sagetime,$fn) if $::form{sage};
+        if( $::form{to_freeze} ){
+            chmod(0444,$fn);
+        }
+        if( $::form{sage} ){
+            utime($sagetime,$sagetime,$fn)
+        }
         &transfer_page();
     }else{
         &transfer_url($::me.'?a=recent');
