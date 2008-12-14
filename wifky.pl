@@ -1,8 +1,8 @@
-#!/usr/local/bin/perl -T
+#!/usr/bin/perl -T
 
 use strict; use warnings;
 
-$::version  = '1.3.3_1';
+$::version  = '1.3.3_2';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -579,7 +579,7 @@ sub form_attachment{
         my $fn = &title2fname($::form{p}, $attach);
 
         &putenc('<input type="checkbox" name="f" value="%s"' , $attach );
-        if( !&is_signed() && ! -w $fn ){
+        if( !&is_signed() && ! &w_ok($fn) ){
             &puts(' disabled');
         }
         &putenc('><input type="text" name="dummy" readonly value="&lt;&lt;{%s}"
@@ -587,7 +587,7 @@ sub form_attachment{
                 onClick="this.select();">', $attach, length($attach)+4 );
         &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$attach } ).':' );
         &putenc('%d bytes, at %s', (stat $fn)[7],&mtime($fn));
-        &puts('<strong>frozen</strong>') unless -w _;
+        &puts('<strong>frozen</strong>') unless &w_ok();
         &puts(')<br>');
     }
     &puts('</p>');
@@ -673,7 +673,7 @@ sub is_frozen{
                         : exists $::form{p} ? $::form{p}
                         : $::config{FrontPage}))
     {
-        ! -w _;
+        ! &w_ok();
     }else{
         &is('lonely');
     }
@@ -1088,7 +1088,7 @@ sub action_delete{
 
     foreach my $f ( @{$::forms{f}} ){
         my $fn=&title2fname( $::form{p} , $f );
-        if( -w $fn || &is_signed() ){
+        if( &w_ok($fn) || &is_signed() ){
             unlink( $fn ) or rmdir( $fn );
         }
     }
@@ -1101,7 +1101,7 @@ sub action_freeze_or_fresh{
 
     foreach my $f ( @{$::forms{f}} ){
         my $fn=&title2fname( $::form{p} , $f );
-        chmod( -w $fn ? 0444 : 0666 , $fn );
+        chmod( &w_ok($fn) ? 0444 : 0666 , $fn );
     }
     &cacheoff;
     &do_preview();
@@ -1160,7 +1160,7 @@ sub action_upload{
     exists $::form{p} or die('not found pagename');
     &check_frozen;
     my $fn=&title2fname( $::form{p} , $::form{'newattachment_b.filename'} );
-    if( -r $fn && !-w _ ){
+    if( -r $fn && ! &w_ok() ){
         &do_preview('The attachment is frozen.');
     }else{
         &write_file( $fn , \$::form{'newattachment_b'} );
@@ -2007,3 +2007,6 @@ sub block_normal{
     1;
 }
 
+sub w_ok{ # equals "-w" except for root-user.
+    ( $#_ < 0 ? stat(_) : stat($_[0]) )[2] & 0200;
+}
