@@ -1603,10 +1603,10 @@ sub ls_core{
     }else{
         @list = sort{ $a->{title} cmp $b->{title} } @list;
     }
-    exists $opt->{r}         and @list = reverse @list;
-    exists $opt->{number} && $#list > $opt->{number}
-        and splice(@list,$opt->{number});
-    exists $opt->{countdown} and splice(@list,$opt->{countdown});
+    @list = reverse @list if exists $opt->{r};
+    if( defined (my $n=$opt->{number} || $opt->{countdown}) ){
+        splice(@list,$n) if $n =~ /^\d+$/ && $#list >= $n;
+    }
     @list;
 }
 
