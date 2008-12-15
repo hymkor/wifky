@@ -1689,7 +1689,7 @@ sub plugin_comment{
         my ($dt,$who,$say) = split(/\t/,$_,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
         $buf .= sprintf('<p><span class="commentator">%s</span>'.
-            '%s <span class="comment_date">(%s)</span></p>'
+            ' %s <span class="comment_date">(%s)</span></p>'
                 , &enc(&deyen($who)), $text , &enc($dt) );
     }
     unless( exists $opt{f} ){
