@@ -7,7 +7,7 @@ $::version  = '1.3.4_0';
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
-$::charset  = 'EUC-JP';
+$::charset  = 'UTF-8';
 %::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME} || (split(/[\\\/]/,$0))[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -40,7 +40,7 @@ if( $0 eq __FILE__ ){
         eval{ alarm 60; };
 
         &read_form;
-        &change_directory;
+        &chdir_and_code;
         foreach my $pl (sort map(/^([\w\.]+\.plg)$/ ? $1 : () ,&directory) ){
             do "./$pl"; die($@) if $@;
         }
@@ -77,11 +77,19 @@ if( $0 eq __FILE__ ){
     exit(0);
 }
 
-sub change_directory{
-    my $pagedir = __FILE__ ; $pagedir =~ s/\.\w+((\.\w+)*)$/.dat$1/;
-    unless( chdir $pagedir ){
-        mkdir($pagedir,0755);
-        chdir $pagedir or die("can not access $pagedir.");
+sub chdir_and_code{
+    (my $utf8_dir = __FILE__ ) =~ s/\.\w+((\.\w+)*)$/.d$1/;
+    if( chdir $utf8_dir ){
+        return;
+    }
+    (my $eucjp_dir = __FILE__ ) =~ s/\.\w+((\.\w+)*)$/.dat$1/;
+    if( chdir $eucjp_dir ){
+        $::charset = 'EUC-JP';
+        return;
+    }
+    mkdir($utf8_dir,0755);
+    unless( chdir $utf8_dir ){
+        die("can not access $utf8_dir or $eucjp_dir.");
     }
 }
 
