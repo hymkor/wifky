@@ -397,7 +397,7 @@ sub read_form{
         $::cookie{$`}=$' if /=/;
     }
     if( exists $ENV{REQUEST_METHOD} && $ENV{REQUEST_METHOD} eq 'POST' ){
-        $ENV{CONTENT_LENGTH} > 1024*1024 and die('Too large form data');
+        $ENV{CONTENT_LENGTH} > 10*1024*1024 and die('Too large form data');
         my $query_string;
         read(STDIN, $query_string, $ENV{CONTENT_LENGTH});
         if( $query_string =~ /\A(--.*?)\r?\n/ ){
