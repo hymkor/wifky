@@ -780,6 +780,20 @@ sub load_config{
     }
 }
 
+sub local_cookie{
+    my $id;
+    if( exists $ENV{LOCAL_COOKIE_FILE} && open(FP,'<'.$ENV{LOCAL_COOKIE_FILE}) ){
+        $id=<FP>;
+        close(FP);
+    }
+    $id;
+}
+
+my $session_id_;
+sub session_id{
+    $session_id_ ||= $::cookie{$::session_cookie} || &local_cookie() || rand();
+}
+
 sub is_signed{
     if( defined($::signed) ){
         return $::signed;
@@ -799,9 +813,7 @@ sub is_signed{
     }
 
     my $remote_addr=$ENV{REMOTE_ADDR}||0;
-    if( exists $::ip{$remote_addr} &&
-        $::ip{$remote_addr}->[0] eq ($::cookie{$::session_cookie}||'') )
-    {
+    if( exists $::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq &session_id() ){
         &touch_session();
         $::signed=1;
     }else{
@@ -811,16 +823,14 @@ sub is_signed{
 
 sub touch_session{
     my $remote_addr = $ENV{REMOTE_ADDR}||0;
-    if( exists $::ip{$remote_addr} &&
-        $::ip{$remote_addr}->[0] eq $::cookie{$::session_cookie} )
-    {
+    if( exists $::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq &session_id() ){
         ### update current session ###
         $::ip{$remote_addr}->[1] = time;
     }else{
         ### create new session ###
-        my $key=rand();
+        my $key=&session_id();
         $::ip{$remote_addr} = [ $key , time ];
-        push( @::http_header , "Set-cookie: $::session_cookie=$key" );
+        push( @::http_header , "Set-Cookie: $::session_cookie=$key" );
     }
     &save_session();
 }
