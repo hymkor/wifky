@@ -172,8 +172,7 @@ sub init_globals{
         '600_Index'     => &anchor('Index',{a=>'recent'}) ,
     );
     if( !&is('lonely') || &is_signed() ){
-        $::menubar{'200_New'} = &anchor('New' , { a=>'new' }
-        );
+        $::menubar{'200_New'} = &anchor('New' , { a=>'new' });
     }
     @::menubar = ();
     if( &is_signed() ){
@@ -481,7 +480,7 @@ sub deyen{
 }
 
 sub mtimeraw{
-    my ($fn)=@_; $::mtime_cache{$fn} ||= (-f $fn ? ( stat($fn) )[9] : 0);
+    $::mtime_cache{$_[0]} ||= (-f $_[0] ? ( stat(_) )[9] : 0);
 }
 
 sub mtime{
@@ -728,7 +727,7 @@ sub read_textfile{ # for text
 
 sub read_file{
     open(FP,$_[0]) or return $::default_contents{ $_[0] } || '';
-    local $/; undef $/;
+    local $/;
     my $object = <FP>;
     close(FP);
     defined($object) ? $object : $::default_contents{ $_[0] } || '';
@@ -798,13 +797,9 @@ sub is_signed{
     if( defined($::signed) ){
         return $::signed;
     }
-    if( exists $::form{signing} ){
-        if( &auth_check() ){
-            &touch_session();
-            return $::signed=1;
-        }else{
-
-        }
+    if( exists $::form{signing} && &auth_check() ){
+        &touch_session();
+        return $::signed=1;
     }
 
     # time(TAB)ip(TAB)key
@@ -823,14 +818,14 @@ sub is_signed{
 
 sub touch_session{
     my $remote_addr = $ENV{REMOTE_ADDR}||0;
-    if( exists $::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq &session_id() ){
+    my $id=&session_id();
+    if( exists $::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq $id ){
         ### update current session ###
         $::ip{$remote_addr}->[1] = time;
     }else{
         ### create new session ###
-        my $key=&session_id();
-        $::ip{$remote_addr} = [ $key , time ];
-        push( @::http_header , "Set-Cookie: $::session_cookie=$key" );
+        $::ip{$remote_addr} = [ $id , time ];
+        push( @::http_header , "Set-Cookie: $::session_cookie=$id" );
     }
     &save_session();
 }
@@ -1170,9 +1165,7 @@ sub begin_day{
 sub end_day{ &puts('</div></div>'); }
 
 sub do_index{
-    my $t=shift;
-    my $n=shift;
-    my @param=@_;
+    my ($t,$n,@param)=@_;
 
     &print_template(
         title => 'IndexPage' ,
@@ -1200,9 +1193,8 @@ sub action_upload{
 }
 
 sub lockdo{
-    my $code=shift;
-    push(@_,'LOCK');
-    my $lock=&title2fname(@_);
+    my ($code,@title)=(@_,'LOCK');
+    my $lock=&title2fname(@title);
     my $retry=0;
     while( mkdir($lock,0777)==0 ){
         sleep(1);
@@ -1653,9 +1645,8 @@ sub ls_core{
 }
 
 sub parse_opt{
-    my $opt=shift;
-    my $arg=shift;
-    foreach my $p (@_){
+    my ($opt,$arg,@rest)=@_;
+    foreach my $p (@rest){
         if( $p =~ /^-(\d+)$/ ){
             $opt->{number} = $opt->{countdown} = $1;
         }elsif( $p =~ /^-/ ){
@@ -1667,11 +1658,10 @@ sub parse_opt{
 }
 
 sub ls{
-    my $buf = '';
-    my %opt=();
-    my @arg=();
+    my (%opt,@arg);
     &parse_opt(\%opt,\@arg,@_);
 
+    my $buf = '';
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
         exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
@@ -1687,7 +1677,7 @@ sub plugin_comment{
     return '' unless $::form{p};
 
     my $session=shift;
-    my @arg; my %opt;
+    my (@arg,%opt);
     &parse_opt( \%opt , \@arg , @_ );
     my $etitle= &enc($::form{p});
     my $comid = ($arg[0] || '0');
