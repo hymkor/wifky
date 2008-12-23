@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.3.4_0';
+$::version  = '1.5.0_0';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -702,7 +702,7 @@ sub print_signarea{
 }
 
 sub check_frozen{
-    if( !is_signed() && &is_frozen() ){
+    if( !&is_signed() && &is_frozen() ){
         die( '!This page is frozen.!');
     }
 }
@@ -916,7 +916,7 @@ sub action_preview{
 }
 
 sub action_passwd{
-    goto &action_signin unless is_signed();
+    goto &action_signin unless &is_signed();
 
     my ($p1,$p2) = ( $::form{p1} , $::form{p2} );
     die('!New signs differ from each other!') if $p1 ne $p2;
@@ -927,7 +927,7 @@ sub action_passwd{
 }
 
 sub action_tools{
-    goto &action_signin unless is_signed();
+    goto &action_signin unless &is_signed();
 
     &browser_cache_off();
     push( @::html_header , <<HEADER );
@@ -1031,7 +1031,7 @@ HEADER
 }
 
 sub action_preferences{
-    goto &action_signin unless is_signed();
+    goto &action_signin unless &is_signed();
 
     foreach my $i ( @{$::preferences{$::form{section}}} ){
         next unless exists $i->{name};
@@ -1277,7 +1277,7 @@ sub do_preview{
 }
 
 sub action_edit{
-    goto &action_signin if is_frozen() && !&is_signed();
+    goto &action_signin if &is_frozen() && !&is_signed();
 
     &browser_cache_off();
     my $title = $::form{p};
