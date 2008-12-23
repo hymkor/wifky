@@ -788,46 +788,27 @@ sub local_cookie{
     $id;
 }
 
-my $session_id_;
-sub session_id{
-    $session_id_ ||= $::cookie{$::session_cookie} || &local_cookie() || rand();
-}
-
 sub is_signed{
-    if( defined($::signed) ){
-        return $::signed;
-    }
-    if( exists $::form{signing} && &auth_check() ){
-        &touch_session();
-        return $::signed=1;
-    }
+    return $::signed if defined $::signed;
+
+    my $remote_addr=$ENV{REMOTE_ADDR}||0;
+    my $id=$::cookie{$::session_cookie} || &local_cookie() || rand();
 
     # time(TAB)ip(TAB)key
     for( split(/\n/,&read_textfile('session.cgi') ) ){
         $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ && $1>time-24*60*60;
     }
 
-    my $remote_addr=$ENV{REMOTE_ADDR}||0;
-    if( exists $::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq &session_id() ){
-        &touch_session();
+    if( ($::form{signing} && &auth_check() ) || 
+        ($::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq $id ) )
+    {
+        push( @::http_header , "Set-Cookie: $::session_cookie=$id" );
+        $::ip{$remote_addr} = [ $id , time ];
+        &save_session();
         $::signed=1;
     }else{
         $::signed=0;
     }
-}
-
-sub touch_session{
-    my $remote_addr = $ENV{REMOTE_ADDR}||0;
-    my $id=&session_id();
-    if( exists $::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq $id ){
-        ### update current session ###
-        $::ip{$remote_addr}->[1] = time;
-    }else{
-        ### create new session ###
-        $::ip{$remote_addr} = [ $id , time ];
-        push( @::http_header , "Set-Cookie: $::session_cookie=$id" );
-    }
-    &save_session();
 }
 
 sub save_session{
@@ -1491,8 +1472,8 @@ sub call_blockquote{
 
 sub call_blockquote_sub{
     local $::print='';
-    &::syntax_engine( $_[0] , $_[1] );
-    qq(\n\n<blockquote class="block">).&::verb($::print)."</blockquote>\n\n";
+    &syntax_engine( $_[0] , $_[1] );
+    qq(\n\n<blockquote class="block">).&verb($::print)."</blockquote>\n\n";
 }
 
 
@@ -1852,7 +1833,7 @@ sub headline{
 }
 
 sub midashi{
-    my ($depth,$text,$session)=(@_);
+    my ($depth,$text,$session)=@_;
     $text = &preprocess($text,$session);
     my $section = ($session->{section} ||= [0,0,0,0,0]) ;
 
