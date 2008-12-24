@@ -944,7 +944,8 @@ HEADER
             while( my ($section,undef)=each %::preferences ){
                 &putenc('<div id="%s" style="display:none" class="section">',$section );
                 &begin_day($section);
-                &putenc('<form action="%s" method="post">',$::postme);
+                &putenc('<form action="%s" method="post" accept-charset="%s">',
+                            $::postme,$::charset);
                 &putenc('<input type="hidden" name="section" value="%s">',$section);
 
                 &puts('<ul>');
