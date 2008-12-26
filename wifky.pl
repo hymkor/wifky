@@ -146,6 +146,7 @@ sub init_globals{
         'edt'           => \&action_edit ,
         'pwd'           => \&action_passwd ,
         'ren'           => \&action_rename ,
+        'rena'          => \&action_rename_attachment ,
         'comment'       => \&action_comment ,
         'Delete'        => \&action_delete ,
         'Commit'        => \&action_commit ,
@@ -496,8 +497,8 @@ sub ymdhms{
 
 sub cacheoff{
     undef %::mtime_cache;
-    undef @::dir_cache;
-    undef %::dir_cache;
+    undef @::contents;
+    undef %::contents;
 }
 sub title2mtime{
     &mtime( &title2fname(@_) );
@@ -625,7 +626,7 @@ sub flush_header{
 
 sub print_header{
     $::final_plugin{'000_header'} = \&flush_header;
-    my %arg=(@_);
+    my %arg=@_;
     my $label = $::config{sitename};
     $label .= ' - '.$::form{p} if exists $::form{p};
     $label .= '('.$arg{title}.')' if exists $arg{title};
@@ -1050,17 +1051,32 @@ sub action_rename{
     my $title    = $::form{p};
     my $fname    = &title2fname($title);
     my $newfname = &title2fname($newtitle);
+    die("!The new page name '$newtitle' is already used.!") if -f $newfname;
 
     my @list = map {
-        my $older=$fname    . $_ ;
-        my $newer=$newfname . $_ ;
-        die("!The new page name '$newtitle' is already used.!") if -f $newfname;
+        my $older="${fname}__${_}" ;
+        my $newer="${newfname}__${_}";
+        die("!The new page name '$newtitle' is already used.!") if -f $newer;
         [ $older , $newer ];
-    } @{$::dir_cache{$fname}};
+    } @{$::contents{$fname}};
 
+    rename( $fname , $newfname );
     rename( $_->[0] , $_->[1] ) foreach @list;
     &transfer_page($newtitle);
 }
+
+sub action_rename_attachment{
+    goto &action_signin unless &is_signed();
+
+    my $older=&title2fname($::form{p},$::form{f1});
+    my $newer=&title2fname($::form{p},$::form{f2});
+    die("!The new attachment name is null.!") unless $::form{f2};
+    die("!The new attachment name '$::form{f2}' is already used.!") if -f $newer;
+
+    rename( $older , $newer );
+    &transfer_page($::form{p});
+}
+
 
 sub action_seek{
     my $keyword=$::form{keyword};
@@ -1267,12 +1283,28 @@ sub action_edit{
 
             if( &object_exists($::form{p}) && &is_signed() ){
                 &begin_day('Rename');
-                &putenc('<p><form action="%s" method="post">
+                &putenc('<h3>page</h3><p><form action="%s" method="post">
                     <input type="hidden"  name="a" value="ren">
                     <input type="hidden"  name="p" value="%s">
                     Title: <input type="text" name="newtitle" value="%s" size="80">'
                     , $::postme , $::form{p} , $::form{p} );
                 &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
+
+                my @attachment=&list_attachment($title);
+                if( @attachment ){
+                    &putenc('<h3>attachment</h3><p>
+                        <form action="%s" method="post" name="rena">
+                        <input type="hidden"  name="a" value="rena">
+                        <input type="hidden"  name="p" value="%s">'
+                        , $::postme , $::form{p});
+                    &puts('<select name="f1" onChange="document.rena.f2.value=this.options[this.selectedIndex].value;return false">');
+                    &puts('<option value="" selected></option>');
+                    foreach my $f(@attachment){
+                        &putenc('<option value="%s">%s</option>', $f, $f);
+                    }
+                    &puts('</select><input type="text" name="f2" value="" size="30" />');
+                    &puts('<br><input type="submit" name="rena" value="Submit"></form></p>');
+                }
                 &end_day();
             }
         }
@@ -1369,12 +1401,14 @@ sub action_cat{
 }
 
 sub cache_update{
-    unless( defined(@::dir_cache) ){
+    unless( defined(@::contents) ){
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
-            push( @::dir_cache , $fn );
-            if( $fn =~ /^((?:[0-9a-f][0-9a-f])+)(__(?:[0-9a-f][0-9a-f])+)?$/ ){
-                push( @{$::dir_cache{$1}} , $2||'' );
+            push( @::contents , $fn );
+            if( $fn =~ /^([0-9a-f][0-9a-f])+$/ ){
+                $::contents{$&} ||= [];
+            }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__((?:[0-9a-f][0-9a-f])+)$/ ){
+                push(@{$::contents{$1}},$2);
             }
         }
         closedir(DIR);
@@ -1382,25 +1416,22 @@ sub cache_update{
 }
 
 sub directory{
-    &cache_update() ; @::dir_cache;
+    &cache_update() ; @::contents;
 }
 
 sub list_page{
-    &cache_update() ; keys %::dir_cache;
+    &cache_update() ; keys %::contents;
 }
 
 sub object_exists{
-    &cache_update() ; exists $::dir_cache{ &title2fname($_[0]) }
+    &cache_update() ; exists $::contents{ &title2fname($_[0]) }
 }
 
 sub list_attachment{
-    my $fname=&title2fname(shift);
     &cache_update();
-    if( exists $::dir_cache{$fname} ){
-        map{ $_ && /^__/ ? &fname2title($') : () } @{$::dir_cache{$fname}};
-    }else{
-        ();
-    }
+    my $fn=&title2fname($_[0]);
+    return () unless exists $::contents{$fn};
+    map{ &fname2title($_) } @{$::contents{$fn}};
 }
 
 sub print_page{
@@ -1590,12 +1621,11 @@ sub plugin_outline{
 }
 
 sub ls_core{
-    my $opt = shift;
-    my @list;
-    push(@_,'*') unless @_;
+    my ($opt,@args) = @_;
+    push(@args,'*') unless @args;
 
-    foreach (@_){
-        my $pat=$_;
+    my @list;
+    foreach my $pat (@args){
         $pat =~ s/([^\*\?]+)/unpack('h*',$1)/eg;
         $pat =~ s/\?/../g;
         $pat =~ s/\*/.*/g;
@@ -1640,14 +1670,13 @@ sub parse_opt{
 }
 
 sub ls{
-    my (%opt,@arg);
-    &parse_opt(\%opt,\@arg,@_);
+    &parse_opt(\my %opt,\my @arg,@_);
 
     my $buf = '';
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
         exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
-        exists $opt{i} and $buf .= '<tt>'.scalar(@{$::dir_cache{ $p->{fname} }}).' </tt>';
+        exists $opt{i} and $buf .= '<tt>'.(1+@{$::contents{ $p->{fname} }}).' </tt>';
 
         $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
         $buf .= "</li>\r\n";
@@ -1675,7 +1704,7 @@ sub plugin_comment{
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
                 $caption );
-    for(split(/\r?\n/,read_text($::form{p} , "comment.$comid"))){
+    for(split(/\r?\n/,&read_text($::form{p} , "comment.$comid"))){
         my ($dt,$who,$say) = split(/\t/,$_,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
         $buf .= sprintf('<p><span class="commentator">%s</span>'.
