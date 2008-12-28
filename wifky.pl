@@ -78,18 +78,18 @@ if( $0 eq __FILE__ ){
 }
 
 sub chdir_and_code{
-    (my $utf8_dir = __FILE__ ) =~ s/\.\w+((\.\w+)*)$/.d$1/;
-    if( chdir $utf8_dir ){
+    (my $udir = __FILE__ ) =~ s/\.\w+((\.\w+)*)$/.d$1/;
+    if( chdir $udir ){
         return;
     }
-    (my $eucjp_dir = __FILE__ ) =~ s/\.\w+((\.\w+)*)$/.dat$1/;
-    if( chdir $eucjp_dir ){
+    (my $edir = __FILE__ ) =~ s/\.\w+((\.\w+)*)$/.dat$1/;
+    if( chdir $edir ){
         $::charset = 'EUC-JP';
         return;
     }
-    mkdir($utf8_dir,0755);
-    unless( chdir $utf8_dir ){
-        die("can not access $utf8_dir or $eucjp_dir.");
+    mkdir($udir,0755);
+    unless( chdir $udir ){
+        die("can not access $udir or $edir.");
     }
 }
 
@@ -368,7 +368,7 @@ sub browser_cache_off{
 sub read_multimedia{
     my ($query_string , $cutter ) = @_;
 
-    my @blocks = split("\r\n${cutter}","\r\n$query_string");
+    my @blocks = split("\r\n$cutter","\r\n$query_string");
     foreach my $block (@blocks){
         $block =~ s/\A\r?\n//;
         my ($header,$body) = split(/\r?\n\r?\n/,$block,2);
@@ -749,7 +749,7 @@ sub write_file{
         &cacheoff;
         0;
     }else{
-        open(FP,">${fname}") or die("can't write the file ${fname}.");
+        open(FP,">$fname") or die("can't write the file $fname.");
             binmode(FP);
             print FP ref($body) ? ${$body} : $body;
         close(FP);
@@ -1054,8 +1054,8 @@ sub action_rename{
     die("!The new page name '$newtitle' is already used.!") if -f $newfname;
 
     my @list = map {
-        my $older="${fname}__${_}" ;
-        my $newer="${newfname}__${_}";
+        my $older="${fname}__$_" ;
+        my $newer="${newfname}__$_";
         die("!The new page name '$newtitle' is already used.!") if -f $newer;
         [ $older , $newer ];
     } @{$::contents{$fname}};
@@ -1141,9 +1141,9 @@ sub action_comment{
         utime( time , time , &title2fname($title) ) <= 0
             and die("unable to comment to unexistant page.");
         &cacheoff;
-        my $fname  = &title2fname($title,"comment.${comid}");
+        my $fname  = &title2fname($title,"comment.$comid");
         local *FP;
-        open(FP,">>${fname}") or die("Can not open $fname for append");
+        open(FP,">>$fname") or die("Can not open $fname for append");
             my @tm=localtime;
             printf FP "%04d/%02d/%02d %02d:%02d:%02d\t%s\t%s\r\n"
                 , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0]
@@ -1237,9 +1237,9 @@ sub transfer_url{
     my $url=(shift || $::me);
     print join("\r\n",@::http_header),"\r\n\r\n";
     print '<html><head><title>Moving...</title>';
-    print qq|<meta http-equiv="refresh" content="1;URL=${url}">\n|
+    print qq|<meta http-equiv="refresh" content="1;URL=$url">\n|
         unless $::config{debugmode} && $messages;
-    print qq|</head><body><a href="${url}">Wait or Click Here</a>|;
+    print qq|</head><body><a href="$url">Wait or Click Here</a>|;
     print $messages if $::config{debugmode} && $messages;
     print '</body></html>';
     exit(0);
@@ -1389,8 +1389,8 @@ sub action_cat{
             : $attach =~ /\.txt$/i ? 'text/plain'
             : 'application/octet-stream';
 
-    print  qq(Content-Disposition: attachment; filename="${attach}"\r\n);
-    print  qq(Content-Type: ${type}\r\n);
+    print  qq(Content-Disposition: attachment; filename="$attach"\r\n);
+    print  qq(Content-Type: $type\r\n);
     printf qq(Content-Length: %d\r\n),( stat(FP) )[7];
     printf qq(Last-Modified: %s, %02d %s %04d %s GMT\r\n) ,
                 (split(' ',scalar(gmtime((stat(FP))[9]))))[0,2,1,4,3];
@@ -1435,7 +1435,7 @@ sub list_attachment{
 }
 
 sub print_page{
-    my %args=( @_ );
+    my %args=@_;
     my $title=$args{title};
     my $html =&enc( exists $args{source} ? ${$args{source}} : &read_text($title));
     return 0 unless $html;
@@ -1446,21 +1446,21 @@ sub print_page{
 
     my %attachment;
     foreach my $attach ( &list_attachment($title) ){
-        my $e_attach = &enc( $attach );
+        my $attach_ = &enc( $attach );
         my $url=&attach2url($title,$attach);
-        $attachment{ $e_attach } = {
+        $attachment{ $attach_ } = {
             # for compatible #
             name => $attach ,
             url  => $url ,
             tag  => $attach =~ /\.(png|gif|jpg|jpeg)$/i
-                    ? qq(<img src="${url}" alt="${e_attach}" class="inline">)
-                    : qq(<a href="${url}" title="${e_attach}" class="attachment">${e_attach}</a>) ,
+                    ? qq(<img src="$url" alt="$attach_" class="inline">)
+                    : qq(<a href="$url" title="$attach_" class="attachment">$attach_</a>) ,
         };
     }
     my %session=(
         title      => $title ,
         attachment => \%attachment ,
-        index      => $args{index} ,
+        'index'    => $args{'index'} ,
         main       => $args{main} ,
     );
     if( exists $args{class} ){
@@ -1521,7 +1521,7 @@ sub inner_link{
     if( &object_exists($title) ){
         &anchor( $symbol , { p=>$title } , { class=>'wikipage' } , $sharp);
     }else{
-        qq(<blink class="page_not_found">${symbol}?</blink>);
+        qq(<blink class="page_not_found">$symbol?</blink>);
     }
 }
 
@@ -1553,9 +1553,9 @@ sub plugin_footnote{
 
     my $i=$#{$session->{footnotes}} + 1;
     my %attr=( title=>&strip_tag($footnotetext)  );
-    $attr{name}="fm${i}" if $session->{index};
+    $attr{name}="fm$i" if $session->{index};
     '<sup>' .
-    &anchor("*${i}", { p=> $::form{p} } , \%attr , "#ft${i}" ) .
+    &anchor("*$i", { p=> $::form{p} } , \%attr , "#ft$i" ) .
     '</sup>' ;
 }
 
@@ -1581,7 +1581,7 @@ sub call_footnote{
 sub verb{
     my $cnt=scalar(@::later);
     push( @::later , $_[0] );
-    "\a(${cnt})";
+    "\a($cnt)";
 }
 
 sub unverb{
@@ -1690,7 +1690,7 @@ sub plugin_comment{
     my $session=shift;
     my (@arg,%opt);
     &parse_opt( \%opt , \@arg , @_ );
-    my $etitle= &enc($::form{p});
+    my $title_= &enc($::form{p});
     my $comid = ($arg[0] || '0');
     my $caption = $#arg >= 1
         ? '<div class="caption">'.join(' ',@arg[1..$#arg]).'</div>'
@@ -1715,7 +1715,7 @@ sub plugin_comment{
         $buf .= <<HTML
 <div class="form">
 <form action="$::postme" method="post" class="comment">
-<input type="hidden" name="p" value="$etitle">
+<input type="hidden" name="p" value="$title_">
 <input type="hidden" name="a" value="comment">
 <input type="hidden" name="comid" value="$ecomid">
 <div class="field name">
@@ -1887,19 +1887,19 @@ sub midashi{
                 }
         );
 
-        $text =~ s/^\+/${tag}. /;
+        $text =~ s/^\+/$tag. /;
         $text = &anchor( '<span class="sanchor">' .
                          &enc($::config{"${cls}mark"}) .
                          '</span>'
                   , { p     => $session->{title} }
                   , { class => "${cls}mark sanchor" }
-                  , "#p${tag}"
+                  , "#p$tag"
                   ) . qq(<span class="${cls}title">$text</span>) ;
 
         if( $session->{main} ){
-            &puts(qq(<div class="${cls} x${cls}">));
+            &puts(qq(<div class="$cls x$cls">));
         }else{
-            &puts(qq(<div class="x${cls}">));
+            &puts(qq(<div class="x$cls">));
         }
         &headline($text,$h,( $session->{index} ? "p$tag" : undef ) );
         if( $session->{main} ){
@@ -1953,7 +1953,7 @@ sub block_listing{ ### <UL><OL>... block ###
         }else{
             $diff < 0    and &puts( reverse splice(@stack,$nest) );
             $#stack >= 0 and &puts( '</li>' );
-            $nest > 0    and &puts( "<li>${text}" );
+            $nest > 0    and &puts( "<li>$text" );
         }
     }
     &puts( reverse @stack );
@@ -2015,7 +2015,7 @@ sub block_table{ ### || ... | ... |
             $tag = 'th'; $tr = $';
         }
         &puts( '<tr class="'.(++$i % 2 ? "odd":"even").'">',
-               map("<${tag}>$_</${tag}>",split(/\|/,$tr) ) , '</tr>' );
+               map("<$tag>$_</$tag>",split(/\|/,$tr) ) , '</tr>' );
     }
     &puts('</table>');
     1;
@@ -2042,9 +2042,9 @@ sub block_normal{
     my ($fragment,$session)=@_;
     if( (my $s = &preprocess($fragment,$session)) !~ /^\s*$/s ){
         if( $s =~ /\A\s*<(\w+).*<\/\1[^\/]*>\s*\Z/si ){
-            &puts( "<div>${s}</div>" );
+            &puts( "<div>$s</div>" );
         }else{
-            &puts("<p>${s}</p>");
+            &puts("<p>$s</p>");
         }
     }
     1;
