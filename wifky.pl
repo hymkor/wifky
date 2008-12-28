@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.3.3_2';
+$::version  = '1.4.0_0';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -1982,8 +1982,8 @@ sub block_htmltag{ ### <blockquote> or <center>
     my ($fragment,$session)=@_;
     return 0 unless
         $fragment =~ /\A\s*&lt;(blockquote|center)&gt;(.*)&lt;\/\1&gt;\s*\Z/si ;
-
-    &puts( "<$1>",&preprocess($2,$session),"</$1>" );
+    my $tag=$1;
+    &puts( "<$tag>",&preprocess($2,$session),"</$tag>" );
     1;
 }
 
