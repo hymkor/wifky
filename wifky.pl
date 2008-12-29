@@ -151,6 +151,8 @@ sub init_globals{
         'Delete'        => \&action_delete ,
         'Commit'        => \&action_commit ,
         'Preview'       => \&action_preview ,
+        'rollback_preview' => \&action_rollback_preview ,
+        'Rollback'      => \&action_rollback ,
         'Upload'        => \&action_upload ,
         'tools'         => \&action_tools ,
         'preferences'   => \&action_preferences ,
@@ -892,6 +894,44 @@ sub action_preview{
     }
 }
 
+sub action_rollback_preview{
+    goto &action_signin if is_frozen() && !&is_signed();
+
+    my $title = $::form{p};
+    my $attach = $::form{f};
+    &print_template(
+        template => $::system_template ,
+        main=>sub{
+            &begin_day("Rollback Preview: $title");
+            &print_page(
+                title=>$title ,
+                source=>\&read_text($title,$attach) ,
+                index=>1,
+                main=>1
+            );
+            &putenc('<form action="%s" method="post">',$::postme);
+            &puts('<input type="submit" name="a" value="Rollback"> ');
+            &puts(&anchor('Cancel',{a=>'edt',p=>$title}));
+            &putenc('<input type="hidden" name="p" value="%s">',$title);
+            &putenc('<input type="hidden" name="f" value="%s">',$attach);
+            &end_day();
+        }
+    );
+}
+
+sub action_rollback{
+    goto &action_signin if is_frozen() && !&is_signed();
+
+    my $title=$::form{p};
+    my $fn=&title2fname($title);
+    my $frozen=&is_frozen();
+    chmod(0644,$fn) if $frozen;
+    &archive() if $::config{archivemode};
+    &lockdo( sub{ &write_file( $fn , \&read_text($title,$::form{f})) } , $title );
+    chmod(0444,$fn) if $frozen;
+    &transfer_page();
+}
+
 sub action_passwd{
     goto &action_signin unless &is_signed();
 
@@ -1283,7 +1323,7 @@ sub action_edit{
 
             if( &object_exists($::form{p}) && &is_signed() ){
                 &begin_day('Rename');
-                &putenc('<h3>page</h3><p><form action="%s" method="post">
+                &putenc('<h3>Page</h3><p><form action="%s" method="post">
                     <input type="hidden"  name="a" value="ren">
                     <input type="hidden"  name="p" value="%s">
                     Title: <input type="text" name="newtitle" value="%s" size="80">'
@@ -1292,7 +1332,7 @@ sub action_edit{
 
                 my @attachment=&list_attachment($title);
                 if( @attachment ){
-                    &putenc('<h3>attachment</h3><p>
+                    &putenc('<h3>Attachment</h3><p>
                         <form action="%s" method="post" name="rena">
                         <input type="hidden"  name="a" value="rena">
                         <input type="hidden"  name="p" value="%s">'
@@ -1306,6 +1346,31 @@ sub action_edit{
                     &puts('<br><input type="submit" name="rena" value="Submit"></form></p>');
                 }
                 &end_day();
+
+                my @archive=grep(/^\~\d{6}_\d{6}\.txt/ ,@attachment);
+                if( @archive ){
+                    &begin_day('Rollback');
+                    &putenc('<form action="%s" method="post"><select name="f">',
+                                $::postme);
+                    foreach my $f(reverse sort @archive){
+                        &putenc('<option value="%s">%s/%s/%s %s:%s:%s</option>',
+                                $f,
+                                substr($f,1,2),
+                                substr($f,3,2),
+                                substr($f,5,2),
+                                substr($f,8,2),
+                                substr($f,10,2),
+                                substr($f,12,2),
+                        );
+
+                    }
+                    &puts('</select>');
+                    &putenc('<input type="hidden" name="p" value="%s">',$::form{p});
+                    &puts('<input type="hidden" name="a" value="rollback_preview" >');
+                    &puts('<input type="submit" value="Rollback">');
+                    &puts('</form>');
+                    &end_day()
+                }
             }
         }
     );
