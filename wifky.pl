@@ -151,8 +151,8 @@ sub init_globals{
         'Delete'        => \&action_delete ,
         'Commit'        => \&action_commit ,
         'Preview'       => \&action_preview ,
-        'rollback_preview' => \&action_rollback_preview ,
-        'Rollback'      => \&action_rollback ,
+        'rollback_'     => \&action_rollback_preview ,
+        'rollback'      => \&action_rollback ,
         'Upload'        => \&action_upload ,
         'tools'         => \&action_tools ,
         'preferences'   => \&action_preferences ,
@@ -910,8 +910,9 @@ sub action_rollback_preview{
                 main=>1
             );
             &putenc('<form action="%s" method="post">',$::postme);
-            &puts('<input type="submit" name="a" value="Rollback"> ');
-            &puts(&anchor('Cancel',{a=>'edt',p=>$title}));
+            &puts('<input type="hidden" name="a" value="rollback"> ');
+            &puts('<input type="submit" name="b" value="Rollback"> ');
+            &puts('<input type="submit" name="b" value="Cancel"> ');
             &putenc('<input type="hidden" name="p" value="%s">',$title);
             &putenc('<input type="hidden" name="f" value="%s">',$attach);
             &end_day();
@@ -920,6 +921,7 @@ sub action_rollback_preview{
 }
 
 sub action_rollback{
+    goto &action_edit if $::form{b} ne 'Rollback';
     goto &action_signin if is_frozen() && !&is_signed();
 
     my $title=$::form{p};
@@ -1366,7 +1368,7 @@ sub action_edit{
                     }
                     &puts('</select>');
                     &putenc('<input type="hidden" name="p" value="%s">',$::form{p});
-                    &puts('<input type="hidden" name="a" value="rollback_preview" >');
+                    &puts('<input type="hidden" name="a" value="rollback_" >');
                     &puts('<input type="submit" value="Rollback">');
                     &puts('</form>');
                     &end_day()
