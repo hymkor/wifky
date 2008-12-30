@@ -1570,8 +1570,9 @@ sub call_blockquote{
 }
 
 sub call_blockquote_sub{
+    my ($text,$request)=@_;
     local $::print='';
-    &syntax_engine( $_[0] , $_[1] );
+    &syntax_engine( $text , $request );
     qq(\n\n<blockquote class="block">).&verb($::print)."</blockquote>\n\n";
 }
 
