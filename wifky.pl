@@ -1653,11 +1653,13 @@ sub verb{
 }
 
 sub unverb{
-    ${$_[0]} =~ s/\a\((\d+)\)/
-          $1 > $#::later
-          ? "(code '$1' not found)"
-          : ref($::later[$1]) eq 'CODE' ? $::later[$1]->()
-          : $::later[$1]/ge  for(1..2);
+    for(1..10){
+        last unless ${$_[0]} =~ s/\a\((\d+)\)/
+              $1 > $#::later
+              ? "(code '$1' not found)"
+              : ref($::later[$1]) eq 'CODE' ? $::later[$1]->()
+              : $::later[$1]/ge;
+    }
 }
 
 
