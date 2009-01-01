@@ -38,6 +38,31 @@ except:
 
 version="0.5"
 user_agents='FeedSnake.py/%s' % version
+config_default={}
+option_handler={}
+
+def option(func):
+    option_handler[ func.func_name ] = func
+    return func
+
+@option
+def shrink(d):
+    re_filter = re.compile(r"<[^>]*>")
+    d["entries"] = [ 
+        e for e in d["entries"]
+           if re_filter.sub("",e.get("description","")).strip()
+    ]
+
+@option
+def uniq(d):
+    checked = set()
+    entries = []
+    for e in d["entries"]:
+        link = e["link"]
+        if link not in checked:
+            entries.append( e )
+        checked.add(link)
+    d["entries"] = entries
 
 def err():
     """ for compatibility between Python 2.4 and 3.0"""
@@ -174,17 +199,6 @@ def entry( title , link=None , id_=None ,content=None , updated=None , author=No
         "updated": updated.isoformat() ,
         "updated_parsed":updated.timetuple() ,
     }
-
-def insert_message(d,message):
-    error_cnt = d["error_cnt"] = d.get("error_cnt",0) + 1
-    d["entries"].insert(0,
-        entry(
-            title="Feed Error! [%d]" % error_cnt ,
-            link="http://example.com/#%d" % error_cnt ,
-            author="FeedSnake System" ,
-            content=message ,
-        )
-    )
 
 re_ahref  = re.compile(r'(<a[^>]+href=")([^"]*)"', re.DOTALL | re.IGNORECASE)
 re_imgsrc = re.compile(r'''(<img[^>]+src=['"])([^"']*)(["'])''',re.DOTALL|re.IGNORECASE)
@@ -376,16 +390,6 @@ def hoursago(n=0):
         dt -= timedelta(hours=n)
     return dt.strftime("%Y%m%d%H%M%S")
 
-def ymdhms2datetime(dt): ### for Python 2.4 which does not have no datetime.strptime() ###
-    return datetime(
-        year   = int(dt[ 0: 4],10) ,
-        month  = int(dt[ 4: 6],10) ,
-        day    = int(dt[ 6: 8],10) ,
-        hour   = int(dt[ 8:10],10) ,
-        minute = int(dt[10:12],10) ,
-        second = int(dt[12:14],10) ,
-    )
-
 def guess_coding(config,html):
     if "htmlcode" in config:
         coding = config["htmlcode"]
@@ -418,7 +422,7 @@ def html2feed(browser,config):
         raise SiteError("%s: url cound not open(%s)" % (index,str(err())))
 
     if "feed_title" in config:
-        title = config["feed_title"]
+        title = config["feed_title"].decode("utf8")
     else :
         m = re.search(r'<title[^>]*>(.*?)</title>',html,re.DOTALL|re.IGNORECASE)
         if m:
@@ -515,6 +519,17 @@ def ddl( cursor ):
     except sqlite.OperationalError:
         pass
 
+def strip_scripts(d):
+    re_strip_scripts = re.compile(r"<script[^>]*>.*?</script>",re.IGNORECASE|re.DOTALL)
+    for e in d["entries"]:
+        if "description" in e :
+            e["description"] = re_strip_scripts.sub("",e["description"])
+        if "content" in e:
+            e["content"] = [
+                { "value":re_strip_scripts.sub("",c["value"]) } 
+                for c in e["content"]
+            ]
+
 def interpret( conn , config , wsgi ):
     if "forward" in config:
         raise Die(
@@ -578,7 +593,7 @@ def interpret( conn , config , wsgi ):
     if "feed" not in d  or "link" not in d["feed"]:
         raise ConfigError("Can not find the feed.")
 
-    for key in "author", "title":
+    for key in "author","title","link":
         if key in config:
             try:
                 accept(d,key,config[key].decode("utf8"))
@@ -592,6 +607,15 @@ def interpret( conn , config , wsgi ):
 
     if "import" in config:
         import_contents(browser , d, config , cursor)
+
+    if "option" in config:
+        for e in config["option"].split():
+            try:
+                option_handler[e](d)
+            except IndexError:
+                pass
+
+    strip_scripts(d)
 
     ### Expire cache ###
     expire_dt = hoursago(7*24)
@@ -644,6 +668,12 @@ def menu( wsgi , conn , config):
 <body><h1>FeedSnake Come On!</h1>
 <ul>''' )
     for e in sorted( config.sections() ):
+        try:
+            if config.getboolean( e , "hidden" ):
+                continue
+        except (ValueError,ConfigParser.NoOptionError):
+            pass
+
         wsgi.write( '<li><a href="%s?%s" rel="nofollow">%s</a>\n' % (
                 wsgi.get("SCRIPT_NAME") or "/" , cgi.escape(e) ,
                 cgi.escape( siteinfo.get( e , "("+e+")" ).encode("utf8")) ) )
@@ -687,7 +717,7 @@ def application(
 ):
     wsgi = WSGI(environ,start_response)
     try:
-        configall = ConfigParser.ConfigParser()
+        configall = ConfigParser.ConfigParser(config_default)
         if inifname is None:
             inifname = re.sub( r"\.py$", ".ini" , inspect.getfile(application) )
         os.chdir( os.path.dirname(inifname) or "." )
@@ -729,14 +759,17 @@ def main(**kwarg):
         print line
 
 if __name__ == '__main__':
-    try:
-        portno = int(sys.argv[1])
-    except (ValueError,IndexError):
-        main()
+    portno = None
+    if len(sys.argv) >= 2:
+        for e in sys.argv[1:]:
+            pair = e.split("=",1)
+            if len(pair) >= 2 :
+                config_default[ pair[0] ] = pair[1]
+            elif re.search(r"^\d+$",e):
+                portno = int(e)
+    if portno and has_wsgiref:
+        wsgiref.simple_server.make_server(
+            "",portno,application
+        ).serve_forever()
     else:
-        if has_wsgiref:
-            wsgiref.simple_server.make_server(
-                "",portno,application
-            ).serve_forever()
-        else:
-            main()
+        main()

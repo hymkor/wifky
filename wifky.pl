@@ -2,12 +2,12 @@
 
 use strict; use warnings;
 
-$::version  = '1.4.0_0';
+$::version  = '1.5.0_0';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
-$::charset  = 'EUC-JP';
+$::charset  = 'UTF-8';
 %::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME} || (split(/[\\\/]/,$0))[-1];
 $::print    = ' 'x 10000; $::print = '';
@@ -40,7 +40,7 @@ if( $0 eq __FILE__ ){
         eval{ alarm 60; };
 
         &read_form;
-        &change_directory;
+        &chdir_and_code;
         foreach my $pl (sort map(/^([\w\.]+\.plg)$/ ? $1 : () ,&directory) ){
             do "./$pl"; die($@) if $@;
         }
@@ -77,11 +77,19 @@ if( $0 eq __FILE__ ){
     exit(0);
 }
 
-sub change_directory{
-    my $pagedir = __FILE__ ; $pagedir =~ s/\.\w+((\.\w+)*)$/.dat$1/;
-    unless( chdir $pagedir ){
-        mkdir($pagedir,0755);
-        chdir $pagedir or die("can not access $pagedir.");
+sub chdir_and_code{
+    (my $udir = __FILE__ ) =~ s/\.\w+((\.\w+)*)$/.d$1/;
+    if( chdir $udir ){
+        return;
+    }
+    (my $edir = __FILE__ ) =~ s/\.\w+((\.\w+)*)$/.dat$1/;
+    if( chdir $edir ){
+        $::charset = 'EUC-JP';
+        return;
+    }
+    mkdir($udir,0755);
+    unless( chdir $udir ){
+        die("can not access $udir or $edir.");
     }
 }
 
@@ -138,10 +146,13 @@ sub init_globals{
         'edt'           => \&action_edit ,
         'pwd'           => \&action_passwd ,
         'ren'           => \&action_rename ,
+        'rena'          => \&action_rename_attachment ,
         'comment'       => \&action_comment ,
         'Delete'        => \&action_delete ,
         'Commit'        => \&action_commit ,
         'Preview'       => \&action_preview ,
+        'rollback_'     => \&action_rollback_preview ,
+        'rollback'      => \&action_rollback ,
         'Upload'        => \&action_upload ,
         'tools'         => \&action_tools ,
         'preferences'   => \&action_preferences ,
@@ -164,8 +175,7 @@ sub init_globals{
         '600_Index'     => &anchor('Index',{a=>'recent'}) ,
     );
     if( !&is('lonely') || &is_signed() ){
-        $::menubar{'200_New'} = &anchor('New' , { a=>'new' }
-        );
+        $::menubar{'200_New'} = &anchor('New' , { a=>'new' });
     }
     @::menubar = ();
     if( &is_signed() ){
@@ -249,6 +259,7 @@ sub init_globals{
     );
     %::call_syntax_plugin = (
         '100_verbatim'       => \&call_verbatim ,
+        '200_blockquote'     => \&call_blockquote ,
         '500_block_syntax'   => \&call_block ,
         '800_close_sections' => \&call_close_sections ,
         '900_footer'         => \&call_footnote ,
@@ -359,7 +370,7 @@ sub browser_cache_off{
 sub read_multimedia{
     my ($query_string , $cutter ) = @_;
 
-    my @blocks = split("\r\n${cutter}","\r\n$query_string");
+    my @blocks = split("\r\n$cutter","\r\n$query_string");
     foreach my $block (@blocks){
         $block =~ s/\A\r?\n//;
         my ($header,$body) = split(/\r?\n\r?\n/,$block,2);
@@ -472,7 +483,7 @@ sub deyen{
 }
 
 sub mtimeraw{
-    my ($fn)=@_; $::mtime_cache{$fn} ||= (-f $fn ? ( stat($fn) )[9] : 0);
+    $::mtime_cache{$_[0]} ||= (-f $_[0] ? ( stat(_) )[9] : 0);
 }
 
 sub mtime{
@@ -488,8 +499,8 @@ sub ymdhms{
 
 sub cacheoff{
     undef %::mtime_cache;
-    undef @::dir_cache;
-    undef %::dir_cache;
+    undef @::contents;
+    undef %::contents;
 }
 sub title2mtime{
     &mtime( &title2fname(@_) );
@@ -617,7 +628,7 @@ sub flush_header{
 
 sub print_header{
     $::final_plugin{'000_header'} = \&flush_header;
-    my %arg=(@_);
+    my %arg=@_;
     my $label = $::config{sitename};
     $label .= ' - '.$::form{p} if exists $::form{p};
     $label .= '('.$arg{title}.')' if exists $arg{title};
@@ -625,7 +636,7 @@ sub print_header{
 
     &puts('<style type="text/css"><!--');
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
-        if( my $css =&read_object($p) ){
+        if( my $css =&read_text($p) ){
             $css =~ s/\<\<\{([^\}]+)\}/&myurl( { p=>$p , f=>$1 } )/ge;
             $css =~ s/[<>&]//g;
             $css =~ s|/\*.*?\*/||gs;
@@ -693,25 +704,33 @@ sub print_signarea{
 }
 
 sub check_frozen{
-    if( !is_signed() && &is_frozen() ){
+    if( !&is_signed() && &is_frozen() ){
         die( '!This page is frozen.!');
     }
 }
 sub check_conflict{
-    my $current_source = &read_object($::form{p});
+    my $current_source = &read_text($::form{p});
     my $before_source  = $::form{orgsrc_t};
     if( $current_source ne $before_source ){
         die( "!Someone else modified this page after you began to edit."  );
     }
 }
 
-sub read_object{
+sub read_text{ # for text
     &read_file(&title2fname(@_));
+}
+
+sub read_object{ # for binary
+    &read_file(&title2fname(@_));
+}
+
+sub read_textfile{ # for text
+    &read_file;
 }
 
 sub read_file{
     open(FP,$_[0]) or return $::default_contents{ $_[0] } || '';
-    local $/; undef $/;
+    local $/;
     my $object = <FP>;
     close(FP);
     defined($object) ? $object : $::default_contents{ $_[0] } || '';
@@ -732,7 +751,7 @@ sub write_file{
         &cacheoff;
         0;
     }else{
-        open(FP,">${fname}") or die("can't write the file ${fname}.");
+        open(FP,">$fname") or die("can't write the file $fname.");
             binmode(FP);
             print FP ref($body) ? ${$body} : $body;
         close(FP);
@@ -758,50 +777,41 @@ sub action_new{
 }
 
 sub load_config{
-    for(split(/\n/,&read_file('index.cgi'))){
+    for(split(/\n/,&read_textfile('index.cgi'))){
         $::config{$1}=&deyen($2) if /^\#?([^\#\!\t ]+)\t(.*)$/;
     }
 }
 
+sub local_cookie{
+    my $id;
+    if( exists $ENV{LOCAL_COOKIE_FILE} && open(FP,'<'.$ENV{LOCAL_COOKIE_FILE}) ){
+        $id=<FP>;
+        close(FP);
+    }
+    $id;
+}
+
 sub is_signed{
-    if( defined($::signed) ){
-        return $::signed;
-    }
-    if( exists $::form{signing}  &&  &auth_check() ){
-        &touch_session();
-        return $::signed=1;
-    }
+    return $::signed if defined $::signed;
+
+    my $remote_addr=$ENV{REMOTE_ADDR}||0;
+    my $id=$::cookie{$::session_cookie} || &local_cookie() || rand();
 
     # time(TAB)ip(TAB)key
-    for( split(/\n/,&read_file('session.cgi') ) ){
+    for( split(/\n/,&read_textfile('session.cgi') ) ){
         $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ && $1>time-24*60*60;
     }
 
-    my $remote_addr=$ENV{REMOTE_ADDR}||0;
-    if( exists $::ip{$remote_addr} &&
-        $::ip{$remote_addr}->[0] eq ($::cookie{$::session_cookie}||'') )
+    if( ($::form{signing} && &auth_check() ) || 
+        ($::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq $id ) )
     {
-        &touch_session();
+        push( @::http_header , "Set-Cookie: $::session_cookie=$id" );
+        $::ip{$remote_addr} = [ $id , time ];
+        &save_session();
         $::signed=1;
     }else{
         $::signed=0;
     }
-}
-
-sub touch_session{
-    my $remote_addr = $ENV{REMOTE_ADDR}||0;
-    if( exists $::ip{$remote_addr} &&
-        $::ip{$remote_addr}->[0] eq $::cookie{$::session_cookie} )
-    {
-        ### update current session ###
-        $::ip{$remote_addr}->[1] = time;
-    }else{
-        ### create new session ###
-        my $key=rand();
-        $::ip{$remote_addr} = [ $key , time ];
-        push( @::http_header , "Set-cookie: $::session_cookie=$key" );
-    }
-    &save_session();
 }
 
 sub save_session{
@@ -884,8 +894,48 @@ sub action_preview{
     }
 }
 
+sub action_rollback_preview{
+    goto &action_signin if is_frozen() && !&is_signed();
+
+    my $title = $::form{p};
+    my $attach = $::form{f};
+    &print_template(
+        template => $::system_template ,
+        main=>sub{
+            &begin_day("Rollback Preview: $title");
+            &print_page(
+                title=>$title ,
+                source=>\&read_text($title,$attach) ,
+                index=>1,
+                main=>1
+            );
+            &putenc('<form action="%s" method="post">',$::postme);
+            &puts('<input type="hidden" name="a" value="rollback"> ');
+            &puts('<input type="submit" name="b" value="Rollback"> ');
+            &puts('<input type="submit" name="b" value="Cancel"> ');
+            &putenc('<input type="hidden" name="p" value="%s">',$title);
+            &putenc('<input type="hidden" name="f" value="%s">',$attach);
+            &end_day();
+        }
+    );
+}
+
+sub action_rollback{
+    goto &action_edit if $::form{b} ne 'Rollback';
+    goto &action_signin if is_frozen() && !&is_signed();
+
+    my $title=$::form{p};
+    my $fn=&title2fname($title);
+    my $frozen=&is_frozen();
+    chmod(0644,$fn) if $frozen;
+    &archive() if $::config{archivemode};
+    &lockdo( sub{ &write_file( $fn , \&read_text($title,$::form{f})) } , $title );
+    chmod(0444,$fn) if $frozen;
+    &transfer_page();
+}
+
 sub action_passwd{
-    goto &signin unless is_signed();
+    goto &action_signin unless &is_signed();
 
     my ($p1,$p2) = ( $::form{p1} , $::form{p2} );
     die('!New signs differ from each other!') if $p1 ne $p2;
@@ -896,7 +946,7 @@ sub action_passwd{
 }
 
 sub action_tools{
-    goto &action_signin unless is_signed();
+    goto &action_signin unless &is_signed();
 
     &browser_cache_off();
     push( @::html_header , <<HEADER );
@@ -937,7 +987,8 @@ HEADER
             while( my ($section,undef)=each %::preferences ){
                 &putenc('<div id="%s" style="display:none" class="section">',$section );
                 &begin_day($section);
-                &putenc('<form action="%s" method="post">',$::postme);
+                &putenc('<form action="%s" method="post" accept-charset="%s">',
+                            $::postme,$::charset);
                 &putenc('<input type="hidden" name="section" value="%s">',$section);
 
                 &puts('<ul>');
@@ -1000,7 +1051,7 @@ HEADER
 }
 
 sub action_preferences{
-    goto &action_signin unless is_signed();
+    goto &action_signin unless &is_signed();
 
     foreach my $i ( @{$::preferences{$::form{section}}} ){
         next unless exists $i->{name};
@@ -1036,23 +1087,38 @@ sub tools_change_sign{
 }
 
 sub action_rename{
-    goto &signin unless &is_signed();
+    goto &action_signin unless &is_signed();
 
     my $newtitle = $::form{newtitle};
     my $title    = $::form{p};
     my $fname    = &title2fname($title);
     my $newfname = &title2fname($newtitle);
+    die("!The new page name '$newtitle' is already used.!") if -f $newfname;
 
     my @list = map {
-        my $older=$fname    . $_ ;
-        my $newer=$newfname . $_ ;
-        die("!The new page name '$newtitle' is already used.!") if -f $newfname;
+        my $older="${fname}__$_" ;
+        my $newer="${newfname}__$_";
+        die("!The new page name '$newtitle' is already used.!") if -f $newer;
         [ $older , $newer ];
-    } @{$::dir_cache{$fname}};
+    } @{$::contents{$fname}};
 
+    rename( $fname , $newfname );
     rename( $_->[0] , $_->[1] ) foreach @list;
     &transfer_page($newtitle);
 }
+
+sub action_rename_attachment{
+    goto &action_signin unless &is_signed();
+
+    my $older=&title2fname($::form{p},$::form{f1});
+    my $newer=&title2fname($::form{p},$::form{f2});
+    die("!The new attachment name is null.!") unless $::form{f2};
+    die("!The new attachment name '$::form{f2}' is already used.!") if -f $newer;
+
+    rename( $older , $newer );
+    &transfer_page($::form{p});
+}
+
 
 sub action_seek{
     my $keyword=$::form{keyword};
@@ -1117,9 +1183,9 @@ sub action_comment{
         utime( time , time , &title2fname($title) ) <= 0
             and die("unable to comment to unexistant page.");
         &cacheoff;
-        my $fname  = &title2fname($title,"comment.${comid}");
+        my $fname  = &title2fname($title,"comment.$comid");
         local *FP;
-        open(FP,">>${fname}") or die("Can not open $fname for append");
+        open(FP,">>$fname") or die("Can not open $fname for append");
             my @tm=localtime;
             printf FP "%04d/%02d/%02d %02d:%02d:%02d\t%s\t%s\r\n"
                 , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0]
@@ -1139,9 +1205,7 @@ sub begin_day{
 sub end_day{ &puts('</div></div>'); }
 
 sub do_index{
-    my $t=shift;
-    my $n=shift;
-    my @param=@_;
+    my ($t,$n,@param)=@_;
 
     &print_template(
         title => 'IndexPage' ,
@@ -1169,9 +1233,8 @@ sub action_upload{
 }
 
 sub lockdo{
-    my $code=shift;
-    push(@_,'LOCK');
-    my $lock=&title2fname(@_);
+    my ($code,@title)=(@_,'LOCK');
+    my $lock=&title2fname(@title);
     my $retry=0;
     while( mkdir($lock,0777)==0 ){
         sleep(1);
@@ -1216,9 +1279,9 @@ sub transfer_url{
     my $url=(shift || $::me);
     print join("\r\n",@::http_header),"\r\n\r\n";
     print '<html><head><title>Moving...</title>';
-    print qq|<meta http-equiv="refresh" content="1;URL=${url}">\n|
+    print qq|<meta http-equiv="refresh" content="1;URL=$url">\n|
         unless $::config{debugmode} && $messages;
-    print qq|</head><body><a href="${url}">Wait or Click Here</a>|;
+    print qq|</head><body><a href="$url">Wait or Click Here</a>|;
     print $messages if $::config{debugmode} && $messages;
     print '</body></html>';
     exit(0);
@@ -1246,7 +1309,7 @@ sub do_preview{
 }
 
 sub action_edit{
-    goto &action_signin if is_frozen() && !&is_signed();
+    goto &action_signin if &is_frozen() && !&is_signed();
 
     &browser_cache_off();
     my $title = $::form{p};
@@ -1256,20 +1319,60 @@ sub action_edit{
         Title => 'Edit' ,
         main  => sub {
             &begin_day( $title );
-            my $fn=&title2fname($title);
-            my $source=&read_file($fn);
+            my $source=&read_text($title);
             &print_form( $title , \$source , \$source );
             &end_day();
 
             if( &object_exists($::form{p}) && &is_signed() ){
                 &begin_day('Rename');
-                &putenc('<p><form action="%s" method="post">
+                &putenc('<h3>Page</h3><p><form action="%s" method="post">
                     <input type="hidden"  name="a" value="ren">
                     <input type="hidden"  name="p" value="%s">
                     Title: <input type="text" name="newtitle" value="%s" size="80">'
                     , $::postme , $::form{p} , $::form{p} );
                 &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
+
+                my @attachment=&list_attachment($title);
+                if( @attachment ){
+                    &putenc('<h3>Attachment</h3><p>
+                        <form action="%s" method="post" name="rena">
+                        <input type="hidden"  name="a" value="rena">
+                        <input type="hidden"  name="p" value="%s">'
+                        , $::postme , $::form{p});
+                    &puts('<select name="f1" onChange="document.rena.f2.value=this.options[this.selectedIndex].value;return false">');
+                    &puts('<option value="" selected></option>');
+                    foreach my $f(@attachment){
+                        &putenc('<option value="%s">%s</option>', $f, $f);
+                    }
+                    &puts('</select><input type="text" name="f2" value="" size="30" />');
+                    &puts('<br><input type="submit" name="rena" value="Submit"></form></p>');
+                }
                 &end_day();
+
+                my @archive=grep(/^\~\d{6}_\d{6}\.txt/ ,@attachment);
+                if( @archive ){
+                    &begin_day('Rollback');
+                    &putenc('<form action="%s" method="post"><select name="f">',
+                                $::postme);
+                    foreach my $f(reverse sort @archive){
+                        &putenc('<option value="%s">%s/%s/%s %s:%s:%s</option>',
+                                $f,
+                                substr($f,1,2),
+                                substr($f,3,2),
+                                substr($f,5,2),
+                                substr($f,8,2),
+                                substr($f,10,2),
+                                substr($f,12,2),
+                        );
+
+                    }
+                    &puts('</select>');
+                    &putenc('<input type="hidden" name="p" value="%s">',$::form{p});
+                    &puts('<input type="hidden" name="a" value="rollback_" >');
+                    &puts('<input type="submit" value="Rollback">');
+                    &puts('</form>');
+                    &end_day()
+                }
             }
         }
     );
@@ -1353,8 +1456,8 @@ sub action_cat{
             : $attach =~ /\.txt$/i ? 'text/plain'
             : 'application/octet-stream';
 
-    print  qq(Content-Disposition: attachment; filename="${attach}"\r\n);
-    print  qq(Content-Type: ${type}\r\n);
+    print  qq(Content-Disposition: attachment; filename="$attach"\r\n);
+    print  qq(Content-Type: $type\r\n);
     printf qq(Content-Length: %d\r\n),( stat(FP) )[7];
     printf qq(Last-Modified: %s, %02d %s %04d %s GMT\r\n) ,
                 (split(' ',scalar(gmtime((stat(FP))[9]))))[0,2,1,4,3];
@@ -1365,12 +1468,14 @@ sub action_cat{
 }
 
 sub cache_update{
-    unless( defined(@::dir_cache) ){
+    unless( defined(@::contents) ){
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
-            push( @::dir_cache , $fn );
-            if( $fn =~ /^((?:[0-9a-f][0-9a-f])+)(__(?:[0-9a-f][0-9a-f])+)?$/ ){
-                push( @{$::dir_cache{$1}} , $2||'' );
+            push( @::contents , $fn );
+            if( $fn =~ /^([0-9a-f][0-9a-f])+$/ ){
+                $::contents{$&} ||= [];
+            }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__((?:[0-9a-f][0-9a-f])+)$/ ){
+                push(@{$::contents{$1}},$2);
             }
         }
         closedir(DIR);
@@ -1378,31 +1483,28 @@ sub cache_update{
 }
 
 sub directory{
-    &cache_update() ; @::dir_cache;
+    &cache_update() ; @::contents;
 }
 
 sub list_page{
-    &cache_update() ; keys %::dir_cache;
+    &cache_update() ; keys %::contents;
 }
 
 sub object_exists{
-    &cache_update() ; exists $::dir_cache{ &title2fname($_[0]) }
+    &cache_update() ; exists $::contents{ &title2fname($_[0]) }
 }
 
 sub list_attachment{
-    my $fname=&title2fname(shift);
     &cache_update();
-    if( exists $::dir_cache{$fname} ){
-        map{ $_ && /^__/ ? &fname2title($') : () } @{$::dir_cache{$fname}};
-    }else{
-        ();
-    }
+    my $fn=&title2fname($_[0]);
+    return () unless exists $::contents{$fn};
+    map{ &fname2title($_) } @{$::contents{$fn}};
 }
 
 sub print_page{
-    my %args=( @_ );
+    my %args=@_;
     my $title=$args{title};
-    my $html =&enc( exists $args{source} ? ${$args{source}} : &read_object($title));
+    my $html =&enc( exists $args{source} ? ${$args{source}} : &read_text($title));
     return 0 unless $html;
 
     push(@::outline,
@@ -1411,21 +1513,21 @@ sub print_page{
 
     my %attachment;
     foreach my $attach ( &list_attachment($title) ){
-        my $e_attach = &enc( $attach );
+        my $attach_ = &enc( $attach );
         my $url=&attach2url($title,$attach);
-        $attachment{ $e_attach } = {
+        $attachment{ $attach_ } = {
             # for compatible #
             name => $attach ,
             url  => $url ,
             tag  => $attach =~ /\.(png|gif|jpg|jpeg)$/i
-                    ? qq(<img src="${url}" alt="${e_attach}" class="inline">)
-                    : qq(<a href="${url}" title="${e_attach}" class="attachment">${e_attach}</a>) ,
+                    ? qq(<img src="$url" alt="$attach_" class="inline">)
+                    : qq(<a href="$url" title="$attach_" class="attachment">$attach_</a>) ,
         };
     }
     my %session=(
         title      => $title ,
         attachment => \%attachment ,
-        index      => $args{index} ,
+        'index'    => $args{'index'} ,
         main       => $args{main} ,
     );
     if( exists $args{class} ){
@@ -1462,6 +1564,19 @@ sub call_verbatim{
     !gesm;
 }
 
+sub call_blockquote{
+    ${$_[0]} =~
+    s!(?:&lt;blockquote&gt;|6&lt;)(.*?)(?:&lt;/blockquote&gt;|&gt;9)!&call_blockquote_sub($1,$_[1])!gesm;
+}
+
+sub call_blockquote_sub{
+    my ($text,$request)=@_;
+    local $::print='';
+    &syntax_engine( $text , $request );
+    qq(\n\n<blockquote class="block">).&verb($::print)."</blockquote>\n\n";
+}
+
+
 sub inner_link{
     my ($session,$symbol,$title,$sharp)
         = ($_[0], $_[1] , split(/(?=#[pf][0-9mt])/,$_[2]) );
@@ -1474,7 +1589,7 @@ sub inner_link{
     if( &object_exists($title) ){
         &anchor( $symbol , { p=>$title } , { class=>'wikipage' } , $sharp);
     }else{
-        qq(<blink class="page_not_found">${symbol}?</blink>);
+        qq(<blink class="page_not_found">$symbol?</blink>);
     }
 }
 
@@ -1506,9 +1621,9 @@ sub plugin_footnote{
 
     my $i=$#{$session->{footnotes}} + 1;
     my %attr=( title=>&strip_tag($footnotetext)  );
-    $attr{name}="fm${i}" if $session->{index};
+    $attr{name}="fm$i" if $session->{index};
     '<sup>' .
-    &anchor("*${i}", { p=> $::form{p} } , \%attr , "#ft${i}" ) .
+    &anchor("*$i", { p=> $::form{p} } , \%attr , "#ft$i" ) .
     '</sup>' ;
 }
 
@@ -1534,7 +1649,7 @@ sub call_footnote{
 sub verb{
     my $cnt=scalar(@::later);
     push( @::later , $_[0] );
-    "\a(${cnt})";
+    "\a($cnt)";
 }
 
 sub unverb{
@@ -1576,12 +1691,11 @@ sub plugin_outline{
 }
 
 sub ls_core{
-    my $opt = shift;
-    my @list;
-    push(@_,'*') unless @_;
+    my ($opt,@args) = @_;
+    push(@args,'*') unless @args;
 
-    foreach (@_){
-        my $pat=$_;
+    my @list;
+    foreach my $pat (@args){
         $pat =~ s/([^\*\?]+)/unpack('h*',$1)/eg;
         $pat =~ s/\?/../g;
         $pat =~ s/\*/.*/g;
@@ -1613,9 +1727,8 @@ sub ls_core{
 }
 
 sub parse_opt{
-    my $opt=shift;
-    my $arg=shift;
-    foreach my $p (@_){
+    my ($opt,$arg,@rest)=@_;
+    foreach my $p (@rest){
         if( $p =~ /^-(\d+)$/ ){
             $opt->{number} = $opt->{countdown} = $1;
         }elsif( $p =~ /^-/ ){
@@ -1627,15 +1740,13 @@ sub parse_opt{
 }
 
 sub ls{
-    my $buf = '';
-    my %opt=();
-    my @arg=();
-    &parse_opt(\%opt,\@arg,@_);
+    &parse_opt(\my %opt,\my @arg,@_);
 
+    my $buf = '';
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
         exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
-        exists $opt{i} and $buf .= '<tt>'.scalar(@{$::dir_cache{ $p->{fname} }}).' </tt>';
+        exists $opt{i} and $buf .= '<tt>'.(1+@{$::contents{ $p->{fname} }}).' </tt>';
 
         $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
         $buf .= "</li>\r\n";
@@ -1647,9 +1758,9 @@ sub plugin_comment{
     return '' unless $::form{p};
 
     my $session=shift;
-    my @arg; my %opt;
+    my (@arg,%opt);
     &parse_opt( \%opt , \@arg , @_ );
-    my $etitle= &enc($::form{p});
+    my $title_= &enc($::form{p});
     my $comid = ($arg[0] || '0');
     my $caption = $#arg >= 1
         ? '<div class="caption">'.join(' ',@arg[1..$#arg]).'</div>'
@@ -1663,7 +1774,7 @@ sub plugin_comment{
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
                 $caption );
-    for(split(/\r?\n/,read_object($::form{p} , "comment.$comid"))){
+    for(split(/\r?\n/,&read_text($::form{p} , "comment.$comid"))){
         my ($dt,$who,$say) = split(/\t/,$_,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
         $buf .= sprintf('<p><span class="commentator">%s</span>'.
@@ -1674,7 +1785,7 @@ sub plugin_comment{
         $buf .= <<HTML
 <div class="form">
 <form action="$::postme" method="post" class="comment">
-<input type="hidden" name="p" value="$etitle">
+<input type="hidden" name="p" value="$title_">
 <input type="hidden" name="a" value="comment">
 <input type="hidden" name="comid" value="$ecomid">
 <div class="field name">
@@ -1822,7 +1933,7 @@ sub headline{
 }
 
 sub midashi{
-    my ($depth,$text,$session)=(@_);
+    my ($depth,$text,$session)=@_;
     $text = &preprocess($text,$session);
     my $section = ($session->{section} ||= [0,0,0,0,0]) ;
 
@@ -1846,19 +1957,19 @@ sub midashi{
                 }
         );
 
-        $text =~ s/^\+/${tag}. /;
+        $text =~ s/^\+/$tag. /;
         $text = &anchor( '<span class="sanchor">' .
                          &enc($::config{"${cls}mark"}) .
                          '</span>'
                   , { p     => $session->{title} }
                   , { class => "${cls}mark sanchor" }
-                  , "#p${tag}"
+                  , "#p$tag"
                   ) . qq(<span class="${cls}title">$text</span>) ;
 
         if( $session->{main} ){
-            &puts(qq(<div class="${cls} x${cls}">));
+            &puts(qq(<div class="$cls x$cls">));
         }else{
-            &puts(qq(<div class="x${cls}">));
+            &puts(qq(<div class="x$cls">));
         }
         &headline($text,$h,( $session->{index} ? "p$tag" : undef ) );
         if( $session->{main} ){
@@ -1912,7 +2023,7 @@ sub block_listing{ ### <UL><OL>... block ###
         }else{
             $diff < 0    and &puts( reverse splice(@stack,$nest) );
             $#stack >= 0 and &puts( '</li>' );
-            $nest > 0    and &puts( "<li>${text}" );
+            $nest > 0    and &puts( "<li>$text" );
         }
     }
     &puts( reverse @stack );
@@ -1974,7 +2085,7 @@ sub block_table{ ### || ... | ... |
             $tag = 'th'; $tr = $';
         }
         &puts( '<tr class="'.(++$i % 2 ? "odd":"even").'">',
-               map("<${tag}>$_</${tag}>",split(/\|/,$tr) ) , '</tr>' );
+               map("<$tag>$_</$tag>",split(/\|/,$tr) ) , '</tr>' );
     }
     &puts('</table>');
     1;
@@ -2001,9 +2112,9 @@ sub block_normal{
     my ($fragment,$session)=@_;
     if( (my $s = &preprocess($fragment,$session)) !~ /^\s*$/s ){
         if( $s =~ /\A\s*<(\w+).*<\/\1[^\/]*>\s*\Z/si ){
-            &puts( "<div>${s}</div>" );
+            &puts( "<div>$s</div>" );
         }else{
-            &puts("<p>${s}</p>");
+            &puts("<p>$s</p>");
         }
     }
     1;
