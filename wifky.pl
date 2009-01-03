@@ -116,8 +116,7 @@ sub init_globals{
         'fn'       => \&plugin_footnote ,
         'ls'       => sub{ '<ul>' . &ls(map(&denc($_),@_[1..$#_])) . '</ul>' },
         'comment'  => \&plugin_comment ,
-        'sitename' => sub{ &enc(exists $::config{sitename} ?
-                                $::config{sitename} : '') } ,
+        'sitename' => sub{ &enc( $::config{sitename} || '') } ,
         'br'       => sub{ '<br>' } ,
         'clear'    => sub{ '<br clear="all">' } ,
         'lt'       => sub{ '&lt;' } ,
@@ -895,7 +894,7 @@ sub action_preview{
 }
 
 sub action_rollback_preview{
-    goto &action_signin if is_frozen() && !&is_signed();
+    goto &action_signin if &is_frozen() && !&is_signed();
 
     my $title = $::form{p};
     my $attach = $::form{f};
@@ -922,7 +921,7 @@ sub action_rollback_preview{
 
 sub action_rollback{
     goto &action_edit if $::form{b} ne 'Rollback';
-    goto &action_signin if is_frozen() && !&is_signed();
+    goto &action_signin if &is_frozen() && !&is_signed();
 
     my $title=$::form{p};
     my $fn=&title2fname($title);
@@ -1122,12 +1121,12 @@ sub action_rename_attachment{
 
 sub action_seek{
     my $keyword=$::form{keyword};
-    my $ekeyword=&enc( $keyword );
+    my $keyword_=&enc( $keyword );
 
     &print_template(
-        Title => qq(Seek: "$ekeyword") ,
+        Title => qq(Seek: "$keyword_") ,
         main => sub {
-            &begin_day( qq(Seek: "$ekeyword") );
+            &begin_day( qq(Seek: "$keyword_") );
             &puts('<ul>');
             foreach my $fn ( &list_page() ){
                 my $title  = &fname2title( $fn );
@@ -1192,7 +1191,6 @@ sub action_comment{
                 , &yen($who) , &yen($comment) ;
         close(FP);
     }
-    my $ecomid = &enc($comid);
     &transfer_page;
 }
 
@@ -1292,7 +1290,7 @@ sub transfer_page{
 }
 
 sub do_preview{
-    goto &action_signin if is_frozen() && !&is_signed();
+    goto &action_signin if &is_frozen() && !&is_signed();
 
     my @param=@_;
     my $title = $::form{p};
@@ -1769,7 +1767,6 @@ sub plugin_comment{
     exists $session->{"comment.$comid"} and return '';
     $session->{"comment.$comid"} = 1;
 
-    my $ecomid = &enc($comid);
     my $buf = sprintf('<div class="comment" id="c_%s_%s">%s<div class="commentshort">',
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
@@ -1782,12 +1779,13 @@ sub plugin_comment{
                 , &enc(&deyen($who)), $text , &enc($dt) );
     }
     unless( exists $opt{f} ){
+        my $comid_ = &enc($comid);
         $buf .= <<HTML
 <div class="form">
 <form action="$::postme" method="post" class="comment">
 <input type="hidden" name="p" value="$title_">
 <input type="hidden" name="a" value="comment">
-<input type="hidden" name="comid" value="$ecomid">
+<input type="hidden" name="comid" value="$comid_">
 <div class="field name">
 <input type="text" name="who" size="10" class="field">
 </div><!-- div.field name -->
@@ -1982,9 +1980,11 @@ sub midashi{
 
 sub syntax_engine{
     my ($ref2html,$session) = ( ref($_[0]) ? $_[0] : \$_[0] , $_[1] );
+    $session->{nest}++;
     foreach my $p ( sort keys %::call_syntax_plugin ){
         $::call_syntax_plugin{$p}->( $ref2html , $session );
     }
+    $session->{nest}--;
 }
 
 sub call_block{
