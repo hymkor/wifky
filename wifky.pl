@@ -266,6 +266,11 @@ sub init_globals{
     %::final_plugin = (
         '900_verbatim' => \&unverb ,
     );
+
+    ### Form-Parts appearing allways . 
+    ### They does not have to print <form> tag themselves.
+    ### They have to keep a draft-text and continue users' operation 
+    ### to preview-screen.
     %::form_list = (
         '000_mode'           => \&form_mode ,
         '100_textarea'       => \&form_textarea ,
@@ -275,6 +280,14 @@ sub init_globals{
         '500_attachemnt'     => \&form_attachment ,
     );
 
+    ### Forms appearing the 1st edit-form. 
+    ### They have to print <form> tag themselves.
+    ### They can drop draft-text.
+    %::form2_list = (
+        '100_rename'         => \&form2_rename ,
+        '200_rename_attach'  => \&form2_rename_attach ,
+        '300_rollback'       => \&form2_rollback ,
+    );
     @::outline = ();
 
     $::user_template ||= '
@@ -1311,6 +1324,7 @@ sub action_edit{
 
     &browser_cache_off();
     my $title = $::form{p};
+    my @attachment=&list_attachment($title);
 
     &print_template(
         template => $::system_template ,
@@ -1321,59 +1335,67 @@ sub action_edit{
             &print_form( $title , \$source , \$source );
             &end_day();
 
-            if( &object_exists($::form{p}) && &is_signed() ){
-                &begin_day('Rename');
-                &putenc('<h3>Page</h3><p><form action="%s" method="post">
-                    <input type="hidden"  name="a" value="ren">
-                    <input type="hidden"  name="p" value="%s">
-                    Title: <input type="text" name="newtitle" value="%s" size="80">'
-                    , $::postme , $::form{p} , $::form{p} );
-                &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
-
-                my @attachment=&list_attachment($title);
-                if( @attachment ){
-                    &putenc('<h3>Attachment</h3><p>
-                        <form action="%s" method="post" name="rena">
-                        <input type="hidden"  name="a" value="rena">
-                        <input type="hidden"  name="p" value="%s">'
-                        , $::postme , $::form{p});
-                    &puts('<select name="f1" onChange="document.rena.f2.value=this.options[this.selectedIndex].value;return false">');
-                    &puts('<option value="" selected></option>');
-                    foreach my $f(@attachment){
-                        &putenc('<option value="%s">%s</option>', $f, $f);
-                    }
-                    &puts('</select><input type="text" name="f2" value="" size="30" />');
-                    &puts('<br><input type="submit" name="rena" value="Submit"></form></p>');
-                }
-                &end_day();
-
-                my @archive=grep(/^\~\d{6}_\d{6}\.txt/ ,@attachment);
-                if( @archive ){
-                    &begin_day('Rollback');
-                    &putenc('<form action="%s" method="post"><select name="f">',
-                                $::postme);
-                    foreach my $f(reverse sort @archive){
-                        &putenc('<option value="%s">%s/%s/%s %s:%s:%s</option>',
-                                $f,
-                                substr($f,1,2),
-                                substr($f,3,2),
-                                substr($f,5,2),
-                                substr($f,8,2),
-                                substr($f,10,2),
-                                substr($f,12,2),
-                        );
-
-                    }
-                    &puts('</select>');
-                    &putenc('<input type="hidden" name="p" value="%s">',$::form{p});
-                    &puts('<input type="hidden" name="a" value="rollback_" >');
-                    &puts('<input type="submit" value="Rollback">');
-                    &puts('</form>');
-                    &end_day()
-                }
+            foreach my $p (sort keys %::form2_list){
+                $::form2_list{$p}->($title,@attachment);
             }
+
         }
     );
+}
+
+sub form2_rename{
+    my ($title,@attachment)=@_;
+    return unless &object_exists($title) && &is_signed();
+    &begin_day('Rename');
+    &putenc('<h3>Page</h3><p><form action="%s" method="post">
+        <input type="hidden"  name="a" value="ren">
+        <input type="hidden"  name="p" value="%s">
+        Title: <input type="text" name="newtitle" value="%s" size="80">'
+        , $::postme , $title , $title );
+    &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
+}
+
+sub form2_rename_attach{
+    my ($title,@attachment)=@_;
+    return unless &object_exists($title) && &is_signed();
+    if( @attachment ){
+        &putenc('<h3>Attachment</h3><p>
+            <form action="%s" method="post" name="rena">
+            <input type="hidden"  name="a" value="rena">
+            <input type="hidden"  name="p" value="%s">'
+            , $::postme , $title);
+        &puts('<select name="f1" onChange="document.rena.f2.value=this.options[this.selectedIndex].value;return false">');
+        &puts('<option value="" selected></option>');
+        foreach my $f (@attachment){
+            &putenc('<option value="%s">%s</option>', $f, $f);
+        }
+        &puts('</select><input type="text" name="f2" value="" size="30" />');
+        &puts('<br><input type="submit" name="rena" value="Submit"></form></p>');
+    }
+    &end_day();
+}
+
+sub form2_rollback{
+    my ($title,@attachment)=@_;
+    return unless &object_exists($title) && &is_signed();
+    my @archive=grep(/^\~\d{6}_\d{6}\.txt/ ,@attachment);
+    if( @archive ){
+        &begin_day('Rollback');
+        &putenc('<form action="%s" method="post"><select name="f">', $::postme);
+        foreach my $f(reverse sort @archive){
+            &putenc('<option value="%s">%s/%s/%s %s:%s:%s</option>',
+                    $f,
+                    substr($f,1,2), substr($f,3,2),  substr($f, 5,2),
+                    substr($f,8,2), substr($f,10,2), substr($f,12,2),
+            );
+        }
+        &puts('</select>');
+        &putenc('<input type="hidden" name="p" value="%s">',$title);
+        &puts('<input type="hidden" name="a" value="rollback_" >');
+        &puts('<input type="submit" value="Preview">');
+        &puts('</form>');
+        &end_day()
+    }
 }
 
 sub print_template{
@@ -1756,13 +1778,10 @@ sub plugin_comment{
     return '' unless $::form{p};
 
     my $session=shift;
-    my (@arg,%opt);
-    &parse_opt( \%opt , \@arg , @_ );
+    &parse_opt( \my %opt , \my @arg , @_ );
     my $title_= &enc($::form{p});
-    my $comid = ($arg[0] || '0');
-    my $caption = $#arg >= 1
-        ? '<div class="caption">'.join(' ',@arg[1..$#arg]).'</div>'
-        : '';
+    my $comid = (shift(@arg) || '0');
+    my $caption = @arg ? '<div class="caption">'.join(' ',@arg).'</div>' : '';
 
     exists $session->{"comment.$comid"} and return '';
     $session->{"comment.$comid"} = 1;
