@@ -97,7 +97,7 @@ $::action_plugin{'pluginmgr_permit'} = sub {
     foreach my $key (grep(/^pluginmgr__/,keys %::config)){
         delete $::config{$key};
     }
-    while( my ($key,$value)=each %::form ){
+    while( my ($key)=each %::form ){
         $::config{$key} = 1 if $key =~ /^pluginmgr__/;
     }
     &::save_config;

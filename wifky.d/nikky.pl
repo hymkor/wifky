@@ -22,7 +22,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.0.0_0';
+my $version='1.0.0_1';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
 my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
@@ -333,13 +333,15 @@ sub action_rss{
                                 unpack('h*',$id)) ;
             $item{title} = sprintf('Comment for %s', $p->{title} );
             $item{desc} = [ 
-                '<dl>' . join("\n",
-                    map{
-                        my ($dt,$who,$text)=
-                            map{ &::enc(&::deyen($_)) } split(/\t/,$_,3);
-                        "<dt>$who ($dt)</dt><dd>$text</dd>";
-                    } split(/\n/,&::read_object($p->{title},$name) )
-                ) . '</dl>'
+                &::verb(
+                    '<dl>' . join("\n",
+                        map{
+                            my ($dt,$who,$text)=
+                                map{ &::enc(&::deyen($_)) } split(/\t/,$_,3);
+                            "<dt>$who ($dt)</dt><dd>$text</dd>";
+                        } split(/\n/,&::read_object($p->{title},$name) )
+                    ) . '</dl>'
+                )
             ];
             push(@topics , { %item } );
         }
