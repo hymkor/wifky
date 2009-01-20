@@ -26,7 +26,7 @@ if( $0 eq __FILE__ ){
         local $SIG{__WARN__} = local $SIG{__DIE__} = sub {
             return if ( caller(0) )[1] =~ /\.pm$/;
             my $msg=join(' ',@_);
-            if( $msg =~ /^!(.*)!/ ){
+            if( $msg =~ /^!([^\!]*)/ ){
                 $messages .= '<div>'.&enc($1)."</div>\n" ;
             }else{
                 $messages .= '<div>'.&enc($msg)."</div>\n" ;
@@ -1720,19 +1720,18 @@ sub ls_core{
         $pat =~ s/\?/../g;
         $pat =~ s/\*/.*/g;
         $pat = '^' . $pat . '$';
-        push(@list, map{
-             +{ fname  => $_ ,
-                title  => &fname2title($_) ,
-                mtimeraw => &mtimeraw($_) ,
-                mtime  => &mtime($_)
-              }
-            }grep{
-                  exists $opt->{a}
-                ? ($_ =~ $pat )
-                : ($_ =~ $pat && !/^e2/ && -f $_ )
-            }
-            &list_page()
-        );
+        while( my ($fn,$c)=each %::contents ){
+            next if $fn !~ $pat;
+            next if ($fn =~ /^e2/ || ! -f $fn) && !exists $opt->{a};
+            push(@list, 
+                 +{ fname  => $fn ,
+                    title  => &fname2title($fn) ,
+                    mtimeraw => &mtimeraw($fn) ,
+                    mtime  => &mtime($fn) ,
+                    attachments => $c ,
+                  }
+            );
+        }
     }
     if( exists $opt->{t} ){
         @list = sort{ $a->{mtime} cmp $b->{mtime} } @list;
@@ -1765,9 +1764,8 @@ sub ls{
     my $buf = '';
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
-        exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
-        exists $opt{i} and $buf .= '<tt>'.(1+@{$::contents{ $p->{fname} }}).' </tt>';
-
+        $buf .= '<tt>'.$p->{mtime}.' </tt>' if $opt{l};
+        $buf .= '<tt>'.(1+@{$p->{attachments}}).' </tt>' if $opt{i};
         $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
         $buf .= "</li>\r\n";
     }
@@ -1780,7 +1778,7 @@ sub plugin_comment{
     my $session=shift;
     &parse_opt( \my %opt , \my @arg , @_ );
     my $title_= &enc($::form{p});
-    my $comid = (shift(@arg) || '0');
+    my $comid = shift(@arg) || '0';
     my $caption = @arg ? '<div class="caption">'.join(' ',@arg).'</div>' : '';
 
     exists $session->{"comment.$comid"} and return '';
