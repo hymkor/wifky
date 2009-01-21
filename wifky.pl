@@ -1511,7 +1511,7 @@ sub cache_update{
     sub xadd{ # class-function
         my $fn=pop;
         push( @::xcontents , $fn );
-        if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?/) ){
+        if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?$/) ){
             my $c=($::xcontents{$p[0]} ||= wifky::Page->new);
             $c->xadd( $p[1] ) if defined $p[1];
         }else{
@@ -1521,7 +1521,7 @@ sub cache_update{
     }
     sub xdel{
         my $fn=shift;
-        if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?/) ){
+        if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?$/) ){
             my $c=$::xcontents{$p[0]} or return;
             if( $p[1] ){
                 $c->xdel($p[1]);
