@@ -14,6 +14,8 @@ $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 %::flag     = ();
 %::cnt      = ();
+sub first(&@);
+sub lockdo(&@);
 
 my $messages = '';
 
@@ -70,12 +72,20 @@ if( $0 eq __FILE__ ){
     };
     if( $@ ){
         print $_,"\r\n" for @::http_header;
-        print "Content-Type: text/html;\r\n" unless grep(/^Content-Type:/i,@::http_header);
+        unless( first{ /^Content-Type:/i } @::http_header ){
+            print "Content-Type: text/html;\r\n";
+        }
         print "\r\n<html><body>\n",&errmsg($@);
         print $messages if $@ !~ /^!/;
         print "</body></html>\n";
     }
     exit(0);
+}
+
+sub first(&@){
+    my $code=shift;
+    for(@_){ return $_ if $code->($_); }
+    undef;
 }
 
 sub chdir_and_code{
@@ -100,6 +110,7 @@ sub init_globals{
         $::RXURL    = '(?:s?https?|ftp|file)://[-\\w.!~*\'();/?:@&=+$,%#]+';
     }
 
+    $::xmlrpc ||= '';
     $::target = ( $::config{target}
                 ? sprintf(' target="%s"',$::config{target}) : '' );
     $::config{CSS} ||= 'CSS';
@@ -290,6 +301,7 @@ sub init_globals{
         '300_rollback'       => \&form2_rollback ,
     );
     @::outline = ();
+    %::mtime_cache = ();
 
     $::user_template ||= '
         <div class="main">
@@ -401,7 +413,7 @@ sub read_multimedia{
 sub read_simpleform{
     foreach my $p ( split(/[&;]/, $_[0]) ){
         my ($name, $value) = split(/=/, $p,2);
-        defined($value) or $value = '' ;
+        $value = '' unless defined $value;
         $value =~ s/\+/ /g;
         $value =~ s/%([0-9a-fA-F][0-9a-fA-F])/pack('C', hex($1))/eg;
         &set_form( $name , $value );
@@ -458,7 +470,7 @@ sub errmsg{
 
 sub enc{
     my $s=shift;
-    defined($s) or return '';
+    return '' unless defined $s;
     $s =~ s/&/\&amp;/g;
     $s =~ s/</\&lt;/g;
     $s =~ s/>/\&gt;/g;
@@ -470,7 +482,7 @@ sub enc{
 
 sub denc{
     my $s = shift;
-    defined($s) or return '';
+    return '' unless defined $s;
     $s =~ s/\&#39;/'/g;
     $s =~ s/\&lt;/</g;
     $s =~ s/\&gt;/>/g;
@@ -510,13 +522,6 @@ sub ymdhms{
     my @tm=localtime( $tm );
     sprintf('%04d/%02d/%02d %02d:%02d:%02d'
         , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0])
-}
-
-sub cacheoff{
-    undef %::mtime_cache;
-    untie %::contents;
-    undef @::xcontents;
-    undef %::xcontents;
 }
 
 sub title2mtime{
@@ -563,9 +568,6 @@ sub img{
     '<img '.&verb(join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr}))).'>';
 }
 
-sub title2url{ &myurl( { p=>$_[0] } ); }
-sub attach2url{ &myurl( { p=>$_[0] , f=>$_[1]} );}
-
 sub form_mode{
     if( $::config{archivemode} ){
         &puts('<div class="archivemode">archive mode</div>');
@@ -603,23 +605,22 @@ sub form_commit_button{
 }
 
 sub form_attachment{
-    ### &begin_day('Attachment');
     &puts('<h3>Attachment</h3>');
     &puts('<p>New:<input type="file" name="newattachment_b" size="48">');
     &puts('<input type="submit" name="a" value="Upload"></p>');
-    my @attachments=&list_attachment( $::form{p} ) or return;
+    my @attachments=$::contents{$::form{p}}->attach or return;
     &puts('<p>');
-    foreach my $attach (sort @attachments){
-        my $fn = &title2fname($::form{p}, $attach);
+    foreach my $f (sort @attachments){
+        my $fn = &title2fname($::form{p}, $f);
 
-        &putenc('<input type="checkbox" name="f" value="%s"' , $attach );
+        &putenc('<input type="checkbox" name="f" value="%s"' , $f );
         if( !&is_signed() && ! &w_ok($fn) ){
             &puts(' disabled');
         }
         &putenc('><input type="text" name="dummy" readonly value="&lt;&lt;{%s}"
                 size="%d" style="font-family:monospace"
-                onClick="this.select();">', $attach, length($attach)+4 );
-        &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$attach } ).':' );
+                onClick="this.select();">', $f, length($f)+4 );
+        &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$f } ).':' );
         &putenc('%d bytes, at %s', (stat $fn)[7],&mtime($fn));
         &puts('<strong>frozen</strong>') unless &w_ok();
         &puts(')<br>');
@@ -627,7 +628,6 @@ sub form_attachment{
     &puts('</p>');
     &puts('<input type="submit" name="a" value="Freeze/Fresh">') if &is_signed();
     &puts('<input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">');
-    ### &end_day();
 }
 
 sub print_form{
@@ -697,7 +697,7 @@ sub is_frozen{
 
 sub auth_check{ # If password is right, return true.
     !$::config{crypt} ||
-    grep(crypt($_,$::config{crypt}) eq $::config{crypt},@{$::forms{password}})>0;
+    first{ crypt($_,$::config{crypt}) eq $::config{crypt} } @{$::forms{password}};
 }
 
 sub ninsho{ # If password is wrong, then die.
@@ -735,6 +735,7 @@ sub read_textfile{ # for text
 }
 
 sub read_file{
+    local *FP;
     open(FP,$_[0]) or return $::default_contents{ $_[0] } || '';
     local $/;
     my $object = <FP>;
@@ -754,14 +755,15 @@ sub write_file{
 
     if( length( ref($body) ? $$body : $body ) <= 0 ){
         unlink($fname) or rmdir($fname);
-        &cacheoff;
+        wifky::Contents::xdel($fname);
         0;
     }else{
+        local *FP;
         open(FP,">$fname") or die("can't write the file $fname.");
             binmode(FP);
             print FP ref($body) ? ${$body} : $body;
         close(FP);
-        &cacheoff;
+        wifky::Contents::xadd($fname);
         1;
     }
 }
@@ -790,6 +792,7 @@ sub load_config{
 
 sub local_cookie{
     my $id;
+    local *FP;
     if( exists $ENV{LOCAL_COOKIE_FILE} && open(FP,'<'.$ENV{LOCAL_COOKIE_FILE}) ){
         $id=<FP>;
         close(FP);
@@ -821,12 +824,12 @@ sub is_signed{
 }
 
 sub save_session{
-    &lockdo( sub{
+    lockdo{
         &write_file( 'session.cgi' ,
             join("\n",map(sprintf("#%s\t%s\t%s",$::ip{$_}->[1],$_,$::ip{$_}->[0]),
                  keys %::ip ))
-        ); } , 'session.cgi'
-    );
+        );
+    } 'session.cgi';
 }
 
 sub action_signin{
@@ -867,7 +870,7 @@ sub save_config{
     while( my ($key,$val)=each %::config ){
         push( @settings , '#'.$key."\t".&yen($val) ) if $val;
     }
-    &lockdo( sub{ &write_file( 'index.cgi' , join("\n", @settings) ) } );
+    lockdo{ &write_file( 'index.cgi' , join("\n", @settings) ) } 'index.cgi';
 }
 
 sub action_commit{
@@ -903,15 +906,15 @@ sub action_preview{
 sub action_rollback_preview{
     goto &action_signin if &is_frozen() && !&is_signed();
 
-    my $title = $::form{p};
-    my $attach = $::form{f};
+    my $p = $::form{p};
+    my $f = $::form{f};
     &print_template(
         template => $::system_template ,
         main=>sub{
-            &begin_day("Rollback Preview: $title");
+            &begin_day("Rollback Preview: $f");
             &print_page(
-                title=>$title ,
-                source=>\&read_text($title,$attach) ,
+                title=>$f ,
+                source=>\&read_text($f,$p) ,
                 index=>1,
                 main=>1
             );
@@ -919,8 +922,8 @@ sub action_rollback_preview{
             &puts('<input type="hidden" name="a" value="rollback"> ');
             &puts('<input type="submit" name="b" value="Rollback"> ');
             &puts('<input type="submit" name="b" value="Cancel"> ');
-            &putenc('<input type="hidden" name="p" value="%s">',$title);
-            &putenc('<input type="hidden" name="f" value="%s">',$attach);
+            &putenc('<input type="hidden" name="p" value="%s">',$p);
+            &putenc('<input type="hidden" name="f" value="%s">',$f);
             &end_day();
         }
     );
@@ -935,7 +938,7 @@ sub action_rollback{
     my $frozen=&is_frozen();
     chmod(0644,$fn) if $frozen;
     &archive() if $::config{archivemode};
-    &lockdo( sub{ &write_file( $fn , \&read_text($title,$::form{f})) } , $title );
+    lockdo{ &write_file( $fn , \&read_text($title,$::form{f})) } $title;
     chmod(0444,$fn) if $frozen;
     &transfer_page();
 }
@@ -1022,14 +1025,14 @@ HEADER
                         );
                     }elsif( $i->{type} eq 'radio' ){
                         &putenc('%s<br>',$i->{desc});
-                        foreach my $p (@{$i->{option}}){
+                        foreach my $e (@{$i->{option}}){
                             &putenc('<input type="radio" name="config__%s" value="%s"%s>%s<br>'
                                 , $i->{name}
-                                , $p->[0]
+                                , $e->[0]
                                 , ( defined($::config{$i->{name}}) &&
-                                    $::config{$i->{name}} eq $p->[0]
+                                    $::config{$i->{name}} eq $e->[0]
                                   ? ' checked' : '' )
-                                , $p->[1] );
+                                , $e->[1] );
                         }
                     }elsif( $i->{type} eq 'a' ){
                         &putenc('<a href="%s">%s</a><br>',$i->{href},$i->{desc} );
@@ -1132,6 +1135,7 @@ sub action_seek{
     &print_template(
         Title => qq(Seek: "$keyword_") ,
         main => sub {
+            local *FP;
             &begin_day( qq(Seek: "$keyword_") );
             &puts('<ul>');
             while( my ($fn)=each %::xcontents ){
@@ -1161,9 +1165,9 @@ sub action_delete{
         my $fn=&title2fname( $::form{p} , $f );
         if( &w_ok($fn) || &is_signed() ){
             unlink( $fn ) or rmdir( $fn );
+            wifky::Contents::xdel($fn);
         }
     }
-    &cacheoff;
     &do_preview();
 }
 
@@ -1174,7 +1178,6 @@ sub action_freeze_or_fresh{
         my $fn=&title2fname( $::form{p} , $f );
         chmod( &w_ok($fn) ? 0444 : 0666 , $fn );
     }
-    &cacheoff;
     &do_preview();
 }
 
@@ -1187,8 +1190,7 @@ sub action_comment{
     if( length($comment) > 0 ){
         utime( time , time , &title2fname($title) ) <= 0
             and die("unable to comment to unexistant page.");
-        &cacheoff;
-        my $fname  = &title2fname($title,"comment.$comid");
+        my $fname = &title2fname($title,"comment.$comid");
         local *FP;
         open(FP,">>$fname") or die("Can not open $fname for append");
             my @tm=localtime;
@@ -1236,7 +1238,7 @@ sub action_upload{
     }
 }
 
-sub lockdo{
+sub lockdo(&@){
     my ($code,@title)=(@_,'LOCK');
     my $lock=&title2fname(@title);
     my $retry=0;
@@ -1265,7 +1267,7 @@ sub do_submit{
     if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
         &archive();
     }
-    if( &lockdo( sub{ &write_file( $fn , \$::form{text_t} ) },$::form{p} )){
+    if( lockdo{ &write_file( $fn , \$::form{text_t} ) } $::form{p} ){
         if( $::form{to_freeze} ){
             chmod(0444,$fn);
         }
@@ -1316,7 +1318,7 @@ sub action_edit{
 
     &browser_cache_off();
     my $title = $::form{p};
-    my @attachment=&list_attachment($title);
+    my @attachment=$::contents{$title}->attach;
 
     &print_template(
         template => $::system_template ,
@@ -1327,8 +1329,8 @@ sub action_edit{
             &print_form( $title , \$source , \$source );
             &end_day();
 
-            foreach my $p (sort keys %::form2_list){
-                $::form2_list{$p}->($title,@attachment);
+            foreach my $e (sort keys %::form2_list){
+                $::form2_list{$e}->($title,@attachment);
             }
 
         }
@@ -1408,7 +1410,7 @@ sub print_template{
         },
     );
     &print_header( userheader=>'template' );
-    $template =~ s/([\&\%]){(.*?)}/&template_callback(\%default,\%hash,$1,$2)/ge;
+    $template =~ s/([\&\%])\{(.*?)\}/&template_callback(\%default,\%hash,$1,$2)/ge;
     &puts( $template );
     &puts('</body></html>');
 }
@@ -1454,6 +1456,7 @@ sub action_view{
 sub action_cat{
     my $attach=$::form{f};
     my $path=&title2fname($::form{p},$attach);
+    local *FP;
 
     unless( open(FP,$path) ){
         push(@::http_header,'Status: 404 Attachment not found.');
@@ -1482,19 +1485,12 @@ sub action_cat{
 
 sub cache_update{
     unless( defined(@::xcontents) ){
+        local *DIR;
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
-            push( @::xcontents , $fn );
-            if( $fn =~ /^([0-9a-f][0-9a-f])+$/ ){
-                $::xcontents{$&} ||= [];
-            }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__((?:[0-9a-f][0-9a-f])+)$/ ){
-                push(@{$::xcontents{$1}},$2);
-            }else{
-                push(@::etcfiles,$fn);
-            }
+            wifky::Contents::xadd( $fn );
         }
         closedir(DIR);
-        tie %::contents,'wifky::Contents',\%::xcontents;
     }
 }
 
@@ -1504,25 +1500,62 @@ sub cache_update{
         my ($class,$value)=@_;
         bless \$value,$class;
     }
-    sub FETCH{
-        ${$_[0]}->{unpack('h*',$_[1]) };
-    }
     sub NEXTKEY{
         my @p=each %{${$_[0]}};
         ( unpack('h*',$p[0]),$p[1] );
     }
-    sub FIRSTKEY{
-        goto &NEXTKEY;
+    sub FETCH{ ${$_[0]}->{unpack('h*',$_[1]) } || wifky::None->new }
+    sub FIRSTKEY{ goto &NEXTKEY; }
+    sub EXISTS{ exists ${$_[0]}->{ unpack('h*',$_[1]) }; }
+    
+    sub xadd{ # class-function
+        my $fn=pop;
+        push( @::xcontents , $fn );
+        if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?/) ){
+            my $c=($::xcontents{$p[0]} ||= wifky::Page->new);
+            $c->xadd( $p[1] ) if defined $p[1];
+        }else{
+            push(@::etcfiles,$fn);
+        }
+        tie %::contents,'wifky::Contents',\%::xcontents;
     }
-    sub EXISTS{
-        exists ${$_[0]}->{ unpack('h*',$_[1]) };
+    sub xdel{
+        my $fn=shift;
+        if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?/) ){
+            my $c=$::xcontents{$p[0]} or return;
+            if( $p[1] ){
+                $c->xdel($p[1]);
+                delete $::xcontents{$p[0]} unless $c->xattach || -f $p[0];
+            }elsif( $c->xattach <= 0 ){
+                delete $::xcontents{$p[0]};
+            }
+        }
     }
-}
 
-sub list_attachment{
-    &cache_update();
-    my $c=$::contents{$_[0]};
-    $c ?  map{ &fname2title($_) } @{$c} : ();
+    package wifky::Page;
+    sub new{ bless [],$_[0]; }
+    sub attach{ map{ pack('h*',$_) } @{$_[0]}; }
+    sub xattach{ @{$_[0]}; }
+    sub xadd{ push(@{$_[0]},$_[1]); }
+    sub has{ 
+        my $f=unpack('h*',$_[1]);
+        ::first{ $_ eq $f } @{$_[0]} || ();
+    }
+    sub xdel{ 
+        my ($self,$attach)=@_;
+        for(my $i=0;$i < @{$self}; ++$i){
+            if( $self->[$i] eq $attach ){
+                splice @{$self},$i,1;
+                return;
+            }
+        }
+    }
+
+    package wifky::None;
+    sub new{ bless [],$_[0] }
+    sub attach{ ();}
+    sub xattach{ (); }
+    sub has{ undef; }
 }
 
 sub print_page{
@@ -1536,16 +1569,15 @@ sub print_page{
     );
 
     my %attachment;
-    foreach my $attach ( &list_attachment($title) ){
-        my $attach_ = &enc( $attach );
-        my $url=&attach2url($title,$attach);
-        $attachment{ $attach_ } = {
+    foreach my $f ( $::contents{$title}->attach ){
+        my $f_ = &enc( $f );
+        $attachment{ $f_ } = {
             # for compatible #
-            name => $attach ,
-            url  => $url ,
-            tag  => $attach =~ /\.(png|gif|jpg|jpeg)$/i
-                    ? qq(<img src="$url" alt="$attach_" class="inline">)
-                    : qq(<a href="$url" title="$attach_" class="attachment">$attach_</a>) ,
+            name => $f ,
+            url  => &myurl({p=>$title,f=>$f}) ,
+            tag  => $f =~ /\.(png|gif|jpg|jpeg)$/i
+                    ? &img($f_,{p=>$title,f=>$f},{class=>'inline'})
+                    : &anchor($f_,{p=>$title,f=>$f},{class=>'attachment'})
         };
     }
     my %session=(
@@ -1629,13 +1661,13 @@ sub plugin_menubar{
 }
 
 sub plugin_search{
-    sprintf( '<div class="search_form"><form class="search" action="%s">
+    sprintf '<div class="search_form"><form class="search" action="%s">
         <input class="search" type="text" name="keyword" size="20" value="%s">
         <input type="hidden" name="a" value="?">
         <input class="search" type="submit" value="?">
         </form></div>' ,
         $::me ,
-        &enc(exists $::form{keyword} ? $::form{keyword} : '' ));
+        &enc(exists $::form{keyword} ? $::form{keyword} : '' );
 }
 
 sub plugin_footnote{
@@ -1691,12 +1723,12 @@ sub plugin_outline{
         sub{
             my $depth=-2;
             my $ss='';
-            foreach my $p( @::outline ){
-                next if $p->{title} eq 'Header' ||
-                        $p->{title} eq 'Footer' ||
-                        $p->{title} eq 'Sidebar' ;
+            foreach my $e ( @::outline ){
+                next if $e->{title} eq 'Header' ||
+                        $e->{title} eq 'Footer' ||
+                        $e->{title} eq 'Sidebar' ;
 
-                my $diff=$p->{depth} - $depth;
+                my $diff=$e->{depth} - $depth;
                 if( $diff > 0 ){
                     $ss .= '<ul><li>' x $diff ;
                 }else{
@@ -1704,8 +1736,8 @@ sub plugin_outline{
                     $depth >= 0  and $ss .= "</li>\n" ;
                     $ss .= '<li>';
                 }
-                $ss .= &anchor( $p->{text}, { p=>$p->{title} }, undef, $p->{sharp} );
-                $depth=$p->{depth};
+                $ss .= &anchor( $e->{text}, { p=>$e->{title} }, undef, $e->{sharp} );
+                $depth=$e->{depth};
             }
             $ss .= '</li></ul>' x ($depth+2);
             $ss;
@@ -1750,13 +1782,13 @@ sub ls_core{
 
 sub parse_opt{
     my ($opt,$arg,@rest)=@_;
-    foreach my $p (@rest){
-        if( $p =~ /^-(\d+)$/ ){
+    foreach my $e (@rest){
+        if( $e =~ /^-(\d+)$/ ){
             $opt->{number} = $opt->{countdown} = $1;
-        }elsif( $p =~ /^-/ ){
+        }elsif( $e =~ /^-/ ){
             $opt->{$'} = 1;
         }else{
-            push(@{$arg},$p);
+            push(@{$arg},$e);
         }
     }
 }
@@ -1768,7 +1800,7 @@ sub ls{
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
         $buf .= '<tt>'.$p->{mtime}.' </tt>' if $opt{l};
-        $buf .= '<tt>'.(1+@{$p->{attachments}}).' </tt>' if $opt{i};
+        $buf .= '<tt>'.scalar(@{$p->{attachments}}).' </tt>' if $opt{i};
         $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
         $buf .= "</li>\r\n";
     }
@@ -1880,19 +1912,19 @@ sub preprocess_outerlink2{ ### [...|http://...] style ###
 }
 
 sub attach2tag{
-    my ($session,$nm,$label)=@_;
-    my ($p,$f)=($session->{title},&denc($nm));
-    $label ||= $nm;
+    my ($session,$f_,$label)=@_;
+    my ($p,$f)=($session->{title},&denc($f_));
+    $label ||= $f_;
     $label =~ s/\r*\n/ /gs;
 
-    if( exists $session->{attachment}->{$nm} ){
-        if( $nm =~ /\.png$/i || $nm =~ /\.gif$/i  || $nm =~ /\.jpe?g$/i ){
+    if( $::contents{$p}->has($f) ){
+        if( $f =~ /\.png$/i || $f =~ /\.gif$/i  || $f =~ /\.jpe?g$/i ){
             &img( $label ,{ p=>$p , f=>$f } , { class=>'inline' } );
         }else{
-            &anchor($label ,{ p=>$p , f=>$f } , { title=>$label } )
+            &anchor( $label ,{ p=>$p , f=>$f } , { title=>$label } );
         }
     }else{
-        &verb(sub{$::ref{$nm} || qq(<blink class="attachment_not_found">$nm</blink>)});
+        &verb(sub{$::ref{$f} || qq(<blink class="attachment_not_found">$f_</blink>)});
     }
 }
 
@@ -1957,7 +1989,9 @@ sub midashi{
     if( $depth < 0 ){
         &puts( "<h1>$text</h1>" );
     }else{
-        grep( $_ && &puts('</div></div>'),@{$section}[$depth .. $#{$section}]);
+        foreach my $p (@{$section}[$depth .. $#{$section}]){
+            &puts('</div></div>') if $p;
+        }
         $section->[ $depth ]++;
         $_=0 for(@{$section}[$depth+1 .. $#{$section} ]);
 
@@ -2017,8 +2051,11 @@ sub call_block{
 
 sub call_close_sections{
     my ($ref2html,$session)=@_;
-    exists $session->{section} and
-        grep( $_ && &puts('</div></div>'),@{$session->{section}} );
+    if( exists $session->{section} ){
+        foreach my $p (@{$session->{section}}){
+            &puts('</div></div>') if $p;
+        }
+    }
 }
 
 sub block_listing{ ### <UL><OL>... block ###
@@ -2167,3 +2204,6 @@ sub directory{ @::xcontents; }
 sub list_page{ keys %::xcontents; }
 sub object_exists{ exists $::contents{ $_[0] }; }
 sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
+sub list_attachment{ $::contents{$_[0]}->attach }
+sub title2url{ &myurl( { p=>$_[0] } ); }
+sub attach2url{ &myurl( { p=>$_[0] , f=>$_[1]} );}
