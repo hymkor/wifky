@@ -1539,7 +1539,7 @@ sub cache_update{
     sub xadd{ push(@{$_[0]},$_[1]); }
     sub has{ 
         my $f=unpack('h*',$_[1]);
-        ::first{ $_ eq $f } @{$_[0]} || ();
+        ::first{ $_ eq $f } @{$_[0]};
     }
     sub xdel{ 
         my ($self,$attach)=@_;
