@@ -659,7 +659,7 @@ sub print_header{
 
     &puts('<style type="text/css"><!--');
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
-        if( my $css =&read_text($p) ){
+        if( my $css = $::contents{$p}->load ){
             $css =~ s/\<\<\{([^\}]+)\}/&myurl( { p=>$p , f=>$1 } )/ge;
             $css =~ s/[<>&]//g;
             $css =~ s|/\*.*?\*/||gs;
@@ -715,23 +715,21 @@ sub check_frozen{
 }
 
 sub check_conflict{
-    my $current_source = &read_text($::form{p});
+    my $current_source = &read_object($::form{p});
     my $before_source  = $::form{orgsrc_t};
     if( $current_source ne $before_source ){
         die( "!Someone else modified this page after you began to edit."  );
     }
 }
 
-sub read_text{ # for text
+sub read_object{
     &read_file(&title2fname(@_));
 }
 
-sub read_object{ # for binary
-    &read_file(&title2fname(@_));
-}
-
-sub read_textfile{ # for text
-    &read_file;
+sub write_object{
+    my $body  = pop(@_);
+    my $fname = &title2fname(@_);
+    &write_file($fname,$body);
 }
 
 sub read_file{
@@ -743,19 +741,11 @@ sub read_file{
     defined($object) ? $object : $::default_contents{ $_[0] } || '';
 }
 
-# write object with OBJECT-NAME(S) , not filename.
-sub write_object{
-    my $body  = pop(@_);
-    my $fname = &title2fname(@_);
-    &write_file($fname,$body);
-}
-
 sub write_file{
     my ($fname,$body) = @_;
 
     if( length( ref($body) ? $$body : $body ) <= 0 ){
         unlink($fname) or rmdir($fname);
-        wifky::Contents::xdel($fname);
         0;
     }else{
         local *FP;
@@ -763,7 +753,6 @@ sub write_file{
             binmode(FP);
             print FP ref($body) ? ${$body} : $body;
         close(FP);
-        wifky::Contents::xadd($fname);
         1;
     }
 }
@@ -785,7 +774,7 @@ sub action_new{
 }
 
 sub load_config{
-    for(split(/\n/,&read_textfile('index.cgi'))){
+    for(split(/\n/,&read_file('index.cgi'))){
         $::config{$1}=&deyen($2) if /^\#?([^\#\!\t ]+)\t(.*)$/;
     }
 }
@@ -807,7 +796,7 @@ sub is_signed{
     my $id=$::cookie{$::session_cookie} || &local_cookie() || rand();
 
     # time(TAB)ip(TAB)key
-    for( split(/\n/,&read_textfile('session.cgi') ) ){
+    for( split(/\n/,&read_file('session.cgi') ) ){
         $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ && $1>time-24*60*60;
     }
 
@@ -882,16 +871,6 @@ sub action_commit{
     &do_preview( $@ ) if $@;
 }
 
-sub archive{
-    my @tm=localtime;
-    my $source=&title2fname($::form{p});
-    my $backno=&title2fname($::form{p},
-        sprintf('~%02d%02d%02d_%02d%02d%02d.txt',$tm[5]%100,1+$tm[4],@tm[3,2,1,0] )
-    );
-    rename( $source , $backno );
-    chmod( 0444 , $backno );
-}
-
 sub action_preview{
     eval{
         &check_conflict;
@@ -914,7 +893,7 @@ sub action_rollback_preview{
             &begin_day("Rollback Preview: $f");
             &print_page(
                 title=>$f ,
-                source=>\&read_text($f,$p) ,
+                source=>\&read_object($f,$p) ,
                 index=>1,
                 main=>1
             );
@@ -934,12 +913,12 @@ sub action_rollback{
     goto &action_signin if &is_frozen() && !&is_signed();
 
     my $title=$::form{p};
-    my $fn=&title2fname($title);
-    my $frozen=&is_frozen();
-    chmod(0644,$fn) if $frozen;
-    &archive() if $::config{archivemode};
-    lockdo{ &write_file( $fn , \&read_text($title,$::form{f})) } $title;
-    chmod(0444,$fn) if $frozen;
+    my $page=$::contents{$title};
+    my $frozen=$page->frozen();
+    $page->fresh if $frozen;
+    $page->archive if $::config{archivemode};
+    $page->save( \&read_object($title,$::form{f}) );
+    $page->freeze if $frozen;
     &transfer_page();
 }
 
@@ -1164,8 +1143,7 @@ sub action_delete{
     foreach my $f ( @{$::forms{f}} ){
         my $fn=&title2fname( $::form{p} , $f );
         if( &w_ok($fn) || &is_signed() ){
-            unlink( $fn ) or rmdir( $fn );
-            wifky::Contents::xdel($fn);
+            $::contents{ $::form{p} }->drop( $f );
         }
     }
     &do_preview();
@@ -1228,12 +1206,13 @@ sub do_index{
 
 sub action_upload{
     exists $::form{p} or die('not found pagename');
+    my $attach=$::form{'newattachment_b.filename'};
     &check_frozen;
-    my $fn=&title2fname( $::form{p} , $::form{'newattachment_b.filename'} );
-    if( -r $fn && ! &w_ok() ){
+    my $page=$::contents{$::form{p}};
+    if( $page->frozen( $attach ) ){
         &do_preview('The attachment is frozen.');
     }else{
-        &write_file( $fn , \$::form{'newattachment_b'} );
+        $page->upload( $attach , \$::form{'newattachment_b'} );
         &do_preview();
     }
 }
@@ -1258,21 +1237,22 @@ sub lockdo(&@){
 
 sub do_submit{
     my $title=$::form{p};
-    my $fn=&title2fname($title);
+    my $page=$::contents{$title};
+    my $fn=$page->fname;
     my $sagetime=&mtimeraw($fn);
 
-    chmod(0644,$fn) if &is_frozen();
+    $page->fresh if $page->frozen;
 
     $::hook_submit->(\$title , \$::form{text_t}) if $::hook_submit;
     if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
-        &archive();
+        $page->archive;
     }
-    if( lockdo{ &write_file( $fn , \$::form{text_t} ) } $::form{p} ){
+    if( $page->save( \$::form{text_t} ) ){
         if( $::form{to_freeze} ){
-            chmod(0444,$fn);
+            $page->freeze;
         }
         if( $::form{sage} ){
-            utime($sagetime,$sagetime,$fn)
+            utime($sagetime,$sagetime,$fn);
         }
         &transfer_page();
     }else{
@@ -1317,20 +1297,20 @@ sub action_edit{
     goto &action_signin if &is_frozen() && !&is_signed();
 
     &browser_cache_off();
-    my $title = $::form{p};
-    my @attachment=$::contents{$title}->attach;
-
     &print_template(
         template => $::system_template ,
         Title => 'Edit' ,
         main  => sub {
+            my $title=$::form{p};
+            my $page=$::contents{$title};
+            my $source=$page->load;
+
             &begin_day( $title );
-            my $source=&read_text($title);
             &print_form( $title , \$source , \$source );
             &end_day();
 
             foreach my $e (sort keys %::form2_list){
-                $::form2_list{$e}->($title,@attachment);
+                $::form2_list{$e}->($title,$page->attach);
             }
 
         }
@@ -1488,9 +1468,16 @@ sub cache_update{
         local *DIR;
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
-            wifky::Contents::xadd( $fn );
+            push( @::xcontents , $fn );
+            if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?$/) ){
+                my $c=($::xcontents{$p[0]} ||= [] );
+                push(@{$c},$p[1]) if defined $p[1];
+            }else{
+                push(@::etcfiles,$fn);
+            }
         }
         closedir(DIR);
+        tie %::contents,'wifky::Contents',\%::xcontents;
     }
 }
 
@@ -1504,64 +1491,86 @@ sub cache_update{
         my @p=each %{${$_[0]}};
         ( unpack('h*',$p[0]),$p[1] );
     }
-    sub FETCH{ ${$_[0]}->{unpack('h*',$_[1]) } || wifky::None->new }
+    sub FETCH{ 
+        my $fn=unpack('h*',$_[1]);
+        wifky::Page->new(
+            xtitle  => $fn ,
+            xattach => ${$_[0]}->{$fn},
+            title   => $_[1] ,
+        );
+    }
     sub FIRSTKEY{ goto &NEXTKEY; }
     sub EXISTS{ exists ${$_[0]}->{ unpack('h*',$_[1]) }; }
     
-    sub xadd{ # class-function
-        my $fn=pop;
-        push( @::xcontents , $fn );
-        if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?$/) ){
-            my $c=($::xcontents{$p[0]} ||= wifky::Page->new);
-            $c->xadd( $p[1] ) if defined $p[1];
-        }else{
-            push(@::etcfiles,$fn);
-        }
-        tie %::contents,'wifky::Contents',\%::xcontents;
-    }
-    sub xdel{
-        my $fn=shift;
-        if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?$/) ){
-            my $c=$::xcontents{$p[0]} or return;
-            if( $p[1] ){
-                $c->xdel($p[1]);
-                delete $::xcontents{$p[0]} unless $c->xattach || -f $p[0];
-            }elsif( $c->xattach <= 0 ){
-                delete $::xcontents{$p[0]};
-            }
-        }
-    }
-
     package wifky::Page;
-    sub new{ bless [],$_[0]; }
-    sub attach{ map{ pack('h*',$_) } @{$_[0]}; }
-    sub xattach{ @{$_[0]}; }
-    sub xadd{ push(@{$_[0]},$_[1]); }
+    sub new{
+        my $class=shift; bless { @_ },$class;
+    }
+    sub attach{ map{ pack('h*',$_) } @{$_[0]->{xattach}}; }
     sub has{ 
         my $f=unpack('h*',$_[1]);
-        ::first{ $_ eq $f } @{$_[0]};
+        ::first{ $_ eq $f } @{$_[0]->{xattach}};
     }
-    sub xdel{ 
-        my ($self,$attach)=@_;
-        for(my $i=0;$i < @{$self}; ++$i){
-            if( $self->[$i] eq $attach ){
-                splice @{$self},$i,1;
-                return;
-            }
+    sub title{ $_[0]->{title}; }
+    sub fname{
+        $_[0]->{xtitle} ||= unpack('h*',$_[0]->{title});
+    }
+    sub fname_of{
+        if( defined $_[1] ){
+            $_[0]->fname . '__'.unpack('h*',$_[1]);
+        }else{
+            $_[0]->fname ;
         }
     }
+    sub load{ &::read_file( $_[0]->fname ); }
+    sub save{
+        my ($self,$body)=@_;
+        my $upd_or_del=::lockdo{ &::write_file( $self->fname , $body ) } $self->fname;
+        if( $upd_or_del ){
+            $::xcontents{ $self->fname } = $self->{xattach};
+        }elsif( @{$self->{xattach}} <= 0 ){
+            delete $::xcontents{$self->fname};
+        }
+        $upd_or_del;
+    }
+    sub exists{ exists $::xcontents{ $_[0]->fname } }
+    sub frozen{ -r $_[0]->fname_of($_[1]) && !&::w_ok(); }
+    sub fresh{ chmod(0644,$_[0]->fname_of($_[1])) }
+    sub freeze{ chmod(0444,$_[0]->fname_of($_[1])) }
+    sub upload{ # attachment
+        my ($self,$as,$body)=@_;
+        my $xattach=unpack('h*',$as);
+        &::write_file( $self->fname.'__'.$xattach , $body );
+        unless( $self->has($as) ){
+            push( @{$::xcontents{ $self->fname }} , $xattach );
+        }
+    }
+    sub drop{ # attachment
+        my ($self,$attach)=@_;
+        my $xattach=unpack('h*',$attach);
+        my $fn=$self->fname . '__' . $xattach;
 
-    package wifky::None;
-    sub new{ bless [],$_[0] }
-    sub attach{ ();}
-    sub xattach{ (); }
-    sub has{ undef; }
+        unlink( $fn ) or rmdir( $fn );
+        my @c=grep{ $_ ne $xattach } @{$self->{xattach}};
+        $::xcontents{$self->fname} = \@c;
+    }
+    sub archive{
+        my $self=shift;
+        my @tm=localtime;
+        my $source=$self->fname;
+        my $backno=$self->fname_of(
+            sprintf('~%02d%02d%02d_%02d%02d%02d.txt',$tm[5]%100,1+$tm[4],@tm[3,2,1,0] )
+        );
+        rename( $source , $backno );
+        chmod( 0444 , $backno );
+    }
 }
 
 sub print_page{
     my %args=@_;
     my $title=$args{title};
-    my $html =&enc( exists $args{source} ? ${$args{source}} : &read_text($title));
+    my $page=$::contents{$title};
+    my $html =&enc( exists $args{source} ? ${$args{source}} : $page->load);
     return 0 unless $html;
 
     push(@::outline,
@@ -1569,7 +1578,7 @@ sub print_page{
     );
 
     my %attachment;
-    foreach my $f ( $::contents{$title}->attach ){
+    foreach my $f ( $page->attach ){
         my $f_ = &enc( $f );
         $attachment{ $f_ } = {
             # for compatible #
@@ -1823,7 +1832,7 @@ sub plugin_comment{
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
                 $caption );
-    for(split(/\r?\n/,&read_text($::form{p} , "comment.$comid"))){
+    for(split(/\r?\n/,&read_object($::form{p} , "comment.$comid"))){
         my ($dt,$who,$say) = split(/\t/,$_,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
         $buf .= sprintf('<p><span class="commentator">%s</span>'.
@@ -2177,7 +2186,8 @@ sub block_normal{
 }
 
 sub w_ok{ # equals "-w" except for root-user.
-    ( $#_ < 0 ? stat(_) : stat($_[0]) )[2] & 0200;
+    my @stat=$#_ < 0 ? stat(_) : stat($_[0]);
+    @stat ? $stat[2] & 0200 : 1;
 }
 
 ### deprecated functions ###
@@ -2207,3 +2217,5 @@ sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
 sub list_attachment{ $::contents{$_[0]}->attach }
 sub title2url{ &myurl( { p=>$_[0] } ); }
 sub attach2url{ &myurl( { p=>$_[0] , f=>$_[1]} );}
+sub read_textfile{ &read_file; }
+sub read_text{ &read_file(&title2fname(@_)); }
