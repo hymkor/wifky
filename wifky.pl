@@ -1077,20 +1077,20 @@ sub action_rename{
     goto &action_signin unless &is_signed();
 
     my $newtitle = $::form{newtitle};
-    my $title    = $::form{p};
-    my $fname    = &title2fname($title);
+    my $page = $::contents{$::form{p}};
+    my $orgfname = $page->fname;
     my $newfname = &title2fname($newtitle);
     die("!The new page name '$newtitle' is already used.!") if -f $newfname;
 
     my @list = map {
-        my $older="${fname}__$_" ;
+        my $older="${orgfname}__$_" ;
         my $newer="${newfname}__$_";
         die("!The new page name '$newtitle' is already used.!") if -f $newer;
         [ $older , $newer ];
-    } @{$::xcontents{$fname}};
+    } @{$page->{attachments}};
 
-    rename( $fname , $newfname );
-    rename( $_->[0] , $_->[1] ) foreach @list;
+    rename( $orgfname , $newfname );
+    rename( $_->[0] , $_->[1] ) for @list;
     &transfer_page($newtitle);
 }
 
@@ -1487,13 +1487,21 @@ sub cache_update{
     }
     sub NEXTKEY{
         my @p=each %{${$_[0]}};
-        ( unpack('h*',$p[0]),$p[1] );
+        return () unless @p;
+        my $title=pack('h*',$p[0]);
+        ( $title ,
+          wifky::Page->new(
+              title=>$title,
+              fname=>$p[0] ,
+              attachments=>$p[1] || []
+          ) 
+        )
     }
     sub FETCH{
         my $fn=unpack('h*',$_[1]);
         wifky::Page->new(
             fname  => $fn ,
-            attachments => ${$_[0]}->{$fn},
+            attachments => ${$_[0]}->{$fn} || [],
             title   => $_[1] ,
         );
     }
