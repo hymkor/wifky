@@ -411,8 +411,8 @@ sub read_multimedia{
 }
 
 sub read_simpleform{
-    foreach my $p ( split(/[&;]/, $_[0]) ){
-        my ($name, $value) = split(/=/, $p,2);
+    foreach my $e ( split(/[&;]/, $_[0]) ){
+        my ($name, $value) = split(/=/, $e,2);
         $value = '' unless defined $value;
         $value =~ s/\+/ /g;
         $value =~ s/%([0-9a-fA-F][0-9a-fA-F])/pack('C', hex($1))/eg;
@@ -429,8 +429,8 @@ sub set_form{
 }
 
 sub read_form{
-    foreach(split(/[,;]\s*/,$ENV{'HTTP_COOKIE'}||'') ){
-        $::cookie{$`}=$' if /=/;
+    foreach my $e (split(/[,;]\s*/,$ENV{'HTTP_COOKIE'}||'') ){
+        $::cookie{$`}=$' if $e =~ /=/;
     }
     if( exists $ENV{REQUEST_METHOD} && $ENV{REQUEST_METHOD} eq 'POST' ){
         $ENV{CONTENT_LENGTH} > 10*1024*1024 and die('Too large form data');
@@ -955,10 +955,9 @@ HEADER
             &puts('<form action="#"><input type="hidden" name="a" value="tools">');
             &putenc('<select onChange="if( lastid ){ hide(lastid); };show(this.options[this.selectedIndex].value);lastid=this.options[this.selectedIndex].value;return false;">' );
 
-            foreach my $section ( (sort keys %::tools_submenu) ,
-                                  (sort keys %::preferences) )
-            {
-                &putenc('<option value="%s">%s</option>',$section,$section);
+            foreach my $e ( (sort keys %::tools_submenu) ,
+                            (sort keys %::preferences  ) ){
+                &putenc('<option value="%s">%s</option>',$e,$e);
             }
             &puts('</select></form>');
 
@@ -1041,22 +1040,22 @@ HEADER
 sub action_preferences{
     goto &action_signin unless &is_signed();
 
-    foreach my $i ( @{$::preferences{$::form{section}}} ){
-        next unless exists $i->{name};
-        my $type = $i->{type} || 'text';
-        my $newval= exists $::form{'config__'.$i->{name}}
-                  ? $::form{'config__'.$i->{name}} : '';
+    foreach my $e ( @{$::preferences{$::form{section}}} ){
+        next unless exists $e->{name};
+        my $type = $e->{type} || 'text';
+        my $newval= exists $::form{'config__'.$e->{name}}
+                  ? $::form{'config__'.$e->{name}} : '';
         if( $type eq 'checkbox' ){
-            $::config{ $i->{name} } = ($newval ? 1 : 0);
+            $::config{ $e->{name} } = ($newval ? 1 : 0);
         }elsif( $type eq 'password' ){
             if( length($newval) > 0 ){
-                if( $newval ne $::form{'verify__'.$i->{name}} ){
-                    die('invalud value for ' . $i->{name} );
+                if( $newval ne $::form{'verify__'.$e->{name}} ){
+                    die('invalud value for ' . $e->{name} );
                 }
-                $::config{ $i->{name} } = $newval;
+                $::config{ $e->{name} } = $newval;
             }
         }else{
-            $::config{ $i->{name} } = $newval;
+            $::config{ $e->{name} } = $newval;
         }
     }
     &save_config;
@@ -1117,11 +1116,10 @@ sub action_seek{
             local *FP;
             &begin_day( qq(Seek: "$keyword_") );
             &puts('<ul>');
-            while( my ($fn)=each %::xcontents ){
-                my $title  = &fname2title( $fn );
+            while( my ($title,$page)=each %::contents ){
                 if( index($title ,$keyword) >= 0 ){
                     &puts('<li>' . &anchor($title,{ p=>$title }) . ' (title)</li>');
-                }elsif( open(FP,$fn) ){
+                }elsif( open(FP,$page->fname) ){
                     while( <FP> ){
                         if( index($_,$keyword) >= 0 ){
                             &puts('<li>' . &anchor($title,{ p=>$title } ) . '</li>' );
@@ -1356,7 +1354,7 @@ sub form2_rollback{
     if( @archive ){
         &begin_day('Rollback');
         &putenc('<form action="%s" method="post"><select name="f">', $::postme);
-        foreach my $f(reverse sort @archive){
+        foreach my $f (reverse sort @archive){
             &putenc('<option value="%s">%s/%s/%s %s:%s:%s</option>',
                     $f,
                     substr($f,1,2), substr($f,3,2),  substr($f, 5,2),
@@ -1484,36 +1482,58 @@ sub cache_update{
 {
     package wifky::Contents;
     sub TIEHASH{
-        my ($class,$value)=@_;
-        bless \$value,$class;
+        my ($class,$xcontents)=@_;
+        bless \$xcontents,$class;
     }
     sub NEXTKEY{
         my @p=each %{${$_[0]}};
         ( unpack('h*',$p[0]),$p[1] );
     }
-    sub FETCH{ 
+    sub FETCH{
         my $fn=unpack('h*',$_[1]);
         wifky::Page->new(
-            xtitle  => $fn ,
-            xattach => ${$_[0]}->{$fn},
+            fname  => $fn ,
+            attachments => ${$_[0]}->{$fn},
             title   => $_[1] ,
         );
     }
     sub FIRSTKEY{ goto &NEXTKEY; }
     sub EXISTS{ exists ${$_[0]}->{ unpack('h*',$_[1]) }; }
-    
+
+    sub match{
+        my $pattern=shift;
+        $pattern =~ s/([^\*\?]+)/unpack('h*',$1)/eg;
+        $pattern =~ s/\?/../g;
+        $pattern =~ s/\*/.*/g;
+        $pattern = '^' . $pattern . '$';
+        my @list;
+        while( my ($fn,$c)=each %::xcontents ){
+            next if $fn !~ $pattern;
+            push(@list,wifky::Page->new( fname=>$fn, attachments=>$c ));
+        }
+        @list;
+    }
+
     package wifky::Page;
     sub new{
         my $class=shift; bless { @_ },$class;
     }
-    sub attach{ map{ pack('h*',$_) } @{$_[0]->{xattach}}; }
-    sub has{ 
+    sub attach{ map{ pack('h*',$_) } @{$_[0]->{attachments}}; }
+    sub has{
         my $f=unpack('h*',$_[1]);
-        ::first{ $_ eq $f } @{$_[0]->{xattach}};
+        ::first{ $_ eq $f } @{$_[0]->{attachments}};
     }
-    sub title{ $_[0]->{title}; }
+    sub title{
+        $_[0]->{title} ||= pack('h*',$_[0]->{fname});
+    }
     sub fname{
-        $_[0]->{xtitle} ||= unpack('h*',$_[0]->{title});
+        $_[0]->{fname} ||= unpack('h*',$_[0]->{title});
+    }
+    sub mtimeraw{
+        $_[0]->{mtimeraw} ||= (-f $_[0]->fname ? ( stat(_) )[9] : 0);
+    }
+    sub mtime{
+        &::ymdhms( $_[0]->mtimeraw );
     }
     sub fname_of{
         if( defined $_[1] ){
@@ -1522,13 +1542,15 @@ sub cache_update{
             $_[0]->fname ;
         }
     }
-    sub load{ &::read_file( $_[0]->fname ); }
+    sub load{
+        &::read_file( $_[0]->fname );
+    }
     sub save{
         my ($self,$body)=@_;
         my $upd_or_del=::lockdo{ &::write_file( $self->fname , $body ) } $self->fname;
         if( $upd_or_del ){
-            $::xcontents{ $self->fname } = $self->{xattach};
-        }elsif( @{$self->{xattach}} <= 0 ){
+            $::xcontents{ $self->fname } = $self->{attachments};
+        }elsif( @{$self->{attachments}} <= 0 ){
             delete $::xcontents{$self->fname};
         }
         $upd_or_del;
@@ -1551,7 +1573,7 @@ sub cache_update{
         my $fn=$self->fname . '__' . $xattach;
 
         unlink( $fn ) or rmdir( $fn );
-        my @c=grep{ $_ ne $xattach } @{$self->{xattach}};
+        my @c=grep{ $_ ne $xattach } @{$self->{attachments}};
         $::xcontents{$self->fname} = \@c;
     }
     sub archive{
@@ -1699,13 +1721,13 @@ sub call_footnote{
 
     my $i=0;
     &puts(qq(<div class="footnote">));
-    foreach my $t (@{$footnotes}){
+    foreach my $e (@{$footnotes}){
         ++$i;
         &puts('<p class="footnote">' ,
             &anchor("*$i",{ p=>$::form{p} } ,
             ($session->{index} ? { name=>"ft$i"} : undef) ,
             "#fm$i"),
-            "$t</p>");
+            "$e</p>");
     }
     &puts('</div><!--footnote-->');
     delete $session->{footnotes};
@@ -1759,28 +1781,18 @@ sub ls_core{
     push(@args,'*') unless @args;
 
     my @list;
-    foreach my $pat (@args){
-        $pat =~ s/([^\*\?]+)/unpack('h*',$1)/eg;
-        $pat =~ s/\?/../g;
-        $pat =~ s/\*/.*/g;
-        $pat = '^' . $pat . '$';
-        while( my ($fn,$c)=each %::xcontents ){
-            next if $fn !~ $pat;
+    foreach my $pattern (@args){
+        foreach my $p (wifky::Contents::match($pattern)){
+            my $fn=$p->fname;
             next if ($fn =~ /^e2/ || ! -f $fn) && !exists $opt->{a};
-            push(@list,
-                 +{ fname  => $fn ,
-                    title  => &fname2title($fn) ,
-                    mtimeraw => &mtimeraw($fn) ,
-                    mtime  => &mtime($fn) ,
-                    attachments => $c ,
-                  }
-            );
+            push(@list,$p);
         }
     }
+
     if( exists $opt->{t} ){
-        @list = sort{ $a->{mtime} cmp $b->{mtime} } @list;
+        @list = sort{ $a->mtimeraw cmp $b->mtimeraw } @list;
     }else{
-        @list = sort{ $a->{title} cmp $b->{title} } @list;
+        @list = sort{ $a->title cmp $b->title } @list;
     }
     @list = reverse @list if exists $opt->{r};
     if( defined (my $n=$opt->{number} || $opt->{countdown}) ){
@@ -1808,9 +1820,9 @@ sub ls{
     my $buf = '';
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
-        $buf .= '<tt>'.$p->{mtime}.' </tt>' if $opt{l};
-        $buf .= '<tt>'.scalar(@{$p->{attachments}}).' </tt>' if $opt{i};
-        $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
+        $buf .= '<tt>'.$p->mtime.' </tt>' if $opt{l};
+        $buf .= '<tt>'.scalar($p->attach).' </tt>' if $opt{i};
+        $buf .= &anchor( &enc($p->title) , { p=>$p->title } );
         $buf .= "</li>\r\n";
     }
     $buf;
@@ -1882,9 +1894,9 @@ sub plugin{
 
     $param =~ s/\x02.*?\x02/"\x05".unpack('h*',$&)."\x05"/eg;
     my @param=split(/\s+/,$param);
-    foreach(@param){
-        s|\x05([^\x05]*)\x05|pack('h*',$1)|ge;
-        s|\x02+|"\x02"x(length($&)>>1)|ge;
+    foreach my $e (@param){
+        $e =~ s|\x05([^\x05]*)\x05|pack('h*',$1)|ge;
+        $e =~ s|\x02+|"\x02"x(length($&)>>1)|ge;
     }
 
     ($::inline_plugin{$name} || sub{'Plugin not found.'} )
@@ -1979,8 +1991,8 @@ sub preprocess_rawurl{
 
 sub preprocess{
     my ($text,$session) = @_;
-    foreach my $p ( sort keys %::inline_syntax_plugin ){
-        $::inline_syntax_plugin{$p}->( \$text , $session );
+    foreach my $e ( sort keys %::inline_syntax_plugin ){
+        $::inline_syntax_plugin{$e}->( \$text , $session );
     }
     $text;
 }
@@ -1998,8 +2010,8 @@ sub midashi{
     if( $depth < 0 ){
         &puts( "<h1>$text</h1>" );
     }else{
-        foreach my $p (@{$section}[$depth .. $#{$section}]){
-            &puts('</div></div>') if $p;
+        foreach my $e (@{$section}[$depth .. $#{$section}]){
+            &puts('</div></div>') if $e;
         }
         $section->[ $depth ]++;
         $_=0 for(@{$section}[$depth+1 .. $#{$section} ]);
@@ -2043,8 +2055,8 @@ sub midashi{
 sub syntax_engine{
     my ($ref2html,$session) = ( ref($_[0]) ? $_[0] : \$_[0] , $_[1] );
     $session->{nest}++;
-    foreach my $p ( sort keys %::call_syntax_plugin ){
-        $::call_syntax_plugin{$p}->( $ref2html , $session );
+    foreach my $e ( sort keys %::call_syntax_plugin ){
+        $::call_syntax_plugin{$e}->( $ref2html , $session );
     }
     $session->{nest}--;
 }
@@ -2052,8 +2064,8 @@ sub syntax_engine{
 sub call_block{
     my ($ref2html,$session)=@_;
     foreach my $fragment( split(/\r?\n\r?\n/,$$ref2html) ){
-        foreach my $p (sort keys %::block_syntax_plugin){
-            $::block_syntax_plugin{$p}->($fragment,$session) and last;
+        foreach my $e (sort keys %::block_syntax_plugin){
+            $::block_syntax_plugin{$e}->($fragment,$session) and last;
         }
     }
 }
@@ -2061,8 +2073,8 @@ sub call_block{
 sub call_close_sections{
     my ($ref2html,$session)=@_;
     if( exists $session->{section} ){
-        foreach my $p (@{$session->{section}}){
-            &puts('</div></div>') if $p;
+        foreach my $e (@{$session->{section}}){
+            &puts('</div></div>') if $e;
         }
     }
 }
@@ -2072,8 +2084,8 @@ sub block_listing{ ### <UL><OL>... block ###
     return 0 unless $fragment =~ /\A\s*[\*\+]/;
 
     my @stack;
-    foreach( split(/\n[ \t]*(?=[\*\+])/,&preprocess($fragment,$session))){
-        my ($mark,$text)=(/\A\s*(\*+|\++)/ ? ($1,$') : ('',$_) );
+    foreach my $e ( split(/\n[ \t]*(?=[\*\+])/,&preprocess($fragment,$session))){
+        my ($mark,$text)=($e =~ /\A\s*(\*+|\++)/ ? ($1,$') : ('',$_) );
         my $nest=length($mark);
         my $diff=$nest - scalar(@stack);
         if( $diff > 0 ){### more deep ###
