@@ -1500,14 +1500,14 @@ sub cache_update{
     sub FIRSTKEY{ goto &NEXTKEY; }
     sub EXISTS{ exists ${$_[0]}->{ unpack('h*',$_[1]) }; }
 
-    sub match{
-        my $pattern=shift;
+    sub match{ ### friend method ###
+        my ($self,$pattern)=@_;
         $pattern =~ s/([^\*\?]+)/unpack('h*',$1)/eg;
         $pattern =~ s/\?/../g;
         $pattern =~ s/\*/.*/g;
         $pattern = '^' . $pattern . '$';
         my @list;
-        while( my ($fn,$c)=each %::xcontents ){
+        while( my ($fn,$c)=each %{$$self} ){
             next if $fn !~ $pattern;
             push(@list,wifky::Page->new( fname=>$fn, attachments=>$c ));
         }
@@ -1782,7 +1782,7 @@ sub ls_core{
 
     my @list;
     foreach my $pattern (@args){
-        foreach my $p (wifky::Contents::match($pattern)){
+        foreach my $p (tied(%::contents)->match($pattern)){
             my $fn=$p->fname;
             next if ($fn =~ /^e2/ || ! -f $fn) && !exists $opt->{a};
             push(@list,$p);
@@ -1844,8 +1844,8 @@ sub plugin_comment{
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
                 $caption );
-    for(split(/\r?\n/,&read_object($::form{p} , "comment.$comid"))){
-        my ($dt,$who,$say) = split(/\t/,$_,3);
+    foreach my $c (split(/\r?\n/,&read_object($::form{p} , "comment.$comid"))){
+        my ($dt,$who,$say) = split(/\t/,$c,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
         $buf .= sprintf('<p><span class="commentator">%s</span>'.
             ' %s <span class="comment_date">(%s)</span></p>'
