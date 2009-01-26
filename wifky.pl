@@ -1508,7 +1508,7 @@ sub cache_update{
             title   => $_[1] ,
         );
     }
-    sub FIRSTKEY{ goto &NEXTKEY; }
+    sub FIRSTKEY{ my $a=scalar keys %{${$_[0]}}; goto &NEXTKEY; }
     sub EXISTS{ exists ${$_[0]}->{ unpack('h*',$_[1]) }; }
 
     sub match{ ### friend method ###
