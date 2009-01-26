@@ -1487,15 +1487,18 @@ sub cache_update{
     }
     sub NEXTKEY{
         my @p=each %{${$_[0]}};
-        return () unless @p;
+        return wantarray ? () : undef if @p <= 0;
+
         my $title=pack('h*',$p[0]);
-        ( $title ,
-          wifky::Page->new(
-              title=>$title,
-              fname=>$p[0] ,
-              attachments=>$p[1] || []
-          ) 
-        )
+        if( wantarray ){
+            ($title,wifky::Page->new(
+                      title=>$title,
+                      fname=>$p[0] ,
+                      attachments=>$p[1] || [] )
+            );
+        }else{
+            $title;
+        }
     }
     sub FETCH{
         my $fn=unpack('h*',$_[1]);
