@@ -43,13 +43,14 @@ if( $0 eq __FILE__ ){
 
         &read_form;
         &chdir_and_code;
-        &cache_update;
-        foreach my $pl (sort map{/^([\w\.]+\.plg)$/ ? $1 : () } @::etcfiles ){
+        tie %::contents,'wifky::Contents',\my @else;
+
+        foreach my $pl (sort map{/^([\w\.]+\.plg)$/ ? $1 : () } @else ){
             do "./$pl"; die($@) if $@;
         }
         &load_config;
         &init_globals;
-        foreach my $pl (sort map{/^([\w\.]+\.pl)$/ ? $1 : () } @::etcfiles ){
+        foreach my $pl (sort map{/^([\w\.]+\.pl)$/ ? $1 : () } @else ){
             do "./$pl"; die($@) if $@;
         }
 
@@ -1461,32 +1462,32 @@ sub action_cat{
     exit(0);
 }
 
-sub cache_update{
-    unless( defined(@::xcontents) ){
+{
+    my %xcontents;
+    my @xcontents;
+    sub directory{ @xcontents; }
+
+    package wifky::Contents;
+    sub TIEHASH{
+        my ($class,$else)=@_;
         local *DIR;
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
-            push( @::xcontents , $fn );
+            push( @xcontents , $fn );
             if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?$/) ){
-                my $c=($::xcontents{$p[0]} ||= [] );
+                my $c=($xcontents{$p[0]} ||= [] );
                 push(@{$c},$p[1]) if defined $p[1];
             }else{
-                push(@::etcfiles,$fn);
+                push(@{$else},$fn) if defined $else;
             }
         }
         closedir(DIR);
-        tie %::contents,'wifky::Contents',\%::xcontents;
-    }
-}
 
-{
-    package wifky::Contents;
-    sub TIEHASH{
-        my ($class,$xcontents)=@_;
-        bless \$xcontents,$class;
+        bless \%xcontents,$class;
     }
     sub NEXTKEY{
-        my @p=each %{${$_[0]}};
+        my $self=shift;
+        my @p=each %{$self};
         return wantarray ? () : undef if @p <= 0;
 
         my $title=pack('h*',$p[0]);
@@ -1501,15 +1502,16 @@ sub cache_update{
         }
     }
     sub FETCH{
-        my $fn=unpack('h*',$_[1]);
+        my ($self,$title)=@_;
+        my $fn=unpack('h*',$title);
         wifky::Page->new(
             fname  => $fn ,
-            attachments => ${$_[0]}->{$fn} || [],
-            title   => $_[1] ,
+            attachments => $self->{$fn} || [],
+            title   => $title ,
         );
     }
-    sub FIRSTKEY{ my $a=scalar keys %{${$_[0]}}; goto &NEXTKEY; }
-    sub EXISTS{ exists ${$_[0]}->{ unpack('h*',$_[1]) }; }
+    sub FIRSTKEY{ my $a=scalar keys %{$_[0]}; goto &NEXTKEY; }
+    sub EXISTS{ exists $_[0]->{ unpack('h*',$_[1]) }; }
 
     sub match{ ### friend method ###
         my ($self,$pattern)=@_;
@@ -1518,7 +1520,7 @@ sub cache_update{
         $pattern =~ s/\*/.*/g;
         $pattern = '^' . $pattern . '$';
         my @list;
-        while( my ($fn,$c)=each %{$$self} ){
+        while( my ($fn,$c)=each %{$self} ){
             next if $fn !~ $pattern;
             push(@list,wifky::Page->new( fname=>$fn, attachments=>$c ));
         }
@@ -1560,13 +1562,13 @@ sub cache_update{
         my ($self,$body)=@_;
         my $upd_or_del=::lockdo{ &::write_file( $self->fname , $body ) } $self->fname;
         if( $upd_or_del ){
-            $::xcontents{ $self->fname } = $self->{attachments};
+            $xcontents{ $self->fname } = $self->{attachments};
         }elsif( @{$self->{attachments}} <= 0 ){
-            delete $::xcontents{$self->fname};
+            delete $xcontents{$self->fname};
         }
         $upd_or_del;
     }
-    sub exists{ exists $::xcontents{ $_[0]->fname } }
+    sub exists{ exists $xcontents{ $_[0]->fname } }
     sub frozen{ -r $_[0]->fname_of($_[1]) && !&::w_ok(); }
     sub fresh{ chmod(0644,$_[0]->fname_of($_[1])) }
     sub freeze{ chmod(0444,$_[0]->fname_of($_[1])) }
@@ -1575,7 +1577,7 @@ sub cache_update{
         my $xattach=unpack('h*',$as);
         &::write_file( $self->fname.'__'.$xattach , $body );
         unless( $self->has($as) ){
-            push( @{$::xcontents{ $self->fname }} , $xattach );
+            push( @{$xcontents{ $self->fname }} , $xattach );
         }
     }
     sub drop{ # attachment
@@ -1585,7 +1587,7 @@ sub cache_update{
 
         unlink( $fn ) or rmdir( $fn );
         my @c=grep{ $_ ne $xattach } @{$self->{attachments}};
-        $::xcontents{$self->fname} = \@c;
+        $xcontents{$self->fname} = \@c;
     }
     sub archive{
         my $self=shift;
@@ -2233,8 +2235,7 @@ sub print_sidebar_and_footer{
 }
 
 sub print_copyright{}
-sub directory{ @::xcontents; }
-sub list_page{ keys %::xcontents; }
+sub list_page{ keys %{tied(%::contents)}; }
 sub object_exists{ exists $::contents{ $_[0] }; }
 sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
 sub list_attachment{ $::contents{$_[0]}->attach }
