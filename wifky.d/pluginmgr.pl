@@ -3,11 +3,11 @@
 
 package wifky::pluginmgr;
 
-#use strict;use warnings; 
+# use strict;use warnings; 
 
-my $version='0.9';
+my $version='1.0';
 
--d 'plugins' or mkdir('plugins',0755) or die('can not mkdir plugins directory');
+-d 'plugins/.' or mkdir('plugins',0755) or die('can not mkdir plugins directory');
 
 ###
 ### Create link to pluginmgr
@@ -97,7 +97,7 @@ $::action_plugin{'pluginmgr_permit'} = sub {
     foreach my $key (grep(/^pluginmgr__/,keys %::config)){
         delete $::config{$key};
     }
-    while( my ($key)=each %::form ){
+    while( my $key=each %::form ){
         $::config{$key} = 1 if $key =~ /^pluginmgr__/;
     }
     &::save_config;

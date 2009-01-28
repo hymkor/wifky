@@ -14,7 +14,6 @@ $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 %::flag     = ();
 %::cnt      = ();
-sub first(&@);
 sub lockdo(&@);
 
 my $messages = '';
@@ -73,7 +72,7 @@ if( $0 eq __FILE__ ){
     };
     if( $@ ){
         print $_,"\r\n" for @::http_header;
-        unless( first{ /^Content-Type:/i } @::http_header ){
+        unless( grep{ /^Content-Type:/i } @::http_header ){
             print "Content-Type: text/html;\r\n";
         }
         print "\r\n<html><body>\n",&errmsg($@);
@@ -81,12 +80,6 @@ if( $0 eq __FILE__ ){
         print "</body></html>\n";
     }
     exit(0);
-}
-
-sub first(&@){
-    my $code=shift;
-    for(@_){ return $_ if $code->($_); }
-    undef;
 }
 
 sub chdir_and_code{
@@ -697,8 +690,11 @@ sub is_frozen{
 }
 
 sub auth_check{ # If password is right, return true.
-    !$::config{crypt} ||
-    first{ crypt($_,$::config{crypt}) eq $::config{crypt} } @{$::forms{password}};
+    return 1 unless $::config{crypt};
+    foreach my $e (@{$::forms{password}}){
+        return 1 if crypt($e,$::config{crypt}) eq $::config{crypt};
+    }
+    0;
 }
 
 sub ninsho{ # If password is wrong, then die.
@@ -1534,7 +1530,10 @@ sub action_cat{
     sub attach{ map{ pack('h*',$_) } @{$_[0]->{attachments}}; }
     sub has{
         my $f=unpack('h*',$_[1]);
-        ::first{ $_ eq $f } @{$_[0]->{attachments}};
+        foreach my $e (@{$_[0]->{attachments}}){
+            return $e if $e eq $f;
+        }
+        undef;
     }
     sub title{
         $_[0]->{title} ||= pack('h*',$_[0]->{fname});
