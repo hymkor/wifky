@@ -1447,7 +1447,13 @@ sub action_cat{
             : $attach =~ /\.txt$/i ? 'text/plain'
             : 'application/octet-stream';
 
-    print  qq(Content-Disposition: attachment; filename="$attach"\r\n);
+    if( $ENV{HTTP_USER_AGENT} =~ /Fire/  || $ENV{HTTP_USER_AGENT} =~ /Opera/ ){
+        printf qq(Content-Disposition: attachment; filename*=%s''%s\r\n),
+            $::charset , $attach ;
+    }else{
+        printf qq(Content-Disposition: attachment; filename=%s\r\n),
+            &percent($attach);
+    }
     print  qq(Content-Type: $type\r\n);
     printf qq(Content-Length: %d\r\n),( stat(FP) )[7];
     printf qq(Last-Modified: %s, %02d %s %04d %s GMT\r\n) ,
