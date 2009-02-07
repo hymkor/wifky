@@ -56,7 +56,12 @@ $::inline_plugin{'rssreader'} = sub {
         map{
             my $cont=$_->[1];
             if( $_->[0] ){ ### has a url ###
-                $cont = sprintf('<a href="%s">%s</a>',$_->[0],$cont);
+                if( $opt{d} ){
+                    $cont = sprintf('%s <sup><a href="%s">&dagger;</a></sup>',
+                                    $cont,$_->[0]);
+                }else{
+                    $cont = sprintf('<a href="%s">%s</a>',$_->[0],$cont);
+                }
             }
             if( $opt{o} || $opt{u} ){
                 '<li>'.$cont.'</li>';
