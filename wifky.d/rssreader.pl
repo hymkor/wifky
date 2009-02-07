@@ -1,10 +1,10 @@
 package wifky::rssreader;
-my $version='0.3';
+my $version='0.4';
 
 use strict;
 use warnings;
 use IO::Socket;
-use Encode;
+use Encode ();
 use Storable ();
 
 $::preferences{"RSS Reader $version"} = [
@@ -23,7 +23,7 @@ $::inline_plugin{'rssreader'} = sub {
     my %opt;
     while( $#_ >= 0 && $_[0] =~ /^-/ ){
         $opt{ $' } = 1;
-        shift(@_);
+        shift;
     }
     my ($rssurl,$maxnum)=@_;
 
@@ -53,24 +53,24 @@ $::inline_plugin{'rssreader'} = sub {
 
     my $tag= $opt{o} ? 'ol' : $opt{u} ? 'ul' : 'dl';
     qq(<$tag class="rssreader">\n) . join('',
-            map{
-                my $cont=$_->[1];
-                if( $_->[0] ){ ### has a url ###
-                    $cont = sprintf('<a href="%s">%s</a>',$_->[0],$cont);
-                }
-                if( $opt{o} || $opt{u} ){
-                    '<li>'.$cont.'</li>';
-                }else{
-                    sprintf(qq(<dt>%s</dt><dd>%s</dd>\n) ,
-                        $cont ,
-                        &set_class_category($_->[2]) );
-                }
-            } @entries
+        map{
+            my $cont=$_->[1];
+            if( $_->[0] ){ ### has a url ###
+                $cont = sprintf('<a href="%s">%s</a>',$_->[0],$cont);
+            }
+            if( $opt{o} || $opt{u} ){
+                '<li>'.$cont.'</li>';
+            }else{
+                sprintf(qq(<dt>%s</dt><dd>%s</dd>\n) ,
+                    $cont ,
+                    &set_class_category($_->[2]) );
+            }
+        } @entries
     ) . "</$tag>";
 };
 
 sub set_class_category{
-    my ($desc)=@_;
+    my $desc=shift;
     $desc =~ s|^(\[.*?\])+|<span class="rssreader_subject">$&</span>|;
     $desc;
 }
@@ -113,19 +113,23 @@ sub rss{
 
     my @newentries;
     if( defined($xml) ){
-        my $encode='utf8';
+        my $encode='UTF-8';
         if( $xml =~ /^Content-Type:.*charset=([\-\_\w]+)/ ||
             $xml =~ /<?xml[^>]+encoding="?([\-\_\w]+)"?/ )
         {
             my $charset=$1;
             if( $charset =~ /euc[\-\_]?jp/i ){
-                $encode = 0;
+                $encode = 'EUC-JP';
             }elsif( $charset =~ /utf[\-\_]?8/i ){
-                $encode = 'utf8';
+                $encode = 'UTF-8';
             }
         }
-        if( $encode ){
-            Encode::from_to($xml,'utf8','euc-jp',Encode::XMLCREF);
+        if( $encode ne $::charset ){
+            if( $encode eq 'EUC-JP' ){
+                Encode::from_to($xml,'euc-jp','utf8',Encode::XMLCREF);
+            }else{
+                Encode::from_to($xml,'utf8','euc-jp',Encode::XMLCREF);
+            }
         }
         &parse_rss($xml,
             sub{
@@ -175,13 +179,11 @@ sub http{
     $http->print("\r\n");
     $http->flush();
 
-    my $flag=0;
-    my $body='';
+    my $body;
     my $line=<$http>;
     &errlog("header> %s",$line);
-    if( ( split(/\s+/,$line) )[1] eq '304' ){
-        $body = undef;
-    }else{
+    unless( ( split(/\s+/,$line) )[1] eq '304' ){
+        $body = '';
         while( defined(my $line=<$http>) ){
             &errlog("body> %s",$line);
             if( $line =~ /^\r?\n?$/ ){
@@ -218,30 +220,32 @@ sub parse_xml{
 
 sub parse_rss{
     my ($xml,$get_entry)=@_;
-    my $item=undef;
-    my $text=undef;
+    my $item;
+    my $text;
     &parse_xml( $xml ,
         sub { ### Start ###
             my $tag=shift;
             my @elements = @_;
             if( $tag eq 'item' ){
                 my %hash;
-                grep( (/^([^\=]+)\=\"?(.*?)\"?$/ and $hash{$1}=$2,0),@elements);
+                foreach my $e (@elements){
+                    $hash{$1}=$2 if $e =~ /^([^\=]+)\=\"?(.*?)\"?$/;
+                }
                 $item = { url=>$hash{'rdf:about'} , 'dc:subject'=>[] };
-            }elsif( defined($item) && $tag =~ /title|description|dc\:subject/){
+            }elsif( defined($item) && $tag =~ /title|description|dc\:subject|link/){
                 $text = '';
             }
             1;
         } ,
         sub { ### End ###
-            my ($tag)=@_;
+            my $tag=shift;
             if( defined($text) ){
-                if( $tag =~ /^(title|description)/ ){
+                if( $tag =~ /^title|description|link/ ){
                     $item->{ $tag } = $text;
                 }elsif( $tag eq 'dc:subject' ){
                     push(@{$item->{'dc:subject'}},$text);
                 }elsif( $tag eq 'item' ){
-                    my $rv=$get_entry->( $item->{url},
+                    my $rv=$get_entry->( $item->{link} || $item->{url},
                             $item->{title},
                             join('',
                                 map("[${_}]", grep( $_  , @{$item->{'dc:subject'}}))
