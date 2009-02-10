@@ -1,4 +1,4 @@
-#!/usr/bin/perl -T
+#!/usr/local/bin/perl -T
 
 use strict; use warnings;
 
@@ -14,7 +14,6 @@ $::print    = ' 'x 10000; $::print = '';
 %::config   = ( crypt => '' , sitename => 'wifky!' );
 %::flag     = ();
 %::cnt      = ();
-sub lockdo(&@);
 
 my $messages = '';
 
@@ -27,7 +26,7 @@ if( $0 eq __FILE__ ){
         local $SIG{__WARN__} = local $SIG{__DIE__} = sub {
             return if ( caller(0) )[1] =~ /\.pm$/;
             my $msg=join(' ',@_);
-            if( $msg =~ /^!([^\!]*)/ ){
+            if( $msg =~ /^!(.*)!/ ){
                 $messages .= '<div>'.&enc($1)."</div>\n" ;
             }else{
                 $messages .= '<div>'.&enc($msg)."</div>\n" ;
@@ -42,14 +41,12 @@ if( $0 eq __FILE__ ){
 
         &read_form;
         &chdir_and_code;
-        tie %::contents,'wifky::Contents',\my @else;
-
-        foreach my $pl (sort map{/^([\w\.]+\.plg)$/ ? $1 : () } @else ){
+        foreach my $pl (sort map(/^([\w\.]+\.plg)$/ ? $1 : () ,&directory) ){
             do "./$pl"; die($@) if $@;
         }
         &load_config;
         &init_globals;
-        foreach my $pl (sort map{/^([\w\.]+\.pl)$/ ? $1 : () } @else ){
+        foreach my $pl (sort map(/^([\w\.]+\.pl)$/ ? $1 : (),&directory) ){
             do "./$pl"; die($@) if $@;
         }
 
@@ -61,7 +58,7 @@ if( $0 eq __FILE__ ){
             }else{ # output page itself.
                 &action_view($::form{p});
             }
-        }elsif( exists $::contents{ $::config{FrontPage} } ){
+        }elsif( &object_exists($::config{FrontPage}) ){
             &action_view($::config{FrontPage});
         }else{
             &do_index('recent','rindex','-l');
@@ -72,9 +69,7 @@ if( $0 eq __FILE__ ){
     };
     if( $@ ){
         print $_,"\r\n" for @::http_header;
-        unless( grep{ /^Content-Type:/i } @::http_header ){
-            print "Content-Type: text/html;\r\n";
-        }
+        print "Content-Type: text/html;\r\n" unless grep(/^Content-Type:/i,@::http_header);
         print "\r\n<html><body>\n",&errmsg($@);
         print $messages if $@ !~ /^!/;
         print "</body></html>\n";
@@ -99,12 +94,11 @@ sub chdir_and_code{
 }
 
 sub init_globals{
-    if( $::config{locallink} ){
+    if( &is('locallink') ){
         $::PROTOCOL = '(?:s?https?|ftp|file)';
         $::RXURL    = '(?:s?https?|ftp|file)://[-\\w.!~*\'();/?:@&=+$,%#]+';
     }
 
-    $::xmlrpc ||= '';
     $::target = ( $::config{target}
                 ? sprintf(' target="%s"',$::config{target}) : '' );
     $::config{CSS} ||= 'CSS';
@@ -179,7 +173,7 @@ sub init_globals{
         '100_FrontPage' => &anchor($::config{FrontPage} , undef  ) ,
         '600_Index'     => &anchor('Index',{a=>'recent'}) ,
     );
-    if( !$::config{lonely} || &is_signed() ){
+    if( !&is('lonely') || &is_signed() ){
         $::menubar{'200_New'} = &anchor('New' , { a=>'new' });
     }
     @::menubar = ();
@@ -273,9 +267,9 @@ sub init_globals{
         '900_verbatim' => \&unverb ,
     );
 
-    ### Form-Parts appearing allways .
+    ### Form-Parts appearing allways . 
     ### They does not have to print <form> tag themselves.
-    ### They have to keep a draft-text and continue users' operation
+    ### They have to keep a draft-text and continue users' operation 
     ### to preview-screen.
     %::form_list = (
         '000_mode'           => \&form_mode ,
@@ -286,7 +280,7 @@ sub init_globals{
         '500_attachemnt'     => \&form_attachment ,
     );
 
-    ### Forms appearing the 1st edit-form.
+    ### Forms appearing the 1st edit-form. 
     ### They have to print <form> tag themselves.
     ### They can drop draft-text.
     %::form2_list = (
@@ -295,7 +289,6 @@ sub init_globals{
         '300_rollback'       => \&form2_rollback ,
     );
     @::outline = ();
-    %::mtime_cache = ();
 
     $::user_template ||= '
         <div class="main">
@@ -405,9 +398,9 @@ sub read_multimedia{
 }
 
 sub read_simpleform{
-    foreach my $e ( split(/[&;]/, $_[0]) ){
-        my ($name, $value) = split(/=/, $e,2);
-        $value = '' unless defined $value;
+    foreach my $p ( split(/[&;]/, $_[0]) ){
+        my ($name, $value) = split(/=/, $p,2);
+        defined($value) or $value = '' ;
         $value =~ s/\+/ /g;
         $value =~ s/%([0-9a-fA-F][0-9a-fA-F])/pack('C', hex($1))/eg;
         &set_form( $name , $value );
@@ -423,8 +416,8 @@ sub set_form{
 }
 
 sub read_form{
-    foreach my $e (split(/[,;]\s*/,$ENV{'HTTP_COOKIE'}||'') ){
-        $::cookie{$`}=$' if $e =~ /=/;
+    foreach(split(/[,;]\s*/,$ENV{'HTTP_COOKIE'}||'') ){
+        $::cookie{$`}=$' if /=/;
     }
     if( exists $ENV{REQUEST_METHOD} && $ENV{REQUEST_METHOD} eq 'POST' ){
         $ENV{CONTENT_LENGTH} > 10*1024*1024 and die('Too large form data');
@@ -432,8 +425,6 @@ sub read_form{
         read(STDIN, $query_string, $ENV{CONTENT_LENGTH});
         if( $query_string =~ /\A(--.*?)\r?\n/ ){
             &read_multimedia( $query_string , $1 );
-        }elsif( $query_string =~ /\A\<\?xml/ ){
-            $::xmlrpc = $query_string;
         }else{
             &read_simpleform( $query_string );
         }
@@ -464,7 +455,7 @@ sub errmsg{
 
 sub enc{
     my $s=shift;
-    return '' unless defined $s;
+    defined($s) or return '';
     $s =~ s/&/\&amp;/g;
     $s =~ s/</\&lt;/g;
     $s =~ s/>/\&gt;/g;
@@ -476,7 +467,7 @@ sub enc{
 
 sub denc{
     my $s = shift;
-    return '' unless defined $s;
+    defined($s) or return '';
     $s =~ s/\&#39;/'/g;
     $s =~ s/\&lt;/</g;
     $s =~ s/\&gt;/>/g;
@@ -518,14 +509,17 @@ sub ymdhms{
         , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0])
 }
 
+sub cacheoff{
+    undef %::mtime_cache;
+    undef @::contents;
+    undef %::contents;
+}
 sub title2mtime{
     &mtime( &title2fname(@_) );
 }
-
 sub fname2title{
     pack('h*',$_[0]);
 }
-
 sub title2fname{
     my $fn=join('__',map(unpack('h*',$_),@_) );
     if( $fn =~ /^(\w+)$/ ){
@@ -534,7 +528,6 @@ sub title2fname{
         die("$fn: invalid filename");
     }
 }
-
 sub percent{
     my $s = shift;
     $s =~ s/([^\w\'\.\-\*\_ ])/sprintf('%%%02X',ord($1))/eg;
@@ -562,6 +555,10 @@ sub img{
     '<img '.&verb(join(' ',map("$_=\"".$attr->{$_}.'"',keys %{$attr}))).'>';
 }
 
+sub title2url{ &myurl( { p=>$_[0] } ); }
+sub attach2url{ &myurl( { p=>$_[0] , f=>$_[1]} );}
+sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
+
 sub form_mode{
     if( $::config{archivemode} ){
         &puts('<div class="archivemode">archive mode</div>');
@@ -569,16 +566,13 @@ sub form_mode{
         &puts('<div class="noarchivemode">no archive mode</div>');
     }
 }
-
 sub form_textarea{
     &putenc('<textarea cols="80" rows="20" name="text_t">%s</textarea><br>'
             , ${$_[0]} );
 }
-
 sub form_preview_button{
     &puts('<input type="submit" name="a" value="Preview">');
 }
-
 sub form_signarea{
     &is_signed() or &is_frozen() or return;
 
@@ -593,28 +587,28 @@ sub form_signarea{
         &puts('<input type="checkbox" name="sage" value="1">sage');
     }
 }
-
 sub form_commit_button{
     &puts('<input type="submit" name="a" value="Commit">');
 }
 
 sub form_attachment{
+    ### &begin_day('Attachment');
     &puts('<h3>Attachment</h3>');
     &puts('<p>New:<input type="file" name="newattachment_b" size="48">');
     &puts('<input type="submit" name="a" value="Upload"></p>');
-    my @attachments=$::contents{$::form{p}}->attach or return;
+    my @attachments=&list_attachment( $::form{p} ) or return;
     &puts('<p>');
-    foreach my $f (sort @attachments){
-        my $fn = &title2fname($::form{p}, $f);
+    foreach my $attach (sort @attachments){
+        my $fn = &title2fname($::form{p}, $attach);
 
-        &putenc('<input type="checkbox" name="f" value="%s"' , $f );
+        &putenc('<input type="checkbox" name="f" value="%s"' , $attach );
         if( !&is_signed() && ! &w_ok($fn) ){
             &puts(' disabled');
         }
         &putenc('><input type="text" name="dummy" readonly value="&lt;&lt;{%s}"
                 size="%d" style="font-family:monospace"
-                onClick="this.select();">', $f, length($f)+4 );
-        &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$f } ).':' );
+                onClick="this.select();">', $attach, length($attach)+4 );
+        &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$attach } ).':' );
         &putenc('%d bytes, at %s', (stat $fn)[7],&mtime($fn));
         &puts('<strong>frozen</strong>') unless &w_ok();
         &puts(')<br>');
@@ -622,6 +616,7 @@ sub form_attachment{
     &puts('</p>');
     &puts('<input type="submit" name="a" value="Freeze/Fresh">') if &is_signed();
     &puts('<input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">');
+    ### &end_day();
 }
 
 sub print_form{
@@ -653,7 +648,7 @@ sub print_header{
 
     &puts('<style type="text/css"><!--');
     foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
-        if( my $css = $::contents{$p}->load ){
+        if( my $css =&read_text($p) ){
             $css =~ s/\<\<\{([^\}]+)\}/&myurl( { p=>$p , f=>$1 } )/ge;
             $css =~ s/[<>&]//g;
             $css =~ s|/\*.*?\*/||gs;
@@ -678,6 +673,24 @@ sub print_header{
     }
 }
 
+sub print_footer{ ### deprecate ###
+    if( $::flag{userheader} ){
+        return if $::flag{userheader} eq 'template';
+        &puts('<div class="copyright footer">',@::copyright,'</div>') if @::copyright;
+        &puts('</div><!-- main --><div class="sidebar">');
+        &print_page( title=>'Sidebar' );
+    }
+    &puts('</div>');
+    &puts( $messages ) if $::config{debugmode} && $messages;
+    &puts('</body></html>');
+}
+
+sub print_sidebar_and_footer{ ### deprecate ###
+    @::copyright=();
+    &print_footer();
+}
+sub print_copyright{} ### deprecate ###
+
 sub is_frozen{
     if( -r &title2fname(  $#_>=0            ? $_[0]
                         : exists $::form{p} ? $::form{p}
@@ -685,16 +698,13 @@ sub is_frozen{
     {
         ! &w_ok();
     }else{
-        $::config{lonely};
+        &is('lonely');
     }
 }
 
 sub auth_check{ # If password is right, return true.
-    return 1 unless $::config{crypt};
-    foreach my $e (@{$::forms{password}}){
-        return 1 if crypt($e,$::config{crypt}) eq $::config{crypt};
-    }
-    0;
+    !$::config{crypt} ||
+    grep(crypt($_,$::config{crypt}) eq $::config{crypt},@{$::forms{password}})>0;
 }
 
 sub ninsho{ # If password is wrong, then die.
@@ -710,27 +720,27 @@ sub check_frozen{
         die( '!This page is frozen.!');
     }
 }
-
 sub check_conflict{
-    my $current_source = &read_object($::form{p});
+    my $current_source = &read_text($::form{p});
     my $before_source  = $::form{orgsrc_t};
     if( $current_source ne $before_source ){
         die( "!Someone else modified this page after you began to edit."  );
     }
 }
 
-sub read_object{
+sub read_text{ # for text
     &read_file(&title2fname(@_));
 }
 
-sub write_object{
-    my $body  = pop(@_);
-    my $fname = &title2fname(@_);
-    &write_file($fname,$body);
+sub read_object{ # for binary
+    &read_file(&title2fname(@_));
+}
+
+sub read_textfile{ # for text
+    &read_file;
 }
 
 sub read_file{
-    local *FP;
     open(FP,$_[0]) or return $::default_contents{ $_[0] } || '';
     local $/;
     my $object = <FP>;
@@ -738,18 +748,26 @@ sub read_file{
     defined($object) ? $object : $::default_contents{ $_[0] } || '';
 }
 
+# write object with OBJECT-NAME(S) , not filename.
+sub write_object{
+    my $body  = pop(@_);
+    my $fname = &title2fname(@_);
+    &write_file($fname,$body);
+}
+
 sub write_file{
     my ($fname,$body) = @_;
 
     if( length( ref($body) ? $$body : $body ) <= 0 ){
         unlink($fname) or rmdir($fname);
+        &cacheoff;
         0;
     }else{
-        local *FP;
         open(FP,">$fname") or die("can't write the file $fname.");
             binmode(FP);
             print FP ref($body) ? ${$body} : $body;
         close(FP);
+        &cacheoff;
         1;
     }
 }
@@ -771,14 +789,13 @@ sub action_new{
 }
 
 sub load_config{
-    for(split(/\n/,&read_file('index.cgi'))){
+    for(split(/\n/,&read_textfile('index.cgi'))){
         $::config{$1}=&deyen($2) if /^\#?([^\#\!\t ]+)\t(.*)$/;
     }
 }
 
 sub local_cookie{
     my $id;
-    local *FP;
     if( exists $ENV{LOCAL_COOKIE_FILE} && open(FP,'<'.$ENV{LOCAL_COOKIE_FILE}) ){
         $id=<FP>;
         close(FP);
@@ -793,11 +810,11 @@ sub is_signed{
     my $id=$::cookie{$::session_cookie} || &local_cookie() || rand();
 
     # time(TAB)ip(TAB)key
-    for( split(/\n/,&read_file('session.cgi') ) ){
+    for( split(/\n/,&read_textfile('session.cgi') ) ){
         $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ && $1>time-24*60*60;
     }
 
-    if( ($::form{signing} && &auth_check() ) ||
+    if( ($::form{signing} && &auth_check() ) || 
         ($::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq $id ) )
     {
         push( @::http_header , "Set-Cookie: $::session_cookie=$id" );
@@ -810,12 +827,12 @@ sub is_signed{
 }
 
 sub save_session{
-    lockdo{
+    &lockdo( sub{
         &write_file( 'session.cgi' ,
             join("\n",map(sprintf("#%s\t%s\t%s",$::ip{$_}->[1],$_,$::ip{$_}->[0]),
                  keys %::ip ))
-        );
-    } 'session.cgi';
+        ); } , 'session.cgi'
+    );
 }
 
 sub action_signin{
@@ -856,7 +873,7 @@ sub save_config{
     while( my ($key,$val)=each %::config ){
         push( @settings , '#'.$key."\t".&yen($val) ) if $val;
     }
-    lockdo{ &write_file( 'index.cgi' , join("\n", @settings) ) } 'index.cgi';
+    &lockdo( sub{ &write_file( 'index.cgi' , join("\n", @settings) ) } );
 }
 
 sub action_commit{
@@ -866,6 +883,16 @@ sub action_commit{
         &do_submit();
     };
     &do_preview( $@ ) if $@;
+}
+
+sub archive{
+    my @tm=localtime;
+    my $source=&title2fname($::form{p});
+    my $backno=&title2fname($::form{p},
+        sprintf('~%02d%02d%02d_%02d%02d%02d.txt',$tm[5]%100,1+$tm[4],@tm[3,2,1,0] )
+    );
+    rename( $source , $backno );
+    chmod( 0444 , $backno );
 }
 
 sub action_preview{
@@ -882,15 +909,15 @@ sub action_preview{
 sub action_rollback_preview{
     goto &action_signin if &is_frozen() && !&is_signed();
 
-    my $p = $::form{p};
-    my $f = $::form{f};
+    my $title = $::form{p};
+    my $attach = $::form{f};
     &print_template(
         template => $::system_template ,
         main=>sub{
-            &begin_day("Rollback Preview: $f");
+            &begin_day("Rollback Preview: $title");
             &print_page(
-                title=>$f ,
-                source=>\&read_object($f,$p) ,
+                title=>$title ,
+                source=>\&read_text($title,$attach) ,
                 index=>1,
                 main=>1
             );
@@ -898,8 +925,8 @@ sub action_rollback_preview{
             &puts('<input type="hidden" name="a" value="rollback"> ');
             &puts('<input type="submit" name="b" value="Rollback"> ');
             &puts('<input type="submit" name="b" value="Cancel"> ');
-            &putenc('<input type="hidden" name="p" value="%s">',$p);
-            &putenc('<input type="hidden" name="f" value="%s">',$f);
+            &putenc('<input type="hidden" name="p" value="%s">',$title);
+            &putenc('<input type="hidden" name="f" value="%s">',$attach);
             &end_day();
         }
     );
@@ -910,12 +937,12 @@ sub action_rollback{
     goto &action_signin if &is_frozen() && !&is_signed();
 
     my $title=$::form{p};
-    my $page=$::contents{$title};
-    my $frozen=$page->frozen();
-    $page->fresh if $frozen;
-    $page->archive if $::config{archivemode};
-    $page->save( \&read_object($title,$::form{f}) );
-    $page->freeze if $frozen;
+    my $fn=&title2fname($title);
+    my $frozen=&is_frozen();
+    chmod(0644,$fn) if $frozen;
+    &archive() if $::config{archivemode};
+    &lockdo( sub{ &write_file( $fn , \&read_text($title,$::form{f})) } , $title );
+    chmod(0444,$fn) if $frozen;
     &transfer_page();
 }
 
@@ -952,9 +979,10 @@ HEADER
             &puts('<form action="#"><input type="hidden" name="a" value="tools">');
             &putenc('<select onChange="if( lastid ){ hide(lastid); };show(this.options[this.selectedIndex].value);lastid=this.options[this.selectedIndex].value;return false;">' );
 
-            foreach my $e ( (sort keys %::tools_submenu) ,
-                            (sort keys %::preferences  ) ){
-                &putenc('<option value="%s">%s</option>',$e,$e);
+            foreach my $section ( (sort keys %::tools_submenu) ,
+                                  (sort keys %::preferences) )
+            {
+                &putenc('<option value="%s">%s</option>',$section,$section);
             }
             &puts('</select></form>');
 
@@ -982,7 +1010,7 @@ HEADER
                     if( $i->{type} eq 'checkbox' ){
                         &putenc('<input type="checkbox" name="config__%s" value="1"%s> %s<br>'
                             , $i->{name}
-                            , ( $::config{$i->{name}} ? ' checked' : '' )
+                            , ( &is($i->{name}) ? ' checked' : '' )
                             , $i->{desc}
                         );
                     }elsif( $i->{type} eq 'password' ){
@@ -1000,14 +1028,14 @@ HEADER
                         );
                     }elsif( $i->{type} eq 'radio' ){
                         &putenc('%s<br>',$i->{desc});
-                        foreach my $e (@{$i->{option}}){
+                        foreach my $p (@{$i->{option}}){
                             &putenc('<input type="radio" name="config__%s" value="%s"%s>%s<br>'
                                 , $i->{name}
-                                , $e->[0]
+                                , $p->[0]
                                 , ( defined($::config{$i->{name}}) &&
-                                    $::config{$i->{name}} eq $e->[0]
+                                    $::config{$i->{name}} eq $p->[0]
                                   ? ' checked' : '' )
-                                , $e->[1] );
+                                , $p->[1] );
                         }
                     }elsif( $i->{type} eq 'a' ){
                         &putenc('<a href="%s">%s</a><br>',$i->{href},$i->{desc} );
@@ -1037,22 +1065,22 @@ HEADER
 sub action_preferences{
     goto &action_signin unless &is_signed();
 
-    foreach my $e ( @{$::preferences{$::form{section}}} ){
-        next unless exists $e->{name};
-        my $type = $e->{type} || 'text';
-        my $newval= exists $::form{'config__'.$e->{name}}
-                  ? $::form{'config__'.$e->{name}} : '';
+    foreach my $i ( @{$::preferences{$::form{section}}} ){
+        next unless exists $i->{name};
+        my $type = $i->{type} || 'text';
+        my $newval= exists $::form{'config__'.$i->{name}}
+                  ? $::form{'config__'.$i->{name}} : '';
         if( $type eq 'checkbox' ){
-            $::config{ $e->{name} } = ($newval ? 1 : 0);
+            $::config{ $i->{name} } = ($newval ? 1 : 0);
         }elsif( $type eq 'password' ){
             if( length($newval) > 0 ){
-                if( $newval ne $::form{'verify__'.$e->{name}} ){
-                    die('invalud value for ' . $e->{name} );
+                if( $newval ne $::form{'verify__'.$i->{name}} ){
+                    die('invalud value for ' . $i->{name} );
                 }
-                $::config{ $e->{name} } = $newval;
+                $::config{ $i->{name} } = $newval;
             }
         }else{
-            $::config{ $e->{name} } = $newval;
+            $::config{ $i->{name} } = $newval;
         }
     }
     &save_config;
@@ -1074,20 +1102,20 @@ sub action_rename{
     goto &action_signin unless &is_signed();
 
     my $newtitle = $::form{newtitle};
-    my $page = $::contents{$::form{p}};
-    my $orgfname = $page->fname;
+    my $title    = $::form{p};
+    my $fname    = &title2fname($title);
     my $newfname = &title2fname($newtitle);
     die("!The new page name '$newtitle' is already used.!") if -f $newfname;
 
     my @list = map {
-        my $older="${orgfname}__$_" ;
+        my $older="${fname}__$_" ;
         my $newer="${newfname}__$_";
         die("!The new page name '$newtitle' is already used.!") if -f $newer;
         [ $older , $newer ];
-    } @{$page->{attachments}};
+    } @{$::contents{$fname}};
 
-    rename( $orgfname , $newfname );
-    rename( $_->[0] , $_->[1] ) for @list;
+    rename( $fname , $newfname );
+    rename( $_->[0] , $_->[1] ) foreach @list;
     &transfer_page($newtitle);
 }
 
@@ -1103,6 +1131,7 @@ sub action_rename_attachment{
     &transfer_page($::form{p});
 }
 
+
 sub action_seek{
     my $keyword=$::form{keyword};
     my $keyword_=&enc( $keyword );
@@ -1110,13 +1139,13 @@ sub action_seek{
     &print_template(
         Title => qq(Seek: "$keyword_") ,
         main => sub {
-            local *FP;
             &begin_day( qq(Seek: "$keyword_") );
             &puts('<ul>');
-            while( my ($title,$page)=each %::contents ){
+            foreach my $fn ( &list_page() ){
+                my $title  = &fname2title( $fn );
                 if( index($title ,$keyword) >= 0 ){
                     &puts('<li>' . &anchor($title,{ p=>$title }) . ' (title)</li>');
-                }elsif( open(FP,$page->fname) ){
+                }elsif( open(FP,$fn) ){
                     while( <FP> ){
                         if( index($_,$keyword) >= 0 ){
                             &puts('<li>' . &anchor($title,{ p=>$title } ) . '</li>' );
@@ -1138,9 +1167,10 @@ sub action_delete{
     foreach my $f ( @{$::forms{f}} ){
         my $fn=&title2fname( $::form{p} , $f );
         if( &w_ok($fn) || &is_signed() ){
-            $::contents{ $::form{p} }->drop( $f );
+            unlink( $fn ) or rmdir( $fn );
         }
     }
+    &cacheoff;
     &do_preview();
 }
 
@@ -1151,6 +1181,7 @@ sub action_freeze_or_fresh{
         my $fn=&title2fname( $::form{p} , $f );
         chmod( &w_ok($fn) ? 0444 : 0666 , $fn );
     }
+    &cacheoff;
     &do_preview();
 }
 
@@ -1163,7 +1194,8 @@ sub action_comment{
     if( length($comment) > 0 ){
         utime( time , time , &title2fname($title) ) <= 0
             and die("unable to comment to unexistant page.");
-        my $fname = &title2fname($title,"comment.$comid");
+        &cacheoff;
+        my $fname  = &title2fname($title,"comment.$comid");
         local *FP;
         open(FP,">>$fname") or die("Can not open $fname for append");
             my @tm=localtime;
@@ -1201,18 +1233,17 @@ sub do_index{
 
 sub action_upload{
     exists $::form{p} or die('not found pagename');
-    my $attach=$::form{'newattachment_b.filename'};
     &check_frozen;
-    my $page=$::contents{$::form{p}};
-    if( $page->frozen( $attach ) ){
+    my $fn=&title2fname( $::form{p} , $::form{'newattachment_b.filename'} );
+    if( -r $fn && ! &w_ok() ){
         &do_preview('The attachment is frozen.');
     }else{
-        $page->upload( $attach , \$::form{'newattachment_b'} );
+        &write_file( $fn , \$::form{'newattachment_b'} );
         &do_preview();
     }
 }
 
-sub lockdo(&@){
+sub lockdo{
     my ($code,@title)=(@_,'LOCK');
     my $lock=&title2fname(@title);
     my $retry=0;
@@ -1230,24 +1261,24 @@ sub lockdo(&@){
     $rc;
 }
 
+
 sub do_submit{
     my $title=$::form{p};
-    my $page=$::contents{$title};
-    my $fn=$page->fname;
+    my $fn=&title2fname($title);
     my $sagetime=&mtimeraw($fn);
 
-    $page->fresh if $page->frozen;
+    chmod(0644,$fn) if &is_frozen();
 
     $::hook_submit->(\$title , \$::form{text_t}) if $::hook_submit;
     if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
-        $page->archive;
+        &archive();
     }
-    if( $page->save( \$::form{text_t} ) ){
+    if( &lockdo( sub{ &write_file( $fn , \$::form{text_t} ) },$::form{p} )){
         if( $::form{to_freeze} ){
-            $page->freeze;
+            chmod(0444,$fn);
         }
         if( $::form{sage} ){
-            utime($sagetime,$sagetime,$fn);
+            utime($sagetime,$sagetime,$fn)
         }
         &transfer_page();
     }else{
@@ -1292,20 +1323,20 @@ sub action_edit{
     goto &action_signin if &is_frozen() && !&is_signed();
 
     &browser_cache_off();
+    my $title = $::form{p};
+    my @attachment=&list_attachment($title);
+
     &print_template(
         template => $::system_template ,
         Title => 'Edit' ,
         main  => sub {
-            my $title=$::form{p};
-            my $page=$::contents{$title};
-            my $source=$page->load;
-
             &begin_day( $title );
+            my $source=&read_text($title);
             &print_form( $title , \$source , \$source );
             &end_day();
 
-            foreach my $e (sort keys %::form2_list){
-                $::form2_list{$e}->($title,$page->attach);
+            foreach my $p (sort keys %::form2_list){
+                $::form2_list{$p}->($title,@attachment);
             }
 
         }
@@ -1314,7 +1345,7 @@ sub action_edit{
 
 sub form2_rename{
     my ($title,@attachment)=@_;
-    return unless exists $::contents{$title} && &is_signed();
+    return unless &object_exists($title) && &is_signed();
     &begin_day('Rename');
     &putenc('<h3>Page</h3><p><form action="%s" method="post">
         <input type="hidden"  name="a" value="ren">
@@ -1326,7 +1357,7 @@ sub form2_rename{
 
 sub form2_rename_attach{
     my ($title,@attachment)=@_;
-    return unless exists $::contents{$title} && &is_signed();
+    return unless &object_exists($title) && &is_signed();
     if( @attachment ){
         &putenc('<h3>Attachment</h3><p>
             <form action="%s" method="post" name="rena">
@@ -1346,12 +1377,12 @@ sub form2_rename_attach{
 
 sub form2_rollback{
     my ($title,@attachment)=@_;
-    return unless exists $::contents{$title} && &is_signed();
+    return unless &object_exists($title) && &is_signed();
     my @archive=grep(/^\~\d{6}_\d{6}\.txt/ ,@attachment);
     if( @archive ){
         &begin_day('Rollback');
         &putenc('<form action="%s" method="post"><select name="f">', $::postme);
-        foreach my $f (reverse sort @archive){
+        foreach my $f(reverse sort @archive){
             &putenc('<option value="%s">%s/%s/%s %s:%s:%s</option>',
                     $f,
                     substr($f,1,2), substr($f,3,2),  substr($f, 5,2),
@@ -1385,11 +1416,10 @@ sub print_template{
         },
     );
     &print_header( userheader=>'template' );
-    $template =~ s/([\&\%])\{(.*?)\}/&template_callback(\%default,\%hash,$1,$2)/ge;
+    $template =~ s/([\&\%]){(.*?)}/&template_callback(\%default,\%hash,$1,$2)/ge;
     &puts( $template );
     &puts('</body></html>');
 }
-
 sub template_callback{
     my ($default,$hash,$mark,$word)=@_;
     if( $mark eq '&' ){
@@ -1431,7 +1461,6 @@ sub action_view{
 sub action_cat{
     my $attach=$::form{f};
     my $path=&title2fname($::form{p},$attach);
-    local *FP;
 
     unless( open(FP,$path) ){
         push(@::http_header,'Status: 404 Attachment not found.');
@@ -1447,12 +1476,17 @@ sub action_cat{
             : $attach =~ /\.txt$/i ? 'text/plain'
             : 'application/octet-stream';
 
-    if( $ENV{HTTP_USER_AGENT} =~ /Fire/  || $ENV{HTTP_USER_AGENT} =~ /Opera/ ){
+    if( $ENV{HTTP_USER_AGENT} =~ /Fire/  ||
+        $ENV{HTTP_USER_AGENT} =~ /Opera/ ){
         printf qq(Content-Disposition: attachment; filename*=%s''%s\r\n),
             $::charset , $attach ;
     }else{
-        printf qq(Content-Disposition: attachment; filename=%s\r\n),
-            &percent($attach);
+        if( $::charset eq 'EUC-JP' ){
+            $attach =~ s/([\x80-\xFF])([\x80-\xFF])/&euc2sjis($1,$2)/ge;
+        }else{
+            $attach = &percent($attach);
+        }
+        printf qq(Content-Disposition: attachment; filename=%s\r\n),$attach;
     }
     print  qq(Content-Type: $type\r\n);
     printf qq(Content-Length: %d\r\n),( stat(FP) )[7];
@@ -1464,153 +1498,62 @@ sub action_cat{
     exit(0);
 }
 
-{
-    my %xcontents;
-    my @xcontents;
-    sub directory{ @xcontents; }
+sub euc2sjis{
+    my $c1=ord(shift) & 0x7F;
+    my $c2=ord(shift) & 0x7F;
+    if( $c1 & 1 ){
+        $c2 += 0x1F;
+    }else{
+        $c2 += 0x7D;
+    }
+    if( $c2 >= 0x7F ){
+        ++$c2;
+    }
+    $c1 = ($c1-0x21)/2 + 0x81;
+    if( $c1 > 0x9F ){
+        $c1 += 0x40;
+    }
+    pack("C2",$c1,$c2);
+}
 
-    package wifky::Contents;
-    sub TIEHASH{
-        my ($class,$else)=@_;
-        local *DIR;
+sub cache_update{
+    unless( defined(@::contents) ){
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
-            push( @xcontents , $fn );
-            if( my @p=($fn =~ /^((?:[0-9a-f]{2})+)(?:__((?:[0-9a-f]{2})+))?$/) ){
-                my $c=($xcontents{$p[0]} ||= [] );
-                push(@{$c},$p[1]) if defined $p[1];
-            }else{
-                push(@{$else},$fn) if defined $else;
+            push( @::contents , $fn );
+            if( $fn =~ /^([0-9a-f][0-9a-f])+$/ ){
+                $::contents{$&} ||= [];
+            }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__((?:[0-9a-f][0-9a-f])+)$/ ){
+                push(@{$::contents{$1}},$2);
             }
         }
         closedir(DIR);
+    }
+}
 
-        bless \%xcontents,$class;
-    }
-    sub NEXTKEY{
-        my $self=shift;
-        my @p=each %{$self};
-        return wantarray ? () : undef if @p <= 0;
+sub directory{
+    &cache_update() ; @::contents;
+}
 
-        my $title=pack('h*',$p[0]);
-        if( wantarray ){
-            ($title,wifky::Page->new(
-                      title=>$title,
-                      fname=>$p[0] ,
-                      attachments=>$p[1] || [] )
-            );
-        }else{
-            $title;
-        }
-    }
-    sub FETCH{
-        my ($self,$title)=@_;
-        my $fn=unpack('h*',$title);
-        wifky::Page->new(
-            fname  => $fn ,
-            attachments => $self->{$fn} || [],
-            title   => $title ,
-        );
-    }
-    sub FIRSTKEY{ my $a=scalar keys %{$_[0]}; goto &NEXTKEY; }
-    sub EXISTS{ exists $_[0]->{ unpack('h*',$_[1]) }; }
+sub list_page{
+    &cache_update() ; keys %::contents;
+}
 
-    sub match{ ### friend method ###
-        my ($self,$pattern)=@_;
-        $pattern =~ s/([^\*\?]+)/unpack('h*',$1)/eg;
-        $pattern =~ s/\?/../g;
-        $pattern =~ s/\*/.*/g;
-        $pattern = '^' . $pattern . '$';
-        my @list;
-        while( my ($fn,$c)=each %{$self} ){
-            next if $fn !~ $pattern;
-            push(@list,wifky::Page->new( fname=>$fn, attachments=>$c ));
-        }
-        @list;
-    }
+sub object_exists{
+    &cache_update() ; exists $::contents{ &title2fname($_[0]) }
+}
 
-    package wifky::Page;
-    sub new{
-        my $class=shift; bless { @_ },$class;
-    }
-    sub attach{ map{ pack('h*',$_) } @{$_[0]->{attachments}}; }
-    sub has{
-        my $f=unpack('h*',$_[1]);
-        foreach my $e (@{$_[0]->{attachments}}){
-            return $e if $e eq $f;
-        }
-        undef;
-    }
-    sub title{
-        $_[0]->{title} ||= pack('h*',$_[0]->{fname});
-    }
-    sub fname{
-        $_[0]->{fname} ||= unpack('h*',$_[0]->{title});
-    }
-    sub mtimeraw{
-        $_[0]->{mtimeraw} ||= (-f $_[0]->fname ? ( stat(_) )[9] : 0);
-    }
-    sub mtime{
-        &::ymdhms( $_[0]->mtimeraw );
-    }
-    sub fname_of{
-        if( defined $_[1] ){
-            $_[0]->fname . '__'.unpack('h*',$_[1]);
-        }else{
-            $_[0]->fname ;
-        }
-    }
-    sub load{
-        &::read_file( $_[0]->fname );
-    }
-    sub save{
-        my ($self,$body)=@_;
-        my $upd_or_del=::lockdo{ &::write_file( $self->fname , $body ) } $self->fname;
-        if( $upd_or_del ){
-            $xcontents{ $self->fname } = $self->{attachments};
-        }elsif( @{$self->{attachments}} <= 0 ){
-            delete $xcontents{$self->fname};
-        }
-        $upd_or_del;
-    }
-    sub exists{ exists $xcontents{ $_[0]->fname } }
-    sub frozen{ -r $_[0]->fname_of($_[1]) && !&::w_ok(); }
-    sub fresh{ chmod(0644,$_[0]->fname_of($_[1])) }
-    sub freeze{ chmod(0444,$_[0]->fname_of($_[1])) }
-    sub upload{ # attachment
-        my ($self,$as,$body)=@_;
-        my $xattach=unpack('h*',$as);
-        &::write_file( $self->fname.'__'.$xattach , $body );
-        unless( $self->has($as) ){
-            push( @{$xcontents{ $self->fname }} , $xattach );
-        }
-    }
-    sub drop{ # attachment
-        my ($self,$attach)=@_;
-        my $xattach=unpack('h*',$attach);
-        my $fn=$self->fname . '__' . $xattach;
-
-        unlink( $fn ) or rmdir( $fn );
-        my @c=grep{ $_ ne $xattach } @{$self->{attachments}};
-        $xcontents{$self->fname} = \@c;
-    }
-    sub archive{
-        my $self=shift;
-        my @tm=localtime;
-        my $source=$self->fname;
-        my $backno=$self->fname_of(
-            sprintf('~%02d%02d%02d_%02d%02d%02d.txt',$tm[5]%100,1+$tm[4],@tm[3,2,1,0] )
-        );
-        rename( $source , $backno );
-        chmod( 0444 , $backno );
-    }
+sub list_attachment{
+    &cache_update();
+    my $fn=&title2fname($_[0]);
+    return () unless exists $::contents{$fn};
+    map{ &fname2title($_) } @{$::contents{$fn}};
 }
 
 sub print_page{
     my %args=@_;
     my $title=$args{title};
-    my $page=$::contents{$title};
-    my $html =&enc( exists $args{source} ? ${$args{source}} : $page->load);
+    my $html =&enc( exists $args{source} ? ${$args{source}} : &read_text($title));
     return 0 unless $html;
 
     push(@::outline,
@@ -1618,15 +1561,16 @@ sub print_page{
     );
 
     my %attachment;
-    foreach my $f ( $page->attach ){
-        my $f_ = &enc( $f );
-        $attachment{ $f_ } = {
+    foreach my $attach ( &list_attachment($title) ){
+        my $attach_ = &enc( $attach );
+        my $url=&attach2url($title,$attach);
+        $attachment{ $attach_ } = {
             # for compatible #
-            name => $f ,
-            url  => &myurl({p=>$title,f=>$f}) ,
-            tag  => $f =~ /\.(png|gif|jpg|jpeg)$/i
-                    ? &img($f_,{p=>$title,f=>$f},{class=>'inline'})
-                    : &anchor($f_,{p=>$title,f=>$f},{class=>'attachment'})
+            name => $attach ,
+            url  => $url ,
+            tag  => $attach =~ /\.(png|gif|jpg|jpeg)$/i
+                    ? qq(<img src="$url" alt="$attach_" class="inline">)
+                    : qq(<a href="$url" title="$attach_" class="attachment">$attach_</a>) ,
         };
     }
     my %session=(
@@ -1652,7 +1596,6 @@ sub unverb_textonly{
           : ref($::later[$1]) eq 'CODE' ? $&
           : $::later[$1]/ge;
 }
-
 sub strip_tag{
     my $text=shift;
     &unverb_textonly( \$text );
@@ -1682,6 +1625,7 @@ sub call_blockquote_sub{
     qq(\n\n<blockquote class="block">).&verb($::print)."</blockquote>\n\n";
 }
 
+
 sub inner_link{
     my ($session,$symbol,$title,$sharp)
         = ($_[0], $_[1] , split(/(?=#[pf][0-9mt])/,$_[2]) );
@@ -1691,7 +1635,7 @@ sub inner_link{
         $title = &denc($title);
     }
 
-    if( exists $::contents{$title} ){
+    if( &object_exists($title) ){
         &anchor( $symbol , { p=>$title } , { class=>'wikipage' } , $sharp);
     }else{
         qq(<blink class="page_not_found">$symbol?</blink>);
@@ -1710,13 +1654,13 @@ sub plugin_menubar{
 }
 
 sub plugin_search{
-    sprintf '<div class="search_form"><form class="search" action="%s">
+    sprintf( '<div class="search_form"><form class="search" action="%s">
         <input class="search" type="text" name="keyword" size="20" value="%s">
         <input type="hidden" name="a" value="?">
         <input class="search" type="submit" value="?">
         </form></div>' ,
         $::me ,
-        &enc(exists $::form{keyword} ? $::form{keyword} : '' );
+        &enc(exists $::form{keyword} ? $::form{keyword} : '' ));
 }
 
 sub plugin_footnote{
@@ -1739,13 +1683,13 @@ sub call_footnote{
 
     my $i=0;
     &puts(qq(<div class="footnote">));
-    foreach my $e (@{$footnotes}){
+    foreach my $t (@{$footnotes}){
         ++$i;
         &puts('<p class="footnote">' ,
             &anchor("*$i",{ p=>$::form{p} } ,
             ($session->{index} ? { name=>"ft$i"} : undef) ,
             "#fm$i"),
-            "$e</p>");
+            "$t</p>");
     }
     &puts('</div><!--footnote-->');
     delete $session->{footnotes};
@@ -1767,17 +1711,18 @@ sub unverb{
     }
 }
 
+
 sub plugin_outline{
     &verb(
         sub{
             my $depth=-2;
             my $ss='';
-            foreach my $e ( @::outline ){
-                next if $e->{title} eq 'Header' ||
-                        $e->{title} eq 'Footer' ||
-                        $e->{title} eq 'Sidebar' ;
+            foreach my $p( @::outline ){
+                next if $p->{title} eq 'Header' ||
+                        $p->{title} eq 'Footer' ||
+                        $p->{title} eq 'Sidebar' ;
 
-                my $diff=$e->{depth} - $depth;
+                my $diff=$p->{depth} - $depth;
                 if( $diff > 0 ){
                     $ss .= '<ul><li>' x $diff ;
                 }else{
@@ -1785,8 +1730,8 @@ sub plugin_outline{
                     $depth >= 0  and $ss .= "</li>\n" ;
                     $ss .= '<li>';
                 }
-                $ss .= &anchor( $e->{text}, { p=>$e->{title} }, undef, $e->{sharp} );
-                $depth=$e->{depth};
+                $ss .= &anchor( $p->{text}, { p=>$p->{title} }, undef, $p->{sharp} );
+                $depth=$p->{depth};
             }
             $ss .= '</li></ul>' x ($depth+2);
             $ss;
@@ -1799,18 +1744,29 @@ sub ls_core{
     push(@args,'*') unless @args;
 
     my @list;
-    foreach my $pattern (@args){
-        foreach my $p (tied(%::contents)->match($pattern)){
-            my $fn=$p->fname;
-            next if ($fn =~ /^e2/ || ! -f $fn) && !exists $opt->{a};
-            push(@list,$p);
-        }
+    foreach my $pat (@args){
+        $pat =~ s/([^\*\?]+)/unpack('h*',$1)/eg;
+        $pat =~ s/\?/../g;
+        $pat =~ s/\*/.*/g;
+        $pat = '^' . $pat . '$';
+        push(@list, map{
+             +{ fname  => $_ ,
+                title  => &fname2title($_) ,
+                mtimeraw => &mtimeraw($_) ,
+                mtime  => &mtime($_)
+              }
+            }grep{
+                  exists $opt->{a}
+                ? ($_ =~ $pat )
+                : ($_ =~ $pat && !/^e2/ && -f $_ )
+            }
+            &list_page()
+        );
     }
-
     if( exists $opt->{t} ){
-        @list = sort{ $a->mtimeraw cmp $b->mtimeraw } @list;
+        @list = sort{ $a->{mtime} cmp $b->{mtime} } @list;
     }else{
-        @list = sort{ $a->title cmp $b->title } @list;
+        @list = sort{ $a->{title} cmp $b->{title} } @list;
     }
     @list = reverse @list if exists $opt->{r};
     if( defined (my $n=$opt->{number} || $opt->{countdown}) ){
@@ -1821,13 +1777,13 @@ sub ls_core{
 
 sub parse_opt{
     my ($opt,$arg,@rest)=@_;
-    foreach my $e (@rest){
-        if( $e =~ /^-(\d+)$/ ){
+    foreach my $p (@rest){
+        if( $p =~ /^-(\d+)$/ ){
             $opt->{number} = $opt->{countdown} = $1;
-        }elsif( $e =~ /^-/ ){
+        }elsif( $p =~ /^-/ ){
             $opt->{$'} = 1;
         }else{
-            push(@{$arg},$e);
+            push(@{$arg},$p);
         }
     }
 }
@@ -1838,9 +1794,10 @@ sub ls{
     my $buf = '';
     foreach my $p ( &ls_core(\%opt,@arg) ){
         $buf .= '<li>';
-        $buf .= '<tt>'.$p->mtime.' </tt>' if $opt{l};
-        $buf .= '<tt>'.scalar($p->attach).' </tt>' if $opt{i};
-        $buf .= &anchor( &enc($p->title) , { p=>$p->title } );
+        exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
+        exists $opt{i} and $buf .= '<tt>'.(1+@{$::contents{ $p->{fname} }}).' </tt>';
+
+        $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
         $buf .= "</li>\r\n";
     }
     $buf;
@@ -1852,7 +1809,7 @@ sub plugin_comment{
     my $session=shift;
     &parse_opt( \my %opt , \my @arg , @_ );
     my $title_= &enc($::form{p});
-    my $comid = shift(@arg) || '0';
+    my $comid = (shift(@arg) || '0');
     my $caption = @arg ? '<div class="caption">'.join(' ',@arg).'</div>' : '';
 
     exists $session->{"comment.$comid"} and return '';
@@ -1862,8 +1819,8 @@ sub plugin_comment{
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
                 $caption );
-    foreach my $c (split(/\r?\n/,&read_object($::form{p} , "comment.$comid"))){
-        my ($dt,$who,$say) = split(/\t/,$c,3);
+    for(split(/\r?\n/,&read_text($::form{p} , "comment.$comid"))){
+        my ($dt,$who,$say) = split(/\t/,$_,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
         $buf .= sprintf('<p><span class="commentator">%s</span>'.
             ' %s <span class="comment_date">(%s)</span></p>'
@@ -1912,9 +1869,9 @@ sub plugin{
 
     $param =~ s/\x02.*?\x02/"\x05".unpack('h*',$&)."\x05"/eg;
     my @param=split(/\s+/,$param);
-    foreach my $e (@param){
-        $e =~ s|\x05([^\x05]*)\x05|pack('h*',$1)|ge;
-        $e =~ s|\x02+|"\x02"x(length($&)>>1)|ge;
+    foreach(@param){
+        s|\x05([^\x05]*)\x05|pack('h*',$1)|ge;
+        s|\x02+|"\x02"x(length($&)>>1)|ge;
     }
 
     ($::inline_plugin{$name} || sub{'Plugin not found.'} )
@@ -1951,21 +1908,22 @@ sub preprocess_outerlink2{ ### [...|http://...] style ###
 }
 
 sub attach2tag{
-    my ($session,$f_,$label)=@_;
-    my ($p,$f)=($session->{title},&denc($f_));
-    $label ||= $f_;
+    my ($session,$nm,$label)=@_;
+    my ($p,$f)=($session->{title},&denc($nm));
+    $label ||= $nm;
     $label =~ s/\r*\n/ /gs;
 
-    if( $::contents{$p}->has($f) ){
-        if( $f =~ /\.png$/i || $f =~ /\.gif$/i  || $f =~ /\.jpe?g$/i ){
+    if( exists $session->{attachment}->{$nm} ){
+        if( $nm =~ /\.png$/i || $nm =~ /\.gif$/i  || $nm =~ /\.jpe?g$/i ){
             &img( $label ,{ p=>$p , f=>$f } , { class=>'inline' } );
         }else{
-            &anchor( $label ,{ p=>$p , f=>$f } , { title=>$label } );
+            &anchor($label ,{ p=>$p , f=>$f } , { title=>$label } )
         }
     }else{
-        &verb(sub{$::ref{$f} || qq(<blink class="attachment_not_found">$f_</blink>)});
+        &verb(sub{$::ref{$nm} || qq(<blink class="attachment_not_found">$nm</blink>)});
     }
 }
+
 
 sub preprocess_attachment{
     ${$_[0]} =~ s|&lt;&lt;\{([^\}]+)\}(?:\{([^\}]+)\})?|&attach2tag($_[1],$1,$2)|ge;
@@ -2009,8 +1967,8 @@ sub preprocess_rawurl{
 
 sub preprocess{
     my ($text,$session) = @_;
-    foreach my $e ( sort keys %::inline_syntax_plugin ){
-        $::inline_syntax_plugin{$e}->( \$text , $session );
+    foreach my $p ( sort keys %::inline_syntax_plugin ){
+        $::inline_syntax_plugin{$p}->( \$text , $session );
     }
     $text;
 }
@@ -2028,9 +1986,7 @@ sub midashi{
     if( $depth < 0 ){
         &puts( "<h1>$text</h1>" );
     }else{
-        foreach my $e (@{$section}[$depth .. $#{$section}]){
-            &puts('</div></div>') if $e;
-        }
+        grep( $_ && &puts('</div></div>'),@{$section}[$depth .. $#{$section}]);
         $section->[ $depth ]++;
         $_=0 for(@{$section}[$depth+1 .. $#{$section} ]);
 
@@ -2073,8 +2029,8 @@ sub midashi{
 sub syntax_engine{
     my ($ref2html,$session) = ( ref($_[0]) ? $_[0] : \$_[0] , $_[1] );
     $session->{nest}++;
-    foreach my $e ( sort keys %::call_syntax_plugin ){
-        $::call_syntax_plugin{$e}->( $ref2html , $session );
+    foreach my $p ( sort keys %::call_syntax_plugin ){
+        $::call_syntax_plugin{$p}->( $ref2html , $session );
     }
     $session->{nest}--;
 }
@@ -2082,19 +2038,16 @@ sub syntax_engine{
 sub call_block{
     my ($ref2html,$session)=@_;
     foreach my $fragment( split(/\r?\n\r?\n/,$$ref2html) ){
-        foreach my $e (sort keys %::block_syntax_plugin){
-            $::block_syntax_plugin{$e}->($fragment,$session) and last;
+        foreach my $p (sort keys %::block_syntax_plugin){
+            $::block_syntax_plugin{$p}->($fragment,$session) and last;
         }
     }
 }
 
 sub call_close_sections{
     my ($ref2html,$session)=@_;
-    if( exists $session->{section} ){
-        foreach my $e (@{$session->{section}}){
-            &puts('</div></div>') if $e;
-        }
-    }
+    exists $session->{section} and
+        grep( $_ && &puts('</div></div>'),@{$session->{section}} );
 }
 
 sub block_listing{ ### <UL><OL>... block ###
@@ -2102,8 +2055,8 @@ sub block_listing{ ### <UL><OL>... block ###
     return 0 unless $fragment =~ /\A\s*[\*\+]/;
 
     my @stack;
-    foreach my $e ( split(/\n[ \t]*(?=[\*\+])/,&preprocess($fragment,$session))){
-        my ($mark,$text)=($e =~ /\A\s*(\*+|\++)/ ? ($1,$') : ('',$_) );
+    foreach( split(/\n[ \t]*(?=[\*\+])/,&preprocess($fragment,$session))){
+        my ($mark,$text)=(/\A\s*(\*+|\++)/ ? ($1,$') : ('',$_) );
         my $nest=length($mark);
         my $diff=$nest - scalar(@stack);
         if( $diff > 0 ){### more deep ###
@@ -2216,35 +2169,5 @@ sub block_normal{
 }
 
 sub w_ok{ # equals "-w" except for root-user.
-    my @stat=$#_ < 0 ? stat(_) : stat($_[0]);
-    @stat ? $stat[2] & 0200 : 1;
+    ( $#_ < 0 ? stat(_) : stat($_[0]) )[2] & 0200;
 }
-
-### deprecated functions ###
-
-sub print_footer{
-    if( $::flag{userheader} ){
-        return if $::flag{userheader} eq 'template';
-        &puts('<div class="copyright footer">',@::copyright,'</div>') if @::copyright;
-        &puts('</div><!-- main --><div class="sidebar">');
-        &print_page( title=>'Sidebar' );
-    }
-    &puts('</div>');
-    &puts( $messages ) if $::config{debugmode} && $messages;
-    &puts('</body></html>');
-}
-
-sub print_sidebar_and_footer{
-    @::copyright=();
-    &print_footer();
-}
-
-sub print_copyright{}
-sub list_page{ keys %{tied(%::contents)}; }
-sub object_exists{ exists $::contents{ $_[0] }; }
-sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
-sub list_attachment{ $::contents{$_[0]}->attach }
-sub title2url{ &myurl( { p=>$_[0] } ); }
-sub attach2url{ &myurl( { p=>$_[0] , f=>$_[1]} );}
-sub read_textfile{ &read_file; }
-sub read_text{ &read_file(&title2fname(@_)); }
