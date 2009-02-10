@@ -22,15 +22,15 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.0.0_1';
+my $version='1.5.0_0';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
-my $ss_terminater=(%::ss ? $::ss{terminator} : 'terminator');
-my $ss_copyright =(%::ss ? $::ss{copyright}  : 'copyright footer');
-
-push( @::body_header , qq{<form name="newdiary" action="$::me" method="post" style="display:none"><input type="hidden" name="p" /><input type="hidden" name="a" value="edt" /></form>} );
 
 my @now=localtime();
-$::menubar{'200_New'} = sprintf( q|<a href="%s?a=new" onClick="JavaScript:if(document.newdiary.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newdiary.submit()};return false;">New</a>|,$::me,$now[5]+1900,$now[4]+1,$now[3] ) if exists $::menubar{'200_New'};
+if( ref($::menubar{'200_New'})){
+    push( @{$::menubar{'200_New'}} ,
+        sprintf( q|<a href="%s?a=newdiary" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newpage.submit()};return false;">Today</a>|,$::me,$now[5]+1900,$now[4]+1,$now[3] )
+    );
+}
 
 $::inline_plugin{'nikky.pl_version'} = sub{ "nikky.pl $version" };
 $::inline_plugin{lastdiary}=\&lastdiary;
@@ -56,9 +56,8 @@ $::inline_plugin{nikky_referer} = sub {
 };
 
 $::action_plugin{rss} = \&action_rss ;
-$::action_plugin{new} = \&action_newdiary;
 
-exists $::form{date} and $::form{a}='date';
+$::form{a}='date' if $::form{date};
 
 if( &::is('nikky_front') &&
     !exists $::form{a} && !exists $::form{p} )
@@ -133,17 +132,16 @@ unshift( @::copyright ,
 &init();
 
 sub concat_article{
-    my $h = ( $::version ge '1.1' || &::is('cssstyle') ? 2 : 1 );
     foreach my $p (@_){
         next unless -f $p->{fname};
         my $pagename=$p->{title};
         &::puts('<div class="day">');
-        &::putenc('<h%d><span class="title"><a href="%s">%s</a></span></h%d><div class="body">',
-                    $h , &::title2url( $pagename ) , $pagename , $h );
+        &::putenc('<h2><span class="title"><a href="%s">%s</a></span></h2><div class="body">',
+                    &::title2url( $pagename ) , $pagename );
         local $::form{p} = $pagename;
         &::print_page( title=>$pagename );
         &::puts('</div></div>');
-        &::print_page( title=>'Footer' , class=>$ss_terminater );
+        &::print_page( title=>'Footer' , class=>'terminator' );
     }
 }
 
@@ -733,7 +731,7 @@ sub set_view_thosenikky{
                 &::print_header( userheader=>'YES' );
             }
             &concat_article( @{$o{region}} );
-            &::puts(qq(<div class="$ss_copyright">),@::copyright,'</div>');
+            &::puts(qq(<div class="copyright footer">),@::copyright,'</div>');
             &::print_sidebar_and_footer;
         }
     } if exists $o{action};

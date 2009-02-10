@@ -58,10 +58,8 @@ if( $0 eq __FILE__ ){
             }else{ # output page itself.
                 &action_view($::form{p});
             }
-        }elsif( &object_exists($::config{FrontPage}) ){
-            &action_view($::config{FrontPage});
         }else{
-            &do_index('recent','rindex','-l');
+            &default_action();
         }
 
         &flush;
@@ -75,6 +73,14 @@ if( $0 eq __FILE__ ){
         print "</body></html>\n";
     }
     exit(0);
+}
+
+sub action_default{
+    if( &object_exists($::config{FrontPage}) ){
+        &action_view($::config{FrontPage});
+    }else{
+        &do_index('recent','rindex','-l');
+    }
 }
 
 sub chdir_and_code{
@@ -142,16 +148,14 @@ sub init_globals{
         'older'         => sub{ &do_index('recent','index' ,'-i','-a','-l','-t'); },
         'recent'        => sub{ &do_index('older' ,'index' ,'-i','-a','-l','-t','-r');},
         '?'             => \&action_seek ,
-        'edt'           => \&action_edit ,
+        'edit'          => \&action_edit ,
         'pwd'           => \&action_passwd ,
-        'ren'           => \&action_rename ,
-        'rena'          => \&action_rename_attachment ,
         'comment'       => \&action_comment ,
         'Delete'        => \&action_delete ,
         'Commit'        => \&action_commit ,
         'Preview'       => \&action_preview ,
-        'rollback_'     => \&action_rollback_preview ,
         'rollback'      => \&action_rollback ,
+        'rename'        => \&action_rename ,
         'Upload'        => \&action_upload ,
         'tools'         => \&action_tools ,
         'preferences'   => \&action_preferences ,
@@ -167,19 +171,33 @@ sub init_globals{
       qq(<meta http-equiv="Content-Type" content="text/html; charset=$::charset">\n<meta http-equiv="Content-Style-Type" content="text/css">\n<meta name="generator" content="wifky.pl $::version">\n<link rel="start" href="$::me">\n<link rel="index" href="$::me?a=index">)
     );
 
-    @::body_header = ( $::config{body_header}||'' );
+    @::body_header = ( 
+        qq{<form name="newpage" action="$::postme" method="post" 
+            style="display:none"><input type="hidden" name="p" />
+            <input type="hidden" name="a" value="edit" /></form>},
+        $::config{body_header}||'' ,
+    );
 
     %::menubar = (
-        '100_FrontPage' => &anchor($::config{FrontPage} , undef  ) ,
-        '600_Index'     => &anchor('Index',{a=>'recent'}) ,
+        '100_FrontPage' => [
+            &anchor($::config{FrontPage} , undef  ) ,
+        ],
+        '600_Index' => [
+            &anchor('Index',{a=>'index'}) ,
+            &anchor('Recent',{a=>'recent'}) ,
+        ],
     );
     if( !&is('lonely') || &is_signed() ){
-        $::menubar{'200_New'} = &anchor('New' , { a=>'new' });
+        $::menubar{'200_New'} = [
+            qq|<a href="$::me?a=new" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new page')){document.newpage.submit()};return false;">New</a>| ,
+        ];
     }
     @::menubar = ();
     if( &is_signed() ){
         $::menubar{'900_SignOut'} = &anchor('SignOut',{a=>'signout'},{ref=>'nofollow'});
-        $::menubar{'500_Tools'} = &anchor('Tools',{a=>'tools'},{ref=>'nofollow'});
+        $::menubar{'500_Tools'} = [
+            &anchor('Tools',{a=>'tools'},{ref=>'nofollow'})
+        ];
     }else{
         my $p={a=>'signin'};
         if( ($ENV{REQUEST_METHOD}||'') eq 'GET' ){
@@ -191,11 +209,20 @@ sub init_globals{
     }
 
     ### menubar ###
-    unless( exists $::form{a} ){
-        my $curpage=exists $::form{p} ? $::form{p} : $::config{FrontPage};
+    if( $::form{p} || !exists $::form{a} ){
+        my $title=$::form{p} || $::config{FrontPage};
         if( !&is_frozen() || &is_signed() ){
-            $::menubar{'300_Edit'} =
-                &anchor('Edit',{ a=>'edt', p=>$curpage},{rel=>'nofollow'});
+            unshift( @{$::menubar{'300_Edit'}} ,
+                &anchor('Edit',{ a=>'edit', p=>$title},{rel=>'nofollow'})
+            );
+            if( &is_signed() ){
+                push( @{$::menubar{'300_Edit'}} ,
+                    &anchor('Rollback',{ a=>'rollback', p=>$title },
+                                {rel=>'nofollow'}) ,
+                    &anchor('Rename' , { a=>'rename' , p=>$title },
+                                {rel=>'nofollow'}) ,
+                );
+            }
         }
     }
     @::copyright = (
@@ -207,10 +234,10 @@ sub init_globals{
     );
     %::preferences = (
         '*Custom Style*' => [
-            { desc=>'Edit "CSS"'     , type=>'a' , href=>"$::me?p=CSS;a=edt"    },
-            { desc=>'Edit "Header"'  , type=>'a' , href=>"$::me?p=Header;a=edt" },
-            { desc=>'Edit "Footer"'  , type=>'a' , href=>"$::me?p=Footer;a=edt" },
-            { desc=>'Edit "Sidebar"' , type=>'a' , href=>"$::me?p=Sidebar;a=edt" },
+            { desc=>'Edit "CSS"'     , type=>'a' , href=>"$::me?p=CSS;a=edit"    },
+            { desc=>'Edit "Header"'  , type=>'a' , href=>"$::me?p=Header;a=edit" },
+            { desc=>'Edit "Footer"'  , type=>'a' , href=>"$::me?p=Footer;a=edit" },
+            { desc=>'Edit "Sidebar"' , type=>'a' , href=>"$::me?p=Sidebar;a=edit" },
             { desc=>'Section mark', name=>'sectionmark', size=>3 } ,
             { desc=>'Subsection mark' , name=>'subsectionmark' , size=>3 } ,
             { desc=>'Subsubsection mark' , name=>'subsubsectionmark' , size=>3 }
@@ -267,10 +294,6 @@ sub init_globals{
         '900_verbatim' => \&unverb ,
     );
 
-    ### Form-Parts appearing allways . 
-    ### They does not have to print <form> tag themselves.
-    ### They have to keep a draft-text and continue users' operation 
-    ### to preview-screen.
     %::form_list = (
         '000_mode'           => \&form_mode ,
         '100_textarea'       => \&form_textarea ,
@@ -280,14 +303,6 @@ sub init_globals{
         '500_attachemnt'     => \&form_attachment ,
     );
 
-    ### Forms appearing the 1st edit-form. 
-    ### They have to print <form> tag themselves.
-    ### They can drop draft-text.
-    %::form2_list = (
-        '100_rename'         => \&form2_rename ,
-        '200_rename_attach'  => \&form2_rename_attach ,
-        '300_rollback'       => \&form2_rollback ,
-    );
     @::outline = ();
 
     $::user_template ||= '
@@ -371,6 +386,47 @@ HERE
 ((menubar))
 
 !!!! ((sitename))
+HERE
+    &title2fname('MenuCSS') => <<HERE ,
+div.menubar{
+    height:1em;
+}
+div.menubar div{
+    position:absolute;
+    width:100%;
+    z-index:100;
+    font-size:14px;
+}
+ul.mainmenu{
+    margin:0px;
+    padding:0px;
+    position:relative;
+    list-style:none;
+    text-align:center;
+}
+ul.mainmenu li.menuoff{
+    position:relative;
+    float:left;
+    height:1em;
+    overflow:hidden;
+    padding-left:2pt;
+}
+ul.mainmenu li.menuon{
+    float:left;
+    overflow:hidden;
+    padding-left:2pt;
+}
+ul.mainmenu>li.menuon{
+    overflow:visible;
+}
+ul.submenu{
+    margin:0px;
+    padding:0px;
+    position:relative;
+    list-style:none;
+
+    background-color:white;
+}
 HERE
     );
 }
@@ -647,7 +703,7 @@ sub print_header{
     push(@::html_header,"<title>$label</title>");
 
     &puts('<style type="text/css"><!--');
-    foreach my $p (split(/\s*\n\s*/,$::config{CSS})){
+    foreach my $p (split(/\s*\n\s*/,$::config{CSS}) , 'MenuCSS' ){
         if( my $css =&read_text($p) ){
             $css =~ s/\<\<\{([^\}]+)\}/&myurl( { p=>$p , f=>$1 } )/ge;
             $css =~ s/[<>&]//g;
@@ -780,7 +836,7 @@ sub action_new{
             &begin_day();
             &putenc(qq(<form action="%s" method="post" accept-charset="%s">
                 <p><input type="text" name="p" size="40">
-                <input type="hidden" name="a" value="edt">
+                <input type="hidden" name="a" value="edit">
                 <input type="submit" value="Create"></p></form>)
                 , $::postme , $::charset );
             &end_day();
@@ -906,44 +962,70 @@ sub action_preview{
     }
 }
 
-sub action_rollback_preview{
-    goto &action_signin if &is_frozen() && !&is_signed();
-
-    my $title = $::form{p};
-    my $attach = $::form{f};
-    &print_template(
-        template => $::system_template ,
-        main=>sub{
-            &begin_day("Rollback Preview: $title");
-            &print_page(
-                title=>$title ,
-                source=>\&read_text($title,$attach) ,
-                index=>1,
-                main=>1
-            );
-            &putenc('<form action="%s" method="post">',$::postme);
-            &puts('<input type="hidden" name="a" value="rollback"> ');
-            &puts('<input type="submit" name="b" value="Rollback"> ');
-            &puts('<input type="submit" name="b" value="Cancel"> ');
-            &putenc('<input type="hidden" name="p" value="%s">',$title);
-            &putenc('<input type="hidden" name="f" value="%s">',$attach);
-            &end_day();
-        }
-    );
-}
-
 sub action_rollback{
-    goto &action_edit if $::form{b} ne 'Rollback';
     goto &action_signin if &is_frozen() && !&is_signed();
 
-    my $title=$::form{p};
-    my $fn=&title2fname($title);
-    my $frozen=&is_frozen();
-    chmod(0644,$fn) if $frozen;
-    &archive() if $::config{archivemode};
-    &lockdo( sub{ &write_file( $fn , \&read_text($title,$::form{f})) } , $title );
-    chmod(0444,$fn) if $frozen;
-    &transfer_page();
+    if( $::form{b} && $::form{b} eq 'Rollback' ){
+        my $title=$::form{p};
+        my $fn=&title2fname($title);
+        my $frozen=&is_frozen();
+        chmod(0644,$fn) if $frozen;
+        &archive() if $::config{archivemode};
+        &lockdo( sub{ &write_file( $fn , \&read_text($title,$::form{f})) } , $title );
+        chmod(0444,$fn) if $frozen;
+        &transfer_page();
+    }elsif( $::form{b} && $::form{b} eq 'Preview' ){
+        my $title = $::form{p};
+        my $attach = $::form{f};
+        &print_template(
+            template => $::system_template ,
+            main=>sub{
+                &begin_day("Rollback Preview: $title");
+                &print_page(
+                    title=>$title ,
+                    source=>\&read_text($title,$attach) ,
+                    index=>1,
+                    main=>1
+                );
+                &putenc('<form action="%s" method="post">',$::postme);
+                &puts('<input type="hidden" name="a" value="rollback"> ');
+                &puts('<input type="submit" name="b" value="Rollback"> ');
+                &puts('<input type="submit" name="b" value="Cancel"> ');
+                &putenc('<input type="hidden" name="p" value="%s">',$title);
+                &putenc('<input type="hidden" name="f" value="%s">',$attach);
+                &end_day();
+            }
+        );
+    }else{ ### menu ###
+        my $title = $::form{p};
+        return unless &object_exists($title) && &is_signed();
+
+        my @attachment=&list_attachment($title);
+
+        &print_template(
+            template => $::system_template ,
+            main => sub{
+                my @archive=grep(/^\~\d{6}_\d{6}\.txt/ ,@attachment);
+                if( @archive ){
+                    &begin_day('Rollback');
+                    &putenc('<form action="%s" method="post"><select name="f">', $::postme);
+                    foreach my $f(reverse sort @archive){
+                        &putenc('<option value="%s">%s/%s/%s %s:%s:%s</option>',
+                                $f,
+                                substr($f,1,2), substr($f,3,2),  substr($f, 5,2),
+                                substr($f,8,2), substr($f,10,2), substr($f,12,2),
+                        );
+                    }
+                    &puts('</select>');
+                    &putenc('<input type="hidden" name="p" value="%s">',$title);
+                    &puts('<input type="hidden" name="a" value="rollback" >');
+                    &puts('<input type="submit" name="b" value="Preview">');
+                    &puts('</form>');
+                    &end_day()
+                }
+            }
+        );
+    }
 }
 
 sub action_passwd{
@@ -1100,37 +1182,69 @@ sub tools_change_sign{
 
 sub action_rename{
     goto &action_signin unless &is_signed();
-
-    my $newtitle = $::form{newtitle};
     my $title    = $::form{p};
-    my $fname    = &title2fname($title);
-    my $newfname = &title2fname($newtitle);
-    die("!The new page name '$newtitle' is already used.!") if -f $newfname;
 
-    my @list = map {
-        my $older="${fname}__$_" ;
-        my $newer="${newfname}__$_";
-        die("!The new page name '$newtitle' is already used.!") if -f $newer;
-        [ $older , $newer ];
-    } @{$::contents{$fname}};
+    if( $::form{b} && $::form{b} eq 'body' ){
+        my $newtitle = $::form{newtitle};
+        my $fname    = &title2fname($title);
+        my $newfname = &title2fname($newtitle);
+        die("!The new page name '$newtitle' is already used.!") if -f $newfname;
 
-    rename( $fname , $newfname );
-    rename( $_->[0] , $_->[1] ) foreach @list;
-    &transfer_page($newtitle);
+        my @list = map {
+            my $older="${fname}__$_" ;
+            my $newer="${newfname}__$_";
+            die("!The new page name '$newtitle' is already used.!") if -f $newer;
+            [ $older , $newer ];
+        } @{$::contents{$fname}};
+
+        rename( $fname , $newfname );
+        rename( $_->[0] , $_->[1] ) foreach @list;
+        &transfer_page($newtitle);
+    }elsif( $::form{b} && $::form{b} eq 'attachment' ){
+        my $older=&title2fname($title,$::form{f1});
+        my $newer=&title2fname($title,$::form{f2});
+        die("!The new attachment name is null.!") unless $::form{f2};
+        die("!The new attachment name '$::form{f2}' is already used.!") if -f $newer;
+
+        rename( $older , $newer );
+        &transfer_page($title);
+    }else{ # menu
+        my @attachment=&list_attachment($title);
+        return unless &object_exists($title) && &is_signed();
+
+        &print_template(
+            template => $::system_template ,
+            Title => 'Rename' ,
+            main => sub{
+                &begin_day('Rename');
+                &putenc('<h3>Page</h3><p><form action="%s" method="post">
+                    <input type="hidden"  name="a" value="rename">
+                    <input type="hidden"  name="b" value="body">
+                    <input type="hidden"  name="p" value="%s">
+                    Title: <input type="text" name="newtitle" value="%s" size="80">'
+                    , $::postme , $title , $title );
+                &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
+
+                if( @attachment ){
+                    &putenc('<h3>Attachment</h3><p>
+                        <form action="%s" method="post" name="rena">
+                        <input type="hidden"  name="a" value="rename">
+                        <input type="hidden"  name="b" value="attachment">
+                        <input type="hidden"  name="p" value="%s">'
+                        , $::postme , $title);
+                    &puts('<select name="f1" onChange="document.rena.f2.value=this.options[this.selectedIndex].value;return false">');
+                    &puts('<option value="" selected></option>');
+                    foreach my $f (@attachment){
+                        &putenc('<option value="%s">%s</option>', $f, $f);
+                    }
+                    &puts('</select><input type="text" name="f2" value="" size="30" />');
+                    &puts('<br><input type="submit" name="rena" value="Submit"></form></p>');
+                }
+                &end_day();
+            }
+        );
+    }
 }
-
-sub action_rename_attachment{
-    goto &action_signin unless &is_signed();
-
-    my $older=&title2fname($::form{p},$::form{f1});
-    my $newer=&title2fname($::form{p},$::form{f2});
-    die("!The new attachment name is null.!") unless $::form{f2};
-    die("!The new attachment name '$::form{f2}' is already used.!") if -f $newer;
-
-    rename( $older , $newer );
-    &transfer_page($::form{p});
-}
-
 
 sub action_seek{
     my $keyword=$::form{keyword};
@@ -1334,68 +1448,8 @@ sub action_edit{
             my $source=&read_text($title);
             &print_form( $title , \$source , \$source );
             &end_day();
-
-            foreach my $p (sort keys %::form2_list){
-                $::form2_list{$p}->($title,@attachment);
-            }
-
         }
     );
-}
-
-sub form2_rename{
-    my ($title,@attachment)=@_;
-    return unless &object_exists($title) && &is_signed();
-    &begin_day('Rename');
-    &putenc('<h3>Page</h3><p><form action="%s" method="post">
-        <input type="hidden"  name="a" value="ren">
-        <input type="hidden"  name="p" value="%s">
-        Title: <input type="text" name="newtitle" value="%s" size="80">'
-        , $::postme , $title , $title );
-    &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
-}
-
-sub form2_rename_attach{
-    my ($title,@attachment)=@_;
-    return unless &object_exists($title) && &is_signed();
-    if( @attachment ){
-        &putenc('<h3>Attachment</h3><p>
-            <form action="%s" method="post" name="rena">
-            <input type="hidden"  name="a" value="rena">
-            <input type="hidden"  name="p" value="%s">'
-            , $::postme , $title);
-        &puts('<select name="f1" onChange="document.rena.f2.value=this.options[this.selectedIndex].value;return false">');
-        &puts('<option value="" selected></option>');
-        foreach my $f (@attachment){
-            &putenc('<option value="%s">%s</option>', $f, $f);
-        }
-        &puts('</select><input type="text" name="f2" value="" size="30" />');
-        &puts('<br><input type="submit" name="rena" value="Submit"></form></p>');
-    }
-    &end_day();
-}
-
-sub form2_rollback{
-    my ($title,@attachment)=@_;
-    return unless &object_exists($title) && &is_signed();
-    my @archive=grep(/^\~\d{6}_\d{6}\.txt/ ,@attachment);
-    if( @archive ){
-        &begin_day('Rollback');
-        &putenc('<form action="%s" method="post"><select name="f">', $::postme);
-        foreach my $f(reverse sort @archive){
-            &putenc('<option value="%s">%s/%s/%s %s:%s:%s</option>',
-                    $f,
-                    substr($f,1,2), substr($f,3,2),  substr($f, 5,2),
-                    substr($f,8,2), substr($f,10,2), substr($f,12,2),
-            );
-        }
-        &puts('</select>');
-        &putenc('<input type="hidden" name="p" value="%s">',$title);
-        &puts('<input type="hidden" name="a" value="rollback_" >');
-        &puts('<input type="submit" value="Preview">');
-        &puts('</form>');
-        &end_day()
-    }
 }
 
 sub print_template{
@@ -1647,10 +1701,22 @@ sub plugin_menubar{
     $::flag{menubar_printed}=1;
     my $i=50;
     my %bar=(%::menubar , map( (sprintf('%03d_argument',++$i) => $_) , @_));
-    '<p class="adminmenu menubar">'. join("\r\n",
-        map('<span class="adminmenu">'.$_.'</span>',
-            map( $bar{$_} , sort keys %bar) , @::menubar )
-    ).'</p>';
+    my $out='<div class="menubar"><div><ul class="mainmenu">';
+    foreach my $p (sort keys %bar){
+        $out .= q|<li class="menuoff" onmouseover="this.className='menuon'" onmouseout="this.className='menuoff'">|;
+        my $items=$bar{$p};
+        if( ref($items) ){
+            $out .= '<ul class="submenu">';
+            foreach my $q (@{$items}){
+                $out .= "<li>$q</li>\n";
+            }
+            $out .= '</ul>';
+        }else{
+            $out .= $items;
+        }
+        $out .= '</li>';
+    }
+    $out . '</ul></div></div>';
 }
 
 sub plugin_search{

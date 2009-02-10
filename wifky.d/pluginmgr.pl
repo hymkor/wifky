@@ -5,7 +5,7 @@ package wifky::pluginmgr;
 
 # use strict;use warnings; 
 
-my $version='1.0';
+my $version='1.1';
 
 -d 'plugins/.' or mkdir('plugins',0755) or die('can not mkdir plugins directory');
 
@@ -18,9 +18,15 @@ if( !defined &::is_signed || &::is_signed() ){
         &::verb( qq(<a href="$::me?a=pluginmgr">Plugin Manager</a>) );
     };
 }
-if( defined &::is_signed &&::is_signed() ){
-    $::menubar{'501_Pluginmgr'} 
-        = &::anchor('Plugin',{a=>'pluginmgr'},{ref=>'nofollow'});
+if( defined &::is_signed && &::is_signed() ){
+    if( ref($::menubar{'500_Tools'}) ){
+        push(@{$::menubar{'500_Tools'}} , 
+            &::anchor('Plugin',{a=>'pluginmgr'},{ref=>'nofollow'})
+        );
+    }else{
+        $::menubar{'501_Pluginmgr'} 
+            = &::anchor('Plugin',{a=>'pluginmgr'},{ref=>'nofollow'});
+    }
 }
 
 ###
