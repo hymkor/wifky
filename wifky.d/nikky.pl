@@ -22,7 +22,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.5.0_0';
+my $version='1.1.0_0';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 
 my @now=localtime();
