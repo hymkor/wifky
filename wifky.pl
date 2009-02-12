@@ -381,47 +381,6 @@ HERE
 
 !!!! ((sitename))
 HERE
-    &title2fname('MenuCSS') => <<HERE ,
-div.menubar{
-    height:1em;
-}
-div.menubar div{
-    position:absolute;
-    width:100%;
-    z-index:100;
-    font-size:14px;
-}
-ul.mainmenu{
-    margin:0px;
-    padding:0px;
-    position:relative;
-    list-style:none;
-    text-align:center;
-}
-ul.mainmenu li.menuoff{
-    position:relative;
-    float:left;
-    height:1em;
-    overflow:hidden;
-    padding-left:2pt;
-}
-ul.mainmenu li.menuon{
-    float:left;
-    overflow:hidden;
-    padding-left:2pt;
-}
-ul.mainmenu>li.menuon{
-    overflow:visible;
-}
-ul.submenu{
-    margin:0px;
-    padding:0px;
-    position:relative;
-    list-style:none;
-
-    background-color:white;
-}
-HERE
     );
 }
 
@@ -696,8 +655,48 @@ sub print_header{
     $label .= '('.$arg{title}.')' if exists $arg{title};
     push(@::html_header,"<title>$label</title>");
 
-    &puts('<style type="text/css"><!--');
-    foreach my $p (split(/\s*\n\s*/,$::config{CSS}) , 'MenuCSS' ){
+    &puts('<style type="text/css"><!--
+div.menubar{
+    height:1em;
+}
+div.menubar div{
+    position:absolute;
+    width:100%;
+    z-index:100;
+    font-size:14px;
+}
+ul.mainmenu{
+    margin:0px;
+    padding:0px;
+    position:relative;
+    list-style:none;
+    text-align:center;
+}
+ul.mainmenu li.menuoff{
+    position:relative;
+    float:left;
+    height:1em;
+    overflow:hidden;
+    padding-left:2pt;
+}
+ul.mainmenu li.menuon{
+    float:left;
+    overflow:hidden;
+    padding-left:2pt;
+}
+ul.mainmenu>li.menuon{
+    overflow:visible;
+}
+ul.submenu{
+    margin:0px;
+    padding:0px;
+    position:relative;
+    list-style:none;
+
+    background-color:white;
+}
+');
+    foreach my $p (split(/\s*\n\s*/,$::config{CSS}) ){
         if( my $css =&read_text($p) ){
             $css =~ s/\<\<\{([^\}]+)\}/&myurl( { p=>$p , f=>$1 } )/ge;
             $css =~ s/[<>&]//g;
