@@ -148,7 +148,7 @@ sub init_globals{
         'older'         => sub{ &do_index('recent','index' ,'-i','-a','-l','-t'); },
         'recent'        => sub{ &do_index('older' ,'index' ,'-i','-a','-l','-t','-r');},
         '?'             => \&action_seek ,
-        'edit'          => \&action_edit ,
+        'edt'           => \&action_edit ,
         'passwd'        => \&action_passwd ,
         'comment'       => \&action_comment ,
         'Delete'        => \&action_delete ,
@@ -174,7 +174,7 @@ sub init_globals{
     @::body_header = (
         qq{<form name="newpage" action="$::postme" method="post"
             style="display:none"><input type="hidden" name="p" />
-            <input type="hidden" name="a" value="edit" /></form>},
+            <input type="hidden" name="a" value="edt" /></form>},
         $::config{body_header}||'' ,
     );
 
@@ -216,7 +216,7 @@ sub init_globals{
         my $title=$::form{p} || $::config{FrontPage};
         if( !&is_frozen() || &is_signed() ){
             unshift( @{$::menubar{'300_Edit'}} ,
-                &anchor('Edit',{ a=>'edit', p=>$title},{rel=>'nofollow'})
+                &anchor('Edit',{ a=>'edt', p=>$title},{rel=>'nofollow'})
             );
             if( &is_signed() ){
                 push( @{$::menubar{'300_Edit'}} ,
@@ -830,7 +830,7 @@ sub action_new{
             &begin_day();
             &putenc(qq(<form action="%s" method="post" accept-charset="%s">
                 <p><input type="text" name="p" size="40">
-                <input type="hidden" name="a" value="edit">
+                <input type="hidden" name="a" value="edt">
                 <input type="submit" value="Create"></p></form>)
                 , $::postme , $::charset );
             &end_day();

@@ -28,7 +28,7 @@ my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 my @now=localtime();
 if( ref($::menubar{'200_New'})){
     push( @{$::menubar{'200_New'}} ,
-        sprintf( q|<a href="%s?a=newdiary" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newpage.submit()};return false;">Today</a>|,$::me,$now[5]+1900,$now[4]+1,$now[3] )
+        sprintf( q|<a href="%s?a=today" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newpage.submit()};return false;">Today</a>|,$::me,$now[5]+1900,$now[4]+1,$now[3] )
     );
 }
 
@@ -67,7 +67,6 @@ if( &::is('nikky_front') &&
 
 if( exists $::form{a} && ($::form{a} eq 'date' || $::form{a} eq 'nikky') ){
     delete $::menubar{'300_Edit'};
-    delete $::menubar{'400_Edit(Admin)'};
 }
 
 $::inline_plugin{read_more} = sub {
@@ -498,7 +497,7 @@ sub nextmonth{ &date_anchor('nextmonth',$nextmonth ,'>>', $_[1]); }
 sub startday { &date_anchor('startday' ,$startday  ,'|' , $_[1]); }
 sub endday   { &date_anchor('endday'   ,$endday    ,'|' , $_[1]); }
 
-sub action_newdiary{
+$::action_plugin{today} = sub {
     my @tm = localtime;
     &::print_header( divclass=>'max' );
     my $default_title=sprintf('(%04d.%02d.%02d)' ,
@@ -511,7 +510,7 @@ sub action_newdiary{
         ><input type="submit"></p></form>'
         , $::me , $default_title );
     &::print_footer;
-}
+};
 
 sub query_wday { ### query week day.
     my ($y,$m) = @_;
