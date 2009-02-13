@@ -668,6 +668,7 @@ div.menubar div{
 ul.mainmenu{
     margin:0px;
     padding:0px;
+    width:100%;
     position:relative;
     list-style:none;
     text-align:center;
