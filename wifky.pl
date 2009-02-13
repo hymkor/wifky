@@ -1713,11 +1713,13 @@ sub plugin_menubar{
         $out .= q|<li class="menuoff" onmouseover="this.className='menuon'" onmouseout="this.className='menuoff'">|;
         my $items=$bar{$p};
         if( ref($items) ){
-            $out .= '<ul class="submenu">';
-            foreach my $q (@{$items}){
-                $out .= "<li>$q</li>\n";
+            my ($first,@rest)=@{$items};
+            $out .= $first;
+            if( @rest ){
+                $out .= '<ul class="submenu"><li>' .
+                        join("</li>\n<li>",@rest)  .
+                        "</li>\n</ul>\n";
             }
-            $out .= '</ul>';
         }else{
             $out .= $items;
         }
