@@ -1718,7 +1718,7 @@ sub plugin_menubar{
         }else{
             $out .= $items;
         }
-        $out .= '</li>';
+        $out .= '&nbsp;</li>';
     }
     $out . '</ul></div></div>';
 }
