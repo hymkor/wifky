@@ -663,7 +663,6 @@ div.menubar div{
     position:absolute;
     width:100%;
     z-index:100;
-    font-size:14px;
 }
 ul.mainmenu{
     margin:0px;
@@ -678,12 +677,10 @@ ul.mainmenu li.menuoff{
     float:left;
     height:1em;
     overflow:hidden;
-    padding-left:2pt;
 }
 ul.mainmenu li.menuon{
     float:left;
     overflow:hidden;
-    padding-left:2pt;
 }
 ul.mainmenu>li.menuon{
     overflow:visible;
@@ -693,8 +690,6 @@ ul.submenu{
     padding:0px;
     position:relative;
     list-style:none;
-
-    background-color:white;
 }
 ');
     foreach my $p (split(/\s*\n\s*/,$::config{CSS}) ){
