@@ -214,7 +214,7 @@ sub init_globals{
     ### menubar ###
     if( $::form{p} || !exists $::form{a} ){
         my $title=$::form{p} || $::config{FrontPage};
-        if( !&is_frozen() || &is_signed() ){
+        if( &object_exists($title) && (!&is_frozen() || &is_signed()) ){
             unshift( @{$::menubar{'300_Edit'}} ,
                 &anchor('Edit',{ a=>'edt', p=>$title},{rel=>'nofollow'})
             );
@@ -653,7 +653,7 @@ sub print_header{
     my $label = $::config{sitename};
     $label .= ' - '.$::form{p} if exists $::form{p};
     $label .= '('.$arg{title}.')' if exists $arg{title};
-    push(@::html_header,"<title>$label</title>");
+    push(@::html_header,'<title>'.&enc($label).'</title>');
 
     &puts('<style type="text/css"><!--
 div.menubar{
@@ -968,8 +968,9 @@ sub action_rollback{
         my $attach = $::form{f};
         &print_template(
             template => $::system_template ,
+            Title=>'Rollback Preview' ,
             main=>sub{
-                &begin_day("Rollback Preview: $title");
+                &begin_day($title);
                 &print_page(
                     title=>$title ,
                     source=>\&read_text($title,$attach) ,
@@ -987,16 +988,17 @@ sub action_rollback{
         );
     }else{ ### menu ###
         my $title = $::form{p};
-        return unless &object_exists($title) && &is_signed();
+        &transfer(page=>$title,message=>'Page not found') unless &object_exists($title);
 
         my @attachment=&list_attachment($title);
 
         &print_template(
             template => $::system_template ,
+            Title => 'Rollback' ,
             main => sub{
                 my @archive=grep(/^\~\d{6}_\d{6}\.txt/ ,@attachment);
+                &begin_day($::form{p});
                 if( @archive ){
-                    &begin_day('Rollback');
                     &putenc('<form action="%s" method="post"><select name="f">', $::postme);
                     foreach my $f(reverse sort @archive){
                         &putenc('<option value="%s">%s/%s/%s %s:%s:%s</option>',
@@ -1010,8 +1012,10 @@ sub action_rollback{
                     &puts('<input type="hidden" name="a" value="rollback" >');
                     &puts('<input type="submit" name="b" value="Preview">');
                     &puts('</form>');
-                    &end_day()
+                }else{
+                    &puts('<p>no archive files.</p>');
                 }
+                &end_day()
             }
         );
     }
@@ -1178,6 +1182,7 @@ sub action_preferences{
 sub action_rename{
     goto &action_signin unless &is_signed();
     my $title    = $::form{p};
+    &transfer(page=>$title,message=>'Page not found') unless &object_exists($title);
 
     if( $::form{b} && $::form{b} eq 'body' ){
         my $newtitle = $::form{newtitle};
@@ -1211,7 +1216,7 @@ sub action_rename{
             template => $::system_template ,
             Title => 'Rename' ,
             main => sub{
-                &begin_day('Rename');
+                &begin_day($::form{p});
                 &putenc('<h3>Page</h3><p><form action="%s" method="post">
                     <input type="hidden"  name="a" value="rename">
                     <input type="hidden"  name="b" value="body">
@@ -2239,5 +2244,6 @@ sub block_normal{
 }
 
 sub w_ok{ # equals "-w" except for root-user.
-    ( $#_ < 0 ? stat(_) : stat($_[0]) )[2] & 0200;
+    my @stat=( $#_ < 0 ? stat(_) : stat($_[0]) );
+    @stat ? $stat[2] & 0200 : -1 ;
 }
