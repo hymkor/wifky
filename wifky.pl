@@ -189,7 +189,7 @@ sub init_globals{
     );
     if( !&is('lonely') || &is_signed() ){
         $::menubar{'200_New'} = [
-            qq|<a href="$::me?a=new" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new page')){document.newpage.submit()};return false;">New</a>| ,
+            qq|<a href="$::me?a=new" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new page','')){document.newpage.submit()};return false;">New</a>| ,
         ];
     }
     @::menubar = ();
