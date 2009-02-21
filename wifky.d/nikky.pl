@@ -25,11 +25,16 @@ my @nikky;
 my $version='1.1.0_0';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 
-my @now=localtime();
-if( ref($::menubar{'200_New'})){
-    push( @{$::menubar{'200_New'}} ,
-        sprintf( q|<a href="%s?a=today" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newpage.submit()};return false;">Today</a>|,$::me,$now[5]+1900,$now[4]+1,$now[3] )
-    );
+if( exists $::menubar{'200_New'} ){
+    my @now=localtime();
+    if( ref($::menubar{'200_New'})){
+        push( @{$::menubar{'200_New'}} ,
+            sprintf( q|<a href="%s?a=today" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newpage.submit()};return false;">Today</a>|,$::me,$now[5]+1900,$now[4]+1,$now[3] )
+        );
+    }else{
+        push( @::body_header , qq|<form name="newdiary" action="$::me" method="post" style="display:none"><input type="hidden" name="p" /><input type="hidden" name="a" value="edt" /></form>| );
+        $::menubar{'200_New'} = sprintf( q|<a href="%s?a=newdiary" onClick="JavaScript:if(document.newdiary.p.value=prompt('Create a new diary','(%04d.%02d.%02d)')){document.newdiary.submit()};return false;">New</a>|,$::me,$now[5]+1900,$now[4]+1,$now[3] );
+    }
 }
 
 $::inline_plugin{'nikky.pl_version'} = sub{ "nikky.pl $version" };
