@@ -357,6 +357,26 @@ sub action_rss{
     print "</channel>\r\n";
 
     ### write description ###
+    local $::call_syntax_plugin{'900_footer'} = sub{
+        my (undef,$session) = @_;
+        my $footnotes = $session->{footnotes};
+        return unless $footnotes;
+
+        my $i=0;
+        &::puts(qq(<div class="footnote">));
+        foreach my $t (@{$footnotes}){
+            ++$i;
+            next unless defined $t;
+            &::puts('<p class="footnote">' ,
+                &::anchor("*$i",{ p=>$::form{p} } ,
+                ($session->{index} ? { name=>"ft$i"} : undef) ,
+                "#fm$i"),
+                "$t</p>");
+            undef $t;
+        }
+        &::puts('</div><!--footnote-->');
+    };
+
     my %session4page;
     foreach my $t (@topics){
         my @tm=gmtime($t->{timestamp});
