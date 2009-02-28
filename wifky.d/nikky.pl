@@ -22,7 +22,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.1.0_0';
+my $version='1.1.0_1';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 
 if( exists $::menubar{'200_New'} ){
@@ -357,6 +357,7 @@ sub action_rss{
     print "</channel>\r\n";
 
     ### write description ###
+    my %session4page;
     foreach my $t (@topics){
         my @tm=gmtime($t->{timestamp});
         printf qq{<item rdf:about="%s">\r\n}, $t->{url};
@@ -375,6 +376,7 @@ sub action_rss{
         local $::print='';
         &::syntax_engine(
             join("\n\n",@{$t->{desc}}) ,
+            $session4page{$t->{page}} ||= 
             { title => $t->{page} , attachment => $t->{attachment} }
         );
         $::print =~ s/<!--- READ MORE --->.*\Z//s;
