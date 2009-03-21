@@ -657,7 +657,7 @@ sub print_header{
 
     &puts('<style type="text/css"><!--
 div.menubar{
-    height:1em;
+    height:1.5em;
 }
 div.menubar div{
     position:absolute;
@@ -672,15 +672,19 @@ ul.mainmenu{
     list-style:none;
     text-align:center;
 }
-ul.mainmenu li.menuoff{
+li.menuoff{
     position:relative;
     float:left;
-    height:1em;
+    height:1.5em;
+    line-height:1.5em;
     overflow:hidden;
 }
-ul.mainmenu li.menuon{
+li.menuon{
     float:left;
+    background-color:white;
+    line-height:1.5em;
     overflow:hidden;
+    border-width:1px;border-color:black;border-style:solid;
 }
 ul.mainmenu>li.menuon{
     overflow:visible;
@@ -1717,13 +1721,13 @@ sub plugin_menubar{
             $out .= $first;
             if( @rest ){
                 $out .= '<ul class="submenu"><li>' .
-                        join("</li>\n<li>",@rest)  .
-                        "</li>\n</ul>\n";
+                        join("</li><li>",@rest)  .
+                        "</li></ul>";
             }
         }else{
             $out .= $items;
         }
-        $out .= '&nbsp;</li>';
+        $out .= '</li>';
     }
     $out . '</ul></div></div>';
 }
