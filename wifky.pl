@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.1_0';
+$::version  = '1.5.1_1';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
