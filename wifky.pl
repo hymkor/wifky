@@ -661,7 +661,6 @@ div.menubar{
 }
 div.menubar div{
     position:absolute;
-    width:100%;
     z-index:100;
 }
 ul.mainmenu{
