@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.1_1';
+$::version  = '1.5.1_2';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -693,6 +693,9 @@ ul.submenu{
     padding:0px;
     position:relative;
     list-style:none;
+}
+.bqh1,.bqh2,.bqh3{
+    font-weight:bold;
 }
 ');
     foreach my $p (split(/\s*\n\s*/,$::config{CSS}) ){
@@ -1682,10 +1685,16 @@ sub call_blockquote{
     s!(?:&lt;blockquote&gt;|6&lt;)(.*?)(?:&lt;/blockquote&gt;|&gt;9)!&call_blockquote_sub($1,$_[1])!gesm;
 }
 
+sub midashi_bq{
+    my ($depth,$text,$session)=@_;
+    &puts('<div class="bqh'.($depth+1).'">'.&preprocess($text,$session).'</div>');
+}
+
 sub call_blockquote_sub{
     my ($text,$request)=@_;
     local $::print='';
-    &syntax_engine( $text , $request );
+    local *::midashi=*::midashi_bq;
+    &call_block( \$text , $request );
     qq(\n\n<blockquote class="block">).&verb($::print)."</blockquote>\n\n";
 }
 
@@ -1763,14 +1772,15 @@ sub call_footnote{
     &puts(qq(<div class="footnote">));
     foreach my $t (@{$footnotes}){
         ++$i;
+        next unless defined $t;
         &puts('<p class="footnote">' ,
             &anchor("*$i",{ p=>$::form{p} } ,
             ($session->{index} ? { name=>"ft$i"} : undef) ,
             "#fm$i"),
             "$t</p>");
+        undef $t;
     }
     &puts('</div><!--footnote-->');
-    delete $session->{footnotes};
 }
 
 sub verb{

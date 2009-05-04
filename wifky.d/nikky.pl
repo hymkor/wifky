@@ -1,6 +1,6 @@
 package wifky::nikky;
 
-# use strict; use warnings;
+use strict; use warnings;
 
 $wifky::nikky::template ||= '
     <div class="main">
@@ -22,7 +22,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.1.0_1';
+my $version='1.1.0_2';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 
 if( exists $::menubar{'200_New'} ){
@@ -283,13 +283,12 @@ sub action_rss{
 
     ### read title list ###
     my @topics;
+    my %session4page;
     foreach my $p (@pagelist){
         my $text = &::enc( &::read_object($p->{title}) );
-        $text =~ s!^\s*\&lt;pre&gt;(.*?\n)\s*\&lt;/pre&gt;|^\s*8\&lt;(.*?\n)\s*\&gt;8|`(.)`(.*?)`\3`!
-                      defined($4)
-                    ? &::verb('<tt class="pre">'.&::cr2br($4).'</tt>')
-                    : "\n\n<pre>".&::verb($1||$2)."</pre>\n\n"
-                !gesm;
+        my $session=($session4page{ $p->{title} } ||= { $p->{attachment} } );
+        &::call_verbatim(\$text,$session);
+        &::call_blockquote(\$text,$session) if defined &::call_blockquote;
 
         my $pageurl = &::percent($p->{title});
         my $id=0;
@@ -313,7 +312,7 @@ sub action_rss{
 
                     $item{url} = sprintf('%s?p=%s#p%d',$::me,$pageurl,++$id) ;
                     $item{desc} = [];
-                    my $title = &::preprocess($1,{ attachment=>{} } );
+                    my $title = &::preprocess($1,$session);
                     $title =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
                     $title =~ s/\<[^\>]*\>\s*//g;
                     $item{title} = &::denc($title);
@@ -377,7 +376,6 @@ sub action_rss{
         &::puts('</div><!--footnote-->');
     };
 
-    my %session4page;
     foreach my $t (@topics){
         my @tm=gmtime($t->{timestamp});
         printf qq{<item rdf:about="%s">\r\n}, $t->{url};
