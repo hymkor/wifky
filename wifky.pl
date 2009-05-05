@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -T
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $::version  = '1.5.1_2';
 
@@ -1753,50 +1753,63 @@ sub plugin_search{
 sub plugin_footnote{
     my $session = shift;
     my $footnotetext=$session->{argv};
-    push(@{$session->{footnotes}}, $footnotetext );
+    my $title=$::form{p};
 
-    my $i=$#{$session->{footnotes}} + 1;
-    my %attr=( title=>&strip_tag($footnotetext)  );
-    $attr{name}="fm$i" if $session->{index};
-    '<sup>' .
-    &anchor("*$i", { p=> $::form{p} } , \%attr , "#ft$i" ) .
-    '</sup>' ;
+    &verb( sub{
+        push(@{$session->{footnotes}}, $footnotetext );
+
+        my $i=$#{$session->{footnotes}} + 1;
+        my %attr=( title=>&strip_tag($footnotetext)  );
+        $attr{name}="fm$i" if $session->{index};
+        '<sup>' .
+        &anchor("*$i", { p=>$title } , \%attr , "#ft$i" ) .
+        '</sup>' 
+    });
 }
 
 sub call_footnote{
     my (undef,$session) = @_;
-    my $footnotes = $session->{footnotes};
-    return unless $footnotes;
+    &puts( &verb( sub{
+        my $footnotes = $session->{footnotes};
+        return "" unless $footnotes;
 
-    my $i=0;
-    &puts(qq(<div class="footnote">));
-    foreach my $t (@{$footnotes}){
-        ++$i;
-        next unless defined $t;
-        &puts('<p class="footnote">' ,
-            &anchor("*$i",{ p=>$::form{p} } ,
-            ($session->{index} ? { name=>"ft$i"} : undef) ,
-            "#fm$i"),
-            "$t</p>");
-        undef $t;
-    }
-    &puts('</div><!--footnote-->');
+        my $i=0;
+        my $out=qq(<div class="footnote">);
+        foreach my $t (@{$footnotes}){
+            ++$i;
+            next unless defined $t;
+            $out .= '<p class="footnote">' .
+                &anchor("*$i",{ p=>$::form{p} } ,
+                ($session->{index} ? { name=>"ft$i"} : undef) ,
+                "#fm$i") .
+                "$t</p>";
+            undef $t;
+        }
+        $out .= '</div><!--footnote-->';
+        $out;
+    }));
 }
 
 sub verb{
-    my $cnt=scalar(@::later);
     push( @::later , $_[0] );
-    "\a($cnt)";
+    "\a($#::later)";
+}
+
+sub unverb_sub{
+    my $s=shift;
+    if( $s > $#::later ){
+        $s="(code '$1' not found)";
+    }elsif( ref($::later[$1]) eq 'CODE' ){
+        $s=$::later[$s]->($1);
+    }else{
+        $s=$::later[$s];
+    }
+    &unverb(\$s);
+    $s;
 }
 
 sub unverb{
-    for(1..10){
-        last unless ${$_[0]} =~ s/\a\((\d+)\)/
-              $1 > $#::later
-              ? "(code '$1' not found)"
-              : ref($::later[$1]) eq 'CODE' ? $::later[$1]->()
-              : $::later[$1]/ge;
-    }
+    ${$_[0]} =~ s/\a\((\d+)\)/&unverb_sub($1)/ge;
 }
 
 
