@@ -249,6 +249,8 @@ sub init_globals{
             { desc=>'Pagename for FrontPage'  , name=>'FrontPage' , size=>40 },
             { desc=>'HTML-Code after <body> (for banner)' ,
               name=>'body_header' , type=>'textarea' , rows=>2 },
+            { desc=>'Not found to new page' , name=>'notfound2newpage' , 
+              type=>'checkbox' },
             { desc=>'Section mark', name=>'sectionmark', size=>3 } ,
             { desc=>'Subsection mark' , name=>'subsectionmark' , size=>3 } ,
             { desc=>'Subsubsection mark' , name=>'subsubsectionmark' , size=>3 }
@@ -696,6 +698,9 @@ ul.submenu{
 }
 .bqh1,.bqh2,.bqh3{
     font-weight:bold;
+}
+a.page_not_found{
+    color:red;
 }
 ');
     foreach my $p (split(/\s*\n\s*/,$::config{CSS}) ){
@@ -1710,6 +1715,8 @@ sub inner_link{
 
     if( &object_exists($title) ){
         &anchor( $symbol , { p=>$title } , { class=>'wikipage' } , $sharp);
+    }elsif( $::config{notfound2newpage} ){
+        &anchor( $symbol , { p=>$title , a=>'edt' } , { class=>'page_not_found' } );
     }else{
         qq(<blink class="page_not_found">$symbol?</blink>);
     }
