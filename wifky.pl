@@ -2,7 +2,7 @@
 
 # use strict; use warnings;
 
-$::version  = '1.5.1_2';
+$::version  = '1.5.2_0';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -41,12 +41,12 @@ if( $0 eq __FILE__ ){
 
         &read_form;
         &chdir_and_code;
-        foreach my $pl (sort map(/^([\w\.]+\.plg)$/ ? $1 : () ,&directory) ){
+        foreach my $pl (sort map(/^([-\w\.]+\.plg)$/ ? $1 : (),&directory) ){
             do "./$pl"; die($@) if $@;
         }
         &load_config;
         &init_globals;
-        foreach my $pl (sort map(/^([\w\.]+\.pl)$/ ? $1 : (),&directory) ){
+        foreach my $pl (sort map(/^([-\w\.]+\.pl)$/ ? $1 : (),&directory) ){
             do "./$pl"; die($@) if $@;
         }
 
@@ -1973,13 +1973,14 @@ sub plugin_pagename{
 sub plugin{
     my $session=shift;
     my ($name,$param)=(map{(my $s=$_)=~s/<br>\Z//;$s} split(/\s+/,shift,2),'');
-    $session->{argv} = $param;
+    &preprocess_plugin_after( $session->{argv} = $param );
 
     $param =~ s/\x02.*?\x02/"\x05".unpack('h*',$&)."\x05"/eg;
     my @param=split(/\s+/,$param);
     foreach(@param){
         s|\x05([^\x05]*)\x05|pack('h*',$1)|ge;
         s|\x02+|"\x02"x(length($&)>>1)|ge;
+        &preprocess_plugin_after( $_ );
     }
 
     ($::inline_plugin{$name} || sub{'Plugin not found.'} )
@@ -2054,15 +2055,22 @@ sub preprocess_decorations{
     $$text =~ s/\n/<br>\n/g if $::config{autocrlf} ;
 }
 
+sub preprocess_plugin_before{
+    $_[0] =~ s/&quot;/\x02/g;
+    $_[0] =~ s/\(\(/\x03/g;
+    $_[0] =~ s/\)\)/\x04/g;
+}
+sub preprocess_plugin_after{
+    $_[0] =~ s/\x04/\)\)/g;
+    $_[0] =~ s/\x03/\(\(/g;
+    $_[0] =~ s/\x02/&quot;/g;
+    
+}
 sub preprocess_plugin{
     my ($text,$sesion) = @_;
-    $$text =~ s/&quot;/\x02/g;
-    $$text =~ s/\(\(/\x03/g;
-    $$text =~ s/\)\)/\x04/g;
+    &preprocess_plugin_before( $$text );
     $$text =~ s/\x03([^\x02-\x04]*?(?:\x02[^\x02]*\x02[^\x02-\x04]*?)*?)\x04/&plugin($sesion,$1)/ges;
-    $$text =~ s/\x04/\)\)/g;
-    $$text =~ s/\x03/\(\(/g;
-    $$text =~ s/\x02/&quot;/g;
+    &preprocess_plugin_after( $$text );
 }
 
 sub preprocess_rawurl{
