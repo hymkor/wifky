@@ -679,6 +679,8 @@ li.menuoff{
     height:1.5em;
     line-height:1.5em;
     overflow:hidden;
+    padding-left:1pt;
+    padding-right:1pt;
 }
 li.menuon{
     float:left;
@@ -686,6 +688,8 @@ li.menuon{
     line-height:1.5em;
     overflow:hidden;
     border-width:1px;border-color:black;border-style:solid;
+    padding-left:1pt;
+    padding-right:1pt;
 }
 ul.mainmenu>li.menuon{
     overflow:visible;
