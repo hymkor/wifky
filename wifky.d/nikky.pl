@@ -373,11 +373,14 @@ sub action_rss{
         }
         local $::form{p}=$t->{page};
         local $::print='';
-        &::syntax_engine(
-            join("\n\n",@{$t->{desc}}) ,
-            $session4page{$t->{page}} ||= 
-            { title => $t->{page} , attachment => $t->{attachment} }
-        );
+        my $ss=$session4page{$t->{page}} || {};
+        $ss->{title} = $t->{page} ;
+        $ss->{attachment} ||= {};
+        while( my ($key,$val)=each %{$t->{attachment}} ){
+            $ss->{attachment}->{$key}  = $val ;
+        }
+
+        &::syntax_engine( join("\n\n",@{$t->{desc}}) , $ss ) ;  
         $::print =~ s/<!--- READ MORE --->.*\Z//s;
         
         print  '<description><![CDATA[';
