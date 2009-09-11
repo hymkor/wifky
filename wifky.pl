@@ -349,10 +349,6 @@ dt,span.commentator{font-weight:bold;padding:1mm}
 
 span.comment_date{font-style:italic}
 
-div.sidebar{ float:right; width:25% ; word-break: break-all;font-size:90%}
-
-div.main{ float:left; width:70% }
-
 a{ text-decoration:none }
 
 a:hover{ text-decoration:underline }
@@ -370,6 +366,11 @@ pre{
  white-space: -o-pre-wrap; /* Opera 7 */
  white-space: pre-wrap; /* CSS3 */
  word-wrap: break-word; /* IE 5.5+ */
+}
+
+@media screen{
+ div.sidebar{ float:right; width:25% ; word-break: break-all;font-size:90%}
+ div.main{ float:left; width:70% }
 }
 
 @media print{
