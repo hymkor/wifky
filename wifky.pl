@@ -904,7 +904,8 @@ sub action_signin{
             &begin_day();
             &putenc(qq(<form action="%s" method="POST" accept-charset="%s">
                 <p>Sign: <input type="password" name="password">
-                <input type="submit" name="signing" value="Enter">)
+                <input type="hidden" name="signing" value="Enter">
+                <input type="submit" value="Enter">)
                 , $::postme , $::charset , $ENV{REQUEST_METHOD} );
 
             while( my ($key,$val)=each %::form ){
