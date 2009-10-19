@@ -6,6 +6,8 @@ import sys
 import urllib
 import email
 
+jcode="utf-8"
+
 class WifkyFormNotFound(Exception):pass
 class WifkyPostFail(Exception):pass
 
@@ -22,7 +24,7 @@ class remote_wifky(object):
                 { 
                     "signing":"1",
                     "password":self.pwd , 
-                    "a":"edt", "p":title.encode("euc-jp") 
+                    "a":"edt", "p":title.encode(jcode) 
                 }
             )
         )
@@ -93,7 +95,7 @@ def postwifky( fd , url , pwd ):
     if title:
         body = u"<<%s>>\n\n%s" % (title,body)
 
-    remote_wifky( url , pwd ).add( body.encode("euc-jp") )
+    remote_wifky( url , pwd ).add( body.encode(jcode) )
 
 if __name__ == "__main__":
     if len(sys.argv) == 3 :
