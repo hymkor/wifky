@@ -165,6 +165,8 @@ sub init_globals{
         'Freeze/Fresh'  => \&action_freeze_or_fresh ,
         'signin'        => \&action_signin ,
         'signout'       => \&action_signout ,
+        'Cut'           => \&action_cut ,
+        'Paste'         => \&action_paste ,
     );
 
     @::http_header = ( "Content-type: text/html; charset=$::charset" );
@@ -612,26 +614,36 @@ sub form_attachment{
     &puts('<h3>Attachment</h3>');
     &puts('<p>New:<input type="file" name="newattachment_b" size="48">');
     &puts('<input type="submit" name="a" value="Upload"></p>');
-    my @attachments=&list_attachment( $::form{p} ) or return;
-    &puts('<p>');
-    foreach my $attach (sort @attachments){
-        my $fn = &title2fname($::form{p}, $attach);
+    if( my @attachments=&list_attachment( $::form{p} ) ){
+        &puts('<p>');
+        foreach my $attach (sort @attachments){
+            my $fn = &title2fname($::form{p}, $attach);
 
-        &putenc('<input type="checkbox" name="f" value="%s"' , $attach );
-        if( !&is_signed() && ! &w_ok($fn) ){
-            &puts(' disabled');
+            &putenc('<input type="checkbox" name="f" value="%s"' , $attach );
+            if( !&is_signed() && ! &w_ok($fn) ){
+                &puts(' disabled');
+            }
+            &putenc('><input type="text" name="dummy" readonly value="&lt;&lt;{%s}"
+                    size="%d" style="font-family:monospace"
+                    onClick="this.select();">', $attach, length($attach)+4 );
+            &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$attach } ).':' );
+            &putenc('%d bytes, at %s', (stat $fn)[7],&mtime($fn));
+            &puts('<strong>frozen</strong>') unless &w_ok();
+            &puts(')<br>');
         }
-        &putenc('><input type="text" name="dummy" readonly value="&lt;&lt;{%s}"
-                size="%d" style="font-family:monospace"
-                onClick="this.select();">', $attach, length($attach)+4 );
-        &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$attach } ).':' );
-        &putenc('%d bytes, at %s', (stat $fn)[7],&mtime($fn));
-        &puts('<strong>frozen</strong>') unless &w_ok();
-        &puts(')<br>');
+        &puts('</p>');
+        &puts('<input type="submit" name="a" value="Freeze/Fresh">') if &is_signed();
+        &puts('<input type="submit" name="a" value="Cut" />') if &is_signed();
+        &puts('<input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">');
     }
-    &puts('</p>');
-    &puts('<input type="submit" name="a" value="Freeze/Fresh">') if &is_signed();
-    &puts('<input type="submit" name="a" value="Delete" onClick="JavaScript:return window.confirm(\'Delete Attachments. Sure?\')">');
+    
+    if( &is_signed() && (my @clip=&select_clipboard()) > 0 ){
+        &putenc('<h3>Attachment Clipboard</h3><ul>', scalar(@clip));
+        foreach my $a (@clip){
+            &putenc('<li>%s</li>',&fname2title($a));
+        }
+        &puts('</ul><input type="submit" name="a" value="Paste" />');
+    }
     ### &end_day();
 }
 
@@ -1295,17 +1307,42 @@ sub action_seek{
     );
 }
 
-sub action_delete{
+sub select_attachment_do{
     goto &action_signin if &is_frozen() && !&is_signed();
+    my $action=shift;
 
     foreach my $f ( @{$::forms{f}} ){
         my $fn=&title2fname( $::form{p} , $f );
         if( &w_ok($fn) || &is_signed() ){
-            unlink( $fn ) or rmdir( $fn );
+            $action->( $f , $fn );
         }
     }
     &cacheoff;
     &do_preview();
+}
+
+sub select_clipboard{
+    map{ /^__((?:[0-9a-f][0-9a-f])+)/ ? $1 : () } @::contents; 
+}
+
+sub action_cut{
+    &select_attachment_do(sub{ rename( $_[1] , &title2fname( '' , $_[0] ) ); },@_);
+}
+
+sub action_paste{
+    goto &action_signin if &is_frozen() && !&is_signed();
+    my $body=&title2fname($::form{p});
+    foreach my $attach ( &select_clipboard() ){
+        my $newfn=$body . '__' . $attach;
+        warn $newfn;
+        rename( '__'.$attach , $newfn ) unless -e $newfn;
+    }
+    &cacheoff;
+    &do_preview();
+}
+
+sub action_delete{
+    &select_attachment_do(sub{ unlink( $_[1] ) or rmdir( $_[1] ); },@_ );
 }
 
 sub action_freeze_or_fresh{
