@@ -198,6 +198,12 @@ sub init_globals{
     }
     @::menubar = ();
     if( &is_signed() ){
+        push( @{$::menubar{'100_FrontPage'}} ,
+            &anchor('Sidebar',{p=>'Sidebar'}) ,
+            &anchor('Header' ,{p=>'Header'}) ,
+            &anchor('Footer' ,{p=>'Footer'}) ,
+        );
+
         $::menubar{'900_Sign'} = [
             &anchor('SignOut',{a=>'signout'},{ref=>'nofollow'}) ,
             &anchor('ChangeSign',{a=>'passwd'},{ref=>'nofollow'}) ,
