@@ -1,8 +1,8 @@
 #!/usr/local/bin/perl -T
 
-# use strict; use warnings;
+use strict; use warnings;
 
-$::version  = '1.5.2_0';
+$::version  = '1.5.3_0';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -110,6 +110,7 @@ sub init_globals{
     $::config{CSS} ||= 'CSS';
     $::config{FrontPage} ||= 'FrontPage';
     ( $::session_cookie = ( split(/[\\\/]/,$0) )[-1] ) =~ s/\.\w+$/_session/;
+    $::remote_addr = ($::config{ignore_addr} ? 'NOIP' : ($ENV{REMOTE_ADDR}||'NOIP'));
 
     %::inline_plugin = (
         'adminmenu'=> \&plugin_menubar ,
@@ -140,6 +141,7 @@ sub init_globals{
         'null'     => sub{ '' } ,
         'outline'  => \&plugin_outline ,
         '#'        => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
+        'remote_addr' => sub{ $::remote_addr; } ,
     );
 
     %::action_plugin = (
@@ -253,7 +255,9 @@ sub init_globals{
               type=>'checkbox' },
             { desc=>'Section mark', name=>'sectionmark', size=>3 } ,
             { desc=>'Subsection mark' , name=>'subsectionmark' , size=>3 } ,
-            { desc=>'Subsubsection mark' , name=>'subsubsectionmark' , size=>3 }
+            { desc=>'Subsubsection mark' , name=>'subsubsectionmark' , size=>3 } ,
+            { desc=>'Ignore IP Address for Administrator' , name=>'ignore_addr' , 
+              type=>'checkbox' }
         ],
     );
     %::inline_syntax_plugin = (
@@ -867,7 +871,6 @@ sub local_cookie{
 sub is_signed{
     return $::signed if defined $::signed;
 
-    my $remote_addr=$ENV{REMOTE_ADDR}||0;
     my $id=$::cookie{$::session_cookie} || &local_cookie() || rand();
 
     # time(TAB)ip(TAB)key
@@ -876,10 +879,10 @@ sub is_signed{
     }
 
     if( ($::form{signing} && &auth_check() ) ||
-        ($::ip{$remote_addr} && $::ip{$remote_addr}->[0] eq $id ) )
+        ($::ip{$::remote_addr} && $::ip{$::remote_addr}->[0] eq $id ) )
     {
         push( @::http_header , "Set-Cookie: $::session_cookie=$id" );
-        $::ip{$remote_addr} = [ $id , time ];
+        $::ip{$::remote_addr} = [ $id , time ];
         &save_session();
         $::signed=1;
     }else{
@@ -924,7 +927,7 @@ sub action_signin{
 
 sub action_signout{
     if( &is_signed() ){
-        delete $::ip{$ENV{REMOTE_ADDR}||0};
+        delete $::ip{$::remote_addr};
         &save_session();
     }
     &transfer_url($::me);
