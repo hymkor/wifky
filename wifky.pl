@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -T
 
-use strict; use warnings;
+# use strict; use warnings;
 
 $::version  = '1.5.3_0';
 
