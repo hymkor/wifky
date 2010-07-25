@@ -22,7 +22,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.1.0_2';
+my $version='1.1.0_3';
 my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
 
 if( exists $::menubar{'200_New'} ){
@@ -54,10 +54,12 @@ $::inline_plugin{a_nikky} = sub {
     qq(<a href="$::me?a=nikky">) .  join(' ',@_[1..$#_]) . '</a>';
 };
 $::inline_plugin{nikky_comment} = sub {
-    $::form{p} =~ /^\(\d\d\d\d\.\d\d.\d\d\)/ ? &::plugin_comment(@_) : '';
+    (defined $::form{p} && $::form{p} =~ /^\(\d\d\d\d\.\d\d.\d\d\)/ )
+    ? &::plugin_comment(@_) : '';
 };
 $::inline_plugin{nikky_referer} = sub {
-    $::form{p} =~ /^\(\d\d\d\d\.\d\d.\d\d\)/ ? &wifky::nikky::referer(@_) : '';
+    (defined $::form{p} && $::form{p} =~ /^\(\d\d\d\d\.\d\d.\d\d\)/ )
+    ? &wifky::nikky::referer(@_) : '';
 };
 
 $::action_plugin{rss} = \&action_rss ;
