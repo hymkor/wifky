@@ -1,8 +1,7 @@
 #!/usr/local/bin/perl -T
 
-# use strict; use warnings;
-
-$::version  = '1.5.3_0';
+use strict; use warnings;
+$::version  = '1.5.4_0';
 
 $::version .= '++' if defined(&strict::import);
 $::PROTOCOL = '(?:s?https?|ftp)';
@@ -458,6 +457,11 @@ sub read_form{
 
 sub puts{
     $::print .= "$_\r\n" for(@_);
+}
+
+sub putsf{
+    my $fmt=shift;
+    $::print .= sprintf("$fmt\r\n",@_);
 }
 
 # puts with auto escaping arguments but format-string.
@@ -1386,7 +1390,7 @@ sub action_comment{
 
 sub begin_day{
     &puts('<div class="day">');
-    &putenc('<h2><span class="title">%s</span></h2>',$_[0]) if @_;
+    &headline( n=>2 , body=>&enc($_[0]) , class=>'title' ) if @_;
     &puts('<div class="body">');
 }
 
@@ -2142,8 +2146,13 @@ sub preprocess{
 }
 
 sub headline{
-    my ($body,$n,$id)=@_;
-    &puts("<h$n" . ($id ? qq( id="$id") : '') . ">$body</h$n>" );
+    my %arg=@_;
+    &putsf( '<h%d%s%s>%s</h%d>' ,
+                $arg{n} ,
+                $arg{id}    ? qq( id="$arg{id}") : '' ,
+                $arg{class} ? qq( class="$arg{class}") : '' ,
+                $arg{body} ,
+                $arg{n} );
 }
 
 sub midashi{
@@ -2152,7 +2161,7 @@ sub midashi{
     my $section = ($session->{section} ||= [0,0,0,0,0]) ;
 
     if( $depth < 0 ){
-        &puts( "<h1>$text</h1>" );
+        &headline( n=>1 , body=>$text , session=>$session );
     }else{
         grep( $_ && &puts('</div></div>'),@{$section}[$depth .. $#{$section}]);
         $section->[ $depth ]++;
@@ -2185,7 +2194,9 @@ sub midashi{
         }else{
             &puts(qq(<div class="x$cls">));
         }
-        &headline($text,$h,( $session->{index} ? "p$tag" : undef ) );
+        &headline( n=>$h, body=>$text, 
+                   id=>($session->{index} && "p$tag") ,
+                   session=>$session );
         if( $session->{main} ){
             &puts(qq(<div class="${cls}body x${cls}body">));
         }else{
