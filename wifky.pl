@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -T
+#!/usr/bin/perl -T
 
 use strict; use warnings;
 $::version  = '1.5.4_0';
@@ -304,6 +304,7 @@ sub init_globals{
     %::form_list = (
         '000_mode'           => \&form_mode ,
         '100_textarea'       => \&form_textarea ,
+        '150_label'          => \&form_label ,
         '200_preview_botton' => \&form_preview_button ,
         '300_signarea'       => \&form_signarea ,
         '400_submit'         => \&form_commit_button ,
@@ -378,6 +379,10 @@ pre{
  white-space: pre-wrap; /* CSS3 */
  word-wrap: break-word; /* IE 5.5+ */
 }
+
+div.tag{  text-align:right }
+
+a.tag{ font-size:80%; background-color:#CCF }
 
 @media screen{
  div.sidebar{ float:right; width:25% ; word-break: break-all;font-size:90%}
@@ -541,6 +546,8 @@ sub cacheoff{
     undef %::mtime_cache;
     undef @::contents;
     undef %::contents;
+    undef %::contents_label;
+    undef %::label;
 }
 sub title2mtime{
     &mtime( &title2fname(@_) );
@@ -594,10 +601,24 @@ sub form_mode{
         &puts('<div class="noarchivemode">no archive mode</div>');
     }
 }
+sub form_label{
+    my $label='';
+    if( $::form{a} eq 'edt' ){
+        my $t=$::contents_label{&title2fname($::form{p})};
+        $label = join(' ',@{$t->{label}}) if defined $t;
+    }else{
+        $label = $::form{label_t};
+        $label =~ s/ +/ /;
+    }
+    &putenc('<div>Tag:<textarea cols="40" rows="1" name="label_t">%s</textarea></div>',
+        $label );
+}
+
 sub form_textarea{
     &putenc('<textarea cols="80" rows="20" name="text_t">%s</textarea><br>'
             , ${$_[0]} );
 }
+
 sub form_preview_button{
     &puts('<input type="submit" name="a" value="Preview">');
 }
@@ -627,6 +648,7 @@ sub form_attachment{
     if( my @attachments=&list_attachment( $::form{p} ) ){
         &puts('<p>');
         foreach my $attach (sort @attachments){
+            next if $attach =~ /^\0/;
             my $fn = &title2fname($::form{p}, $attach);
 
             &putenc('<input type="checkbox" name="f" value="%s"' , $attach );
@@ -1454,7 +1476,19 @@ sub do_submit{
     if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
         &archive();
     }
-    if( &lockdo( sub{ &write_file( $fn , \$::form{text_t} ) },$::form{p} )){
+    &cache_update();
+    if( &lockdo( sub{
+        my $label=$::contents_label{$fn};
+        if( defined $label && $label->{fname} =~ /^([0-9a-f_]*)$/ ){
+            unlink( $1 );
+        }
+        my $file_exists=&write_file( $fn , \$::form{text_t} );
+        if( $file_exists && $::form{label_t} && $::form{label_t} =~ /^\S+/ ){
+            local *FP;
+            open(FP,'>'.$fn.'__00'.join('00',map{ unpack('h*',$_) } split(/ +/,$::form{label_t})));
+            close(FP);
+        }
+    },$::form{p} )){
         if( $::form{to_freeze} ){
             chmod(0444,$fn);
         }
@@ -1524,6 +1558,18 @@ sub action_edit{
             &end_day();
         }
     );
+}
+
+sub label2html{
+    my ($title,$tag)=@_;
+    my $t=$::contents_label{&title2fname($title)};
+    if( defined $t ){
+        qq{ <$tag class="tag">} .
+        join(' ',map{ &anchor($_,{ tag=>$_,a=>'index'},{ class=>'tag'}) } @{$t->{label}}) .
+        "</$tag> ";
+    }else{
+        '';
+    }
 }
 
 sub print_template{
@@ -1651,6 +1697,11 @@ sub cache_update{
             push( @::contents , $fn );
             if( $fn =~ /^([0-9a-f][0-9a-f])+$/ ){
                 $::contents{$&} ||= [];
+            }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__00((?:[0-9a-f][0-9a-f])+)$/ ){
+                my ($p,$t)=($1,$2);
+                my @label = split(/\0/,&fname2title($t) );
+                $::contents_label{$p} = { fname=> $fn , label => \@label };
+                push(@{$::contents{$p}},"00$t");
             }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__((?:[0-9a-f][0-9a-f])+)$/ ){
                 push(@{$::contents{$1}},$2);
             }
@@ -1683,6 +1734,8 @@ sub print_page{
     my $title=$args{title};
     my $html =&enc( exists $args{source} ? ${$args{source}} : &read_text($title));
     return 0 unless $html;
+
+    &puts( &label2html($title,'div') );
 
     push(@::outline,
         { depth => -1 , text  => $title , title => $title , sharp => '' }
@@ -1903,6 +1956,17 @@ sub plugin_outline{
     );
 }
 
+sub has_label{
+    my ($page,$tag)=@_;
+
+    my $t=$::contents_label{$page};
+    if( defined $t ){
+        ( grep{ $_ eq $tag } @{$t->{label}} ) > 0;
+    }else{
+        0;
+    }
+}
+
 sub ls_core{
     my ($opt,@args) = @_;
     push(@args,'*') unless @args;
@@ -1920,9 +1984,11 @@ sub ls_core{
                 mtime  => &mtime($_)
               }
             }grep{
-                  exists $opt->{a}
+                (  exists $opt->{a}
                 ? ($_ =~ $pat )
-                : ($_ =~ $pat && !/^e2/ && -f $_ )
+                : ($_ =~ $pat && !/^e2/ && -f $_ ) )
+                && 
+                ( ! exists $::form{tag} || &has_label( $_ , $::form{tag} ) )
             }
             &list_page()
         );
@@ -1962,6 +2028,8 @@ sub ls{
         exists $opt{i} and $buf .= '<tt>'.(1+@{$::contents{ $p->{fname} }}).' </tt>';
 
         $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
+
+        exists $opt{l} and $buf .= &label2html($p->{title},'span');
         $buf .= "</li>\r\n";
     }
     $buf;
