@@ -547,7 +547,6 @@ sub cacheoff{
     undef @::contents;
     undef %::contents;
     undef %::contents_label;
-    undef %::label;
 }
 sub title2mtime{
     &mtime( &title2fname(@_) );
@@ -605,7 +604,7 @@ sub form_label{
     my $label='';
     if( $::form{a} eq 'edt' ){
         my $t=$::contents_label{&title2fname($::form{p})};
-        $label = join(' ',@{$t->{label}}) if defined $t;
+        $label = join(' ',@{$t}) if defined $t;
     }else{
         $label = $::form{label_t};
         $label =~ s/ +/ /;
@@ -1479,14 +1478,19 @@ sub do_submit{
     &cache_update();
     if( &lockdo( sub{
         my $label=$::contents_label{$fn};
-        if( defined $label && $label->{fname} =~ /^([0-9a-f_]*)$/ ){
-            unlink( $1 );
+        if( defined $label ){
+            foreach my $e (@{$label}){
+                unlink( $fn.'__00'.unpack('h*',$e) );
+            }
         }
         my $file_exists=&write_file( $fn , \$::form{text_t} );
-        if( $file_exists && $::form{label_t} && $::form{label_t} =~ /^\S+/ ){
-            local *FP;
-            open(FP,'>'.$fn.'__00'.join('00',map{ unpack('h*',$_) } split(/ +/,$::form{label_t})));
-            close(FP);
+        if( $file_exists && $::form{label_t} ){
+            my $label=$::form{label_t};
+            while( $label =~ m/(\S+)/g ){
+                local *FP;
+                open(FP,'>'.$fn.'__00'.unpack('h*',$1));
+                close(FP);
+            }
         }
     },$::form{p} )){
         if( $::form{to_freeze} ){
@@ -1565,7 +1569,7 @@ sub label2html{
     my $t=$::contents_label{&title2fname($title)};
     if( defined $t ){
         qq{ <$tag class="tag">} .
-        join(' ',map{ &anchor($_,{ tag=>$_,a=>'index'},{ class=>'tag'}) } @{$t->{label}}) .
+        join(' ',map{ &anchor($_,{ tag=>$_,a=>'index'},{ class=>'tag'}) } @{$t}) .
         "</$tag> ";
     }else{
         '';
@@ -1698,10 +1702,8 @@ sub cache_update{
             if( $fn =~ /^([0-9a-f][0-9a-f])+$/ ){
                 $::contents{$&} ||= [];
             }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__00((?:[0-9a-f][0-9a-f])+)$/ ){
-                my ($p,$t)=($1,$2);
-                my @label = split(/\0/,&fname2title($t) );
-                $::contents_label{$p} = { fname=> $fn , label => \@label };
-                push(@{$::contents{$p}},"00$t");
+                push(@{$::contents_label{$1}} , pack('h*',$2) );
+                push(@{$::contents{$1}},"00$2");
             }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__((?:[0-9a-f][0-9a-f])+)$/ ){
                 push(@{$::contents{$1}},$2);
             }
@@ -1961,7 +1963,7 @@ sub has_label{
 
     my $t=$::contents_label{$page};
     if( defined $t ){
-        ( grep{ $_ eq $tag } @{$t->{label}} ) > 0;
+        ( grep{ $_ eq $tag } @{$t} ) > 0;
     }else{
         0;
     }
