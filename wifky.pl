@@ -1492,6 +1492,7 @@ sub do_submit{
                 close(FP);
             }
         }
+        $file_exists;
     },$::form{p} )){
         if( $::form{to_freeze} ){
             chmod(0444,$fn);
