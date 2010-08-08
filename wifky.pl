@@ -604,7 +604,7 @@ sub form_label{
     my $label='';
     if( $::form{a} eq 'edt' ){
         my $t=$::contents_label{&title2fname($::form{p})};
-        $label = join(' ',@{$t}) if defined $t;
+        $label = join(' ',keys %{$t}) if defined $t;
     }else{
         $label = $::form{label_t};
         $label =~ s/ +/ /;
@@ -1420,6 +1420,12 @@ sub end_day{ &puts('</div></div>'); }
 sub do_index{
     my ($t,$n,@param)=@_;
 
+    if( $::form{tag} ){
+        for my $t (@{$::forms{tag}}){
+            unshift(@param,"+$t");
+        }
+    }
+
     &print_template(
         title => 'IndexPage' ,
         main  => sub{
@@ -1475,12 +1481,12 @@ sub do_submit{
     if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
         &archive();
     }
-    &cache_update();
+    cache_update() unless %::contents_label;
     if( &lockdo( sub{
         my $label=$::contents_label{$fn};
         if( defined $label ){
-            foreach my $e (@{$label}){
-                unlink( $fn.'__00'.unpack('h*',$e) );
+            while( my (undef,$labelfname)=each %{$label}){
+                unlink( $labelfname );
             }
         }
         my $file_exists=&write_file( $fn , \$::form{text_t} );
@@ -1570,7 +1576,7 @@ sub label2html{
     my $t=$::contents_label{&title2fname($title)};
     if( defined $t ){
         qq{ <$tag class="tag">} .
-        join(' ',map{ &anchor($_,{ tag=>$_,a=>'index'},{ class=>'tag'}) } @{$t}) .
+        join(' ',map{ &anchor($_,{ tag=>$_,a=>'index'},{ class=>'tag'}) } keys %{$t}) .
         "</$tag> ";
     }else{
         '';
@@ -1703,7 +1709,8 @@ sub cache_update{
             if( $fn =~ /^([0-9a-f][0-9a-f])+$/ ){
                 $::contents{$&} ||= [];
             }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__00((?:[0-9a-f][0-9a-f])+)$/ ){
-                push(@{$::contents_label{$1}} , pack('h*',$2) );
+                $::contents_label{$1} ||= {};
+                $::contents_label{$1}->{ pack('h*',$2) } = $&;
                 push(@{$::contents{$1}},"00$2");
             }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__((?:[0-9a-f][0-9a-f])+)$/ ){
                 push(@{$::contents{$1}},$2);
@@ -1960,14 +1967,13 @@ sub plugin_outline{
 }
 
 sub has_label{
-    my ($page,$tag)=@_;
+    my ($page,$arglabel)=@_;
 
-    my $t=$::contents_label{$page};
-    if( defined $t ){
-        ( grep{ $_ eq $tag } @{$t} ) > 0;
-    }else{
-        0;
+    my $pagelabel=$::contents_label{$page};
+    foreach my $T (@{$arglabel}){
+        return 0 unless exists $pagelabel->{$T};
     }
+    return 1;
 }
 
 sub ls_core{
@@ -1991,7 +1997,7 @@ sub ls_core{
                 ? ($_ =~ $pat )
                 : ($_ =~ $pat && !/^e2/ && -f $_ ) )
                 && 
-                ( ! exists $::form{tag} || &has_label( $_ , $::form{tag} ) )
+                ( ! exists $opt->{'+'} || &has_label( $_ , $opt->{'+'} ) )
             }
             &list_page()
         );
@@ -2015,6 +2021,8 @@ sub parse_opt{
             $opt->{number} = $opt->{countdown} = $1;
         }elsif( $p =~ /^-/ ){
             $opt->{$'} = 1;
+        }elsif( $p =~ /^\+/ ){
+            push(@{$opt->{'+'}} , $' );
         }else{
             push(@{$arg},$p);
         }
