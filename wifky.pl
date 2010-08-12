@@ -141,6 +141,7 @@ sub init_globals{
         'outline'  => \&plugin_outline ,
         '#'        => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
         'remote_addr' => sub{ $::remote_addr; } ,
+        'taglist'  => \&plugin_taglist ,
     );
 
     %::action_plugin = (
@@ -384,6 +385,8 @@ div.tag{  text-align:right }
 
 a.tag{ font-size:80%; background-color:#CCF }
 
+span.tagnum{ font-size:70% ; color:blue }
+
 @media screen{
  div.sidebar{ float:right; width:25% ; word-break: break-all;font-size:90%}
  div.main{ float:left; width:70% }
@@ -547,6 +550,7 @@ sub cacheoff{
     undef @::contents;
     undef %::contents;
     undef %::contents_label;
+    undef %::label_contents;
 }
 sub title2mtime{
     &mtime( &title2fname(@_) );
@@ -867,15 +871,16 @@ sub write_file{
     my ($fname,$body) = @_;
 
     if( length( ref($body) ? $$body : $body ) <= 0 ){
-        unlink($fname) or rmdir($fname);
-        &cacheoff;
+        if( unlink($fname) or rmdir($fname) ){
+            &cacheoff;
+        }
         0;
     }else{
+        &cacheoff unless -f $fname;
         open(FP,">$fname") or die("can't write the file $fname.");
             binmode(FP);
             print FP ref($body) ? ${$body} : $body;
         close(FP);
-        &cacheoff;
         1;
     }
 }
@@ -1365,7 +1370,6 @@ sub action_paste{
     my $body=&title2fname($::form{p});
     foreach my $attach ( &select_clipboard() ){
         my $newfn=$body . '__' . $attach;
-        warn $newfn;
         rename( '__'.$attach , $newfn ) unless -e $newfn;
     }
     &cacheoff;
@@ -1576,7 +1580,7 @@ sub label2html{
     my $t=$::contents_label{&title2fname($title)};
     if( defined $t ){
         qq{ <$tag class="tag">} .
-        join(' ',map{ &anchor($_,{ tag=>$_,a=>'index'},{ class=>'tag'}) } keys %{$t}) .
+        join(' ',map{ &anchor(&enc($_),{ tag=>$_,a=>'index'},{ class=>'tag'}) } keys %{$t}) .
         "</$tag> ";
     }else{
         '';
@@ -1710,7 +1714,9 @@ sub cache_update{
                 $::contents{$&} ||= [];
             }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__00((?:[0-9a-f][0-9a-f])+)$/ ){
                 $::contents_label{$1} ||= {};
-                $::contents_label{$1}->{ pack('h*',$2) } = $&;
+                my $label=pack('h*',$2);
+                $::contents_label{$1}->{$label} = $&;
+                push(@{$::label_contents{$label}} , $1 );
                 push(@{$::contents{$1}},"00$2");
             }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__((?:[0-9a-f][0-9a-f])+)$/ ){
                 push(@{$::contents{$1}},$2);
@@ -2103,6 +2109,16 @@ sub plugin_pagename{
     }else{
         &enc( exists $::form{p} ? $::form{p} : $::config{FrontPage} );
     }
+}
+
+sub plugin_taglist{
+    my $html='<div class="taglist">';
+    while( my ($label,$list)=each %::label_contents ){
+        $html .= '<span class="taglist">';
+        $html .= &anchor(&enc($label),{ tag=>$label,a=>'index'},{ class=>'tag'});
+        $html .= sprintf('<span class="tagnum">(%d)</span></span> ',scalar(@{$list}));
+    }
+    $html .= '</div>';
 }
 
 sub plugin{
