@@ -236,6 +236,10 @@ sub init_globals{
                                 {rel=>'nofollow'}) ,
                 );
             }
+        }elsif( !&is('lonely') || &is_signed() ){
+            unshift( @{$::menubar{'300_Edit'}} ,
+                &anchor('Edit',{ a=>'edt', p=>$title},{rel=>'nofollow'})
+            );
         }
     }
     @::copyright = (
