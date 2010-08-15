@@ -75,23 +75,25 @@ sub marking{
     }
 
     # [Bookmark anchor]
-    sprintf(
-        ' <a href="http://b.hatena.ne.jp/add?mode=confirm&title=%s&url=%s"><img src="%s" alt="[B!]" border="0" /></a><a href="http://b.hatena.ne.jp/entry/%s"><img src="http://b.hatena.ne.jp/entry/image/%s" border="0" alt="[n user]"/></a>'
-        , &::percent( $fulltitle )
-        , &::percent( $url1 )
-        , &::enc($::config{hatenabookmark_mark} || ($::me . '?a=b_entry') )
-        , $url2
-        , $url2
-    ) .
-    # [Twitter mark]
-    sprintf(
-        ' <a href="http://twitter.com/share" class="twitter-share-button" data-url="%s" data-text="&quot;%s&quot;" data-count="%s" %s data-lang="ja">Tweet</a><script type="text/javascript" src="http://platform.twitter.com/widgets.js"></script>'
-        , &::enc($url1)
-        , &::enc($fulltitle)
-        , $::config{hmark_tweet_counter} ? 'horizontal' : 'none'
-        , $::config{hmark_twitter_id} 
-            ? 'data-via="'.&::enc($::config{hmark_twitter_id}).'"'
-            : ''
+    &::verb( 
+        sprintf(
+            ' <a href="http://b.hatena.ne.jp/add?mode=confirm&title=%s&url=%s"><img src="%s" alt="[B!]" border="0" /></a><a href="http://b.hatena.ne.jp/entry/%s"><img src="http://b.hatena.ne.jp/entry/image/%s" border="0" alt="[n user]"/></a>'
+            , &::percent( $fulltitle )
+            , &::percent( $url1 )
+            , &::enc($::config{hatenabookmark_mark} || ($::me . '?a=b_entry') )
+            , $url2
+            , $url2
+        ) .
+        # [Twitter mark]
+        sprintf(
+            ' <a href="http://twitter.com/share" class="twitter-share-button" data-url="%s" data-text="&quot;%s&quot;" data-count="%s" %s data-lang="ja">Tweet</a><script type="text/javascript" src="http://platform.twitter.com/widgets.js"></script>'
+            , &::enc($url1)
+            , &::enc($fulltitle)
+            , $::config{hmark_tweet_counter} ? 'horizontal' : 'none'
+            , $::config{hmark_twitter_id} 
+                ? 'data-via="'.&::enc($::config{hmark_twitter_id}).'"'
+                : ''
+        )
     );
 }
 
