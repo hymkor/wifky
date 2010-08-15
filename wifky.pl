@@ -224,17 +224,19 @@ sub init_globals{
     ### menubar ###
     if( $::form{p} || !exists $::form{a} ){
         my $title=$::form{p} || $::config{FrontPage};
-        if( &object_exists($title) && (!&is_frozen() || &is_signed()) ){
-            unshift( @{$::menubar{'300_Edit'}} ,
-                &anchor('Edit',{ a=>'edt', p=>$title},{rel=>'nofollow'})
-            );
-            if( &is_signed() ){
-                push( @{$::menubar{'300_Edit'}} ,
-                    &anchor('Rollback',{ a=>'rollback', p=>$title },
-                                {rel=>'nofollow'}) ,
-                    &anchor('Rename' , { a=>'rename' , p=>$title },
-                                {rel=>'nofollow'}) ,
+        if( &object_exists($title) ){
+            if( !&is_frozen() || &is_signed() ){
+                unshift( @{$::menubar{'300_Edit'}} ,
+                    &anchor('Edit',{ a=>'edt', p=>$title},{rel=>'nofollow'})
                 );
+                if( &is_signed() ){
+                    push( @{$::menubar{'300_Edit'}} ,
+                        &anchor('Rollback',{ a=>'rollback', p=>$title },
+                                    {rel=>'nofollow'}) ,
+                        &anchor('Rename' , { a=>'rename' , p=>$title },
+                                    {rel=>'nofollow'}) ,
+                    );
+                }
             }
         }elsif( !&is('lonely') || &is_signed() ){
             unshift( @{$::menubar{'300_Edit'}} ,
