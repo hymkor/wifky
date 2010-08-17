@@ -2,11 +2,22 @@ package wifky::hmarks;
 use strict;use warnings;
 use Encode ();
 
+my $utf8=Encode::find_encoding('utf8');
+my $eucjp=Encode::find_encoding('euc-jp');
+
 my $version="1.6_0";
 
 ###
 ### Hatena Bookmark Secion ###
 ###
+
+if( exists $::form{utf8p} ){
+    print  "Status: 301 See Other\r\n";
+    printf "Location: %s\r\n",
+        &::myurl( { p=>$eucjp->encode( $utf8->decode( $::form{utf8p} ) ) } );
+    print  "\r\n\r\n";
+    exit(0);
+}
 
 if( ! exists $::form{p} && exists $::form{q} ){
     $::form{p} = unypack($::form{q});
@@ -70,9 +81,12 @@ sub marking{
     my $fulltitle = $::config{sitename} . ' - ' . $title;
 
     if( $::charset eq 'EUC-JP' ){
-        Encode::from_to($title,'euc-jp','utf8');
-        Encode::from_to($fulltitle,'euc-jp','utf8');
+        $url1 = &::myurl(
+            { utf8p=>$utf8->encode( $eucjp->decode($session->{title}) ) } ,
+            $sharp||''
+        );
     }
+    $url1 =~ s/\+/\%20/g;
 
     # [Bookmark anchor]
     &::verb( 
