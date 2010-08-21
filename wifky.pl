@@ -1,9 +1,8 @@
 #!/usr/bin/perl -T
 
 use strict; use warnings;
-$::version  = '1.5.4_0';
 
-$::version .= '++' if defined(&strict::import);
+$::version  = '1.5.5_0';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -790,24 +789,6 @@ a.page_not_found{
                      source=>\$::default_contents{ &title2fname('Header')} );
     }
 }
-
-sub print_footer{ ### deprecate ###
-    if( $::flag{userheader} ){
-        return if $::flag{userheader} eq 'template';
-        &puts('<div class="copyright footer">',@::copyright,'</div>') if @::copyright;
-        &puts('</div><!-- main --><div class="sidebar">');
-        &print_page( title=>'Sidebar' );
-    }
-    &puts('</div>');
-    &puts( $messages ) if $::config{debugmode} && $messages;
-    &puts('</body></html>');
-}
-
-sub print_sidebar_and_footer{ ### deprecate ###
-    @::copyright=();
-    &print_footer();
-}
-sub print_copyright{} ### deprecate ###
 
 sub is_frozen{
     if( -r &title2fname(  $#_>=0            ? $_[0]
