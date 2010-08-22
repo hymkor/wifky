@@ -166,6 +166,8 @@ sub init_globals{
         'signout'       => \&action_signout ,
         'Cut'           => \&action_cut ,
         'Paste'         => \&action_paste ,
+        '+tag'          => \&action_tagplus ,
+        '-tag'          => \&action_tagminus ,
     );
 
     @::http_header = ( "Content-type: text/html; charset=$::charset" );
@@ -408,6 +410,19 @@ HERE
 
 !!!! ((sitename))
 HERE
+    );
+
+    @::index_columns = (
+        sub{ $_[1]->{l} ? '<tt>'.$_[0]->{mtime}.'</tt>' : '' } ,
+        sub{ $_[1]->{i} ? '<tt>'.(1+@{$::contents{ $_[0]->{fname} }}).'</tt>' : '' } ,
+        sub{ anchor( &enc($_[0]->{title}) , { p=>$_[0]->{title} } ) } ,
+        sub{ $_[1]->{l} ? &label2html($_[0]->{title},'span') : '' } ,
+    );
+
+    @::index_action = (
+        '<div><input type="text" name="tag" />'.
+        '<input type="submit" name="a" value="+tag" />'.
+        '<input type="submit" name="a" value="-tag" /></div>' ,
     );
 }
 
@@ -1421,10 +1436,25 @@ sub do_index{
         title => 'IndexPage' ,
         main  => sub{
             &begin_day('IndexPage');
-            &puts( '<ul><li><tt>' .
-                    &anchor(' Last Modified Time' , { a=>$t } ) .
+            if( &is_signed() ){
+                &putenc( '<form name="indecs" action="%s" method="post">' , $::postme );
+                unshift( @::index_columns , sub{
+                        '<input type="checkbox" name="p" value="'.&enc($_[0]->{title}).'" />'
+                    }
+                )
+            }
+            &puts( '<ul><li><tt>' );
+            if( &is_signed() ){
+                &puts( '<input type="checkbox" name="all" onClick="(function(){ var p=document.indecs.p ; for( e in p ){ p[e].checked = document.indecs.all.checked } } )();" />');
+            }
+            &puts( &anchor(' Last Modified Time' , { a=>$t } ) .
                     '&nbsp' . &anchor('Page Title' , { a=>$n } ) .
                     '</tt></li>' . &ls(@param) . '</ul>' );
+            if( &is_signed() ){
+                shift( @::index_columns );
+                &puts( join("\n",@::index_action) );
+                &putenc( '</form>' );
+            }
             &end_day();
         }
     );
@@ -1440,6 +1470,27 @@ sub action_upload{
         &write_file( $fn , \$::form{'newattachment_b'} );
         &do_preview();
     }
+}
+
+sub do_tagging{
+    my $action=shift;
+    foreach my $tag ( split(/\s+/,$::form{tag}) ){
+        my $suffix='__00'.unpack('h*',$tag);
+        foreach my $p ( @{$::forms{p}} ){
+            if( (unpack('h*',$p).$suffix)=~ /^([_0-9a-f]+)$/ ){ # taint
+                $action->($1);
+            }
+        }
+    }
+    &transfer( url=>&myurl({a=>'index'}) );
+}
+
+sub action_tagplus{
+    &do_tagging( sub{ open(FP,'>'.$_[0]) and close(FP) } );
+}
+
+sub action_tagminus{
+    &do_tagging( sub{ unlink($_[0]) } );
 }
 
 sub lockdo{
@@ -2027,14 +2078,7 @@ sub ls{
 
     my $buf = '';
     foreach my $p ( &ls_core(\%opt,@arg) ){
-        $buf .= '<li>';
-        exists $opt{l} and $buf .= '<tt>'.$p->{mtime}.' </tt>';
-        exists $opt{i} and $buf .= '<tt>'.(1+@{$::contents{ $p->{fname} }}).' </tt>';
-
-        $buf .= &anchor( &enc($p->{title}) , { p=>$p->{title} } );
-
-        exists $opt{l} and $buf .= &label2html($p->{title},'span');
-        $buf .= "</li>\r\n";
+        $buf .= '<li>'.join(' ', map{ $_->($p,\%opt) } @::index_columns )."</li>\n";
     }
     $buf;
 }
