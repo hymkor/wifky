@@ -1316,6 +1316,16 @@ sub action_rename{
     }
 }
 
+sub action_seek_found_{
+    &puts(
+        '<li>'.
+        join(' ', map{ $_->(
+            { title=>$_[0] , fname=>$_[1] , mtime=>&mtime($_[1]) } , { l=>1 } )
+        } @::index_columns ).
+        "</li>\n"
+    );
+}
+
 sub action_seek{
     my $keyword=$::form{keyword};
     my $keyword_=&enc( $keyword );
@@ -1323,23 +1333,24 @@ sub action_seek{
     &print_template(
         Title => qq(Seek: "$keyword_") ,
         main => sub {
-            &begin_day( qq(Seek: "$keyword_") );
-            &puts('<ul>');
+            &begin_day( qq(Seek: "$keyword") );
+            &do_index_header_();
+            &puts(' Last Modified Time&nbsp;Page Title</tt></li>');
             foreach my $fn ( &list_page() ){
                 my $title  = &fname2title( $fn );
                 if( index($title ,$keyword) >= 0 ){
-                    &puts('<li>' . &anchor($title,{ p=>$title }) . ' (title)</li>');
+                    &action_seek_found_($title,$fn);
                 }elsif( open(FP,$fn) ){
                     while( <FP> ){
                         if( index($_,$keyword) >= 0 ){
-                            &puts('<li>' . &anchor($title,{ p=>$title } ) . '</li>' );
+                            &action_seek_found_($title,$fn);
                             last;
                         }
                     }
                     close(FP);
                 }
             }
-            &puts('</ul>');
+            &do_index_footer_();
             &end_day();
         },
     );
@@ -1423,6 +1434,28 @@ sub begin_day{
 
 sub end_day{ &puts('</div></div>'); }
 
+sub do_index_header_{
+    if( &is_signed() ){
+        &putenc( '<form name="indecs" action="%s" method="post">' , $::postme );
+        unshift( @::index_columns , sub{
+                '<input type="checkbox" name="p" value="'.&enc($_[0]->{title}).'" />'
+            }
+        )
+    }
+    &puts( '<ul><li><tt>' );
+    if( &is_signed() ){
+        &puts( '<input type="checkbox" name="all" onClick="(function(){ var p=document.indecs.p ; for( e in p ){ p[e].checked = document.indecs.all.checked } } )();" />');
+    }
+}
+
+sub do_index_footer_{
+    if( &is_signed() ){
+        shift( @::index_columns );
+        &puts( join("\n",@::index_action) );
+        &putenc( '</form>' );
+    }
+}
+
 sub do_index{
     my ($t,$n,@param)=@_;
 
@@ -1436,25 +1469,11 @@ sub do_index{
         title => 'IndexPage' ,
         main  => sub{
             &begin_day('IndexPage');
-            if( &is_signed() ){
-                &putenc( '<form name="indecs" action="%s" method="post">' , $::postme );
-                unshift( @::index_columns , sub{
-                        '<input type="checkbox" name="p" value="'.&enc($_[0]->{title}).'" />'
-                    }
-                )
-            }
-            &puts( '<ul><li><tt>' );
-            if( &is_signed() ){
-                &puts( '<input type="checkbox" name="all" onClick="(function(){ var p=document.indecs.p ; for( e in p ){ p[e].checked = document.indecs.all.checked } } )();" />');
-            }
+            &do_index_header_();
             &puts( &anchor(' Last Modified Time' , { a=>$t } ) .
-                    '&nbsp' . &anchor('Page Title' , { a=>$n } ) .
+                    '&nbsp;&nbsp;&nbsp;' . &anchor('Page Title' , { a=>$n } ) .
                     '</tt></li>' . &ls(@param) . '</ul>' );
-            if( &is_signed() ){
-                shift( @::index_columns );
-                &puts( join("\n",@::index_action) );
-                &putenc( '</form>' );
-            }
+            &do_index_footer_();
             &end_day();
         }
     );
