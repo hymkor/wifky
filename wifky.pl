@@ -667,7 +667,8 @@ sub form_attachment{
     ### &begin_day('Attachment');
     &puts('<h3>Attachment</h3>');
     &puts('<p>New:<input type="file" name="newattachment_b" size="48">');
-    &puts('<input type="submit" name="a" value="Upload"></p>');
+    &puts('<input type="submit" name="a" value="Upload">&nbsp;');
+    &puts('<input type="checkbox" name="append_tag" value="1" />append-tag</p>');
     if( my @attachments=&list_attachment( $::form{p} ) ){
         &puts('<p>');
         foreach my $attach (sort @attachments){
@@ -1487,6 +1488,9 @@ sub action_upload{
         &do_preview('The attachment is frozen.');
     }else{
         &write_file( $fn , \$::form{'newattachment_b'} );
+        if( $::form{append_tag} ){
+            $::form{text_t} .= "\n<<{".$::form{'newattachment_b.filename'}.'}';
+        }
         &do_preview();
     }
 }
