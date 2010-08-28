@@ -23,8 +23,8 @@ if( &::is_signed() ){
         $::menubar{'556_expirelist'} = &::anchor('ExpireList',{ a=>'expirelist' } );
     }
     if( defined @::index_action ){
-        unshift( @::index_action , 
-            '<div><input type="submit" name="a" value="expire" /></div>'
+        push( @::index_action , 
+            ' <input type="submit" name="a" value="expire" />'
         );
     }
 }
