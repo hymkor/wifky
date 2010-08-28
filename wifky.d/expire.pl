@@ -22,18 +22,24 @@ if( &::is_signed() ){
     }else{
         $::menubar{'556_expirelist'} = &::anchor('ExpireList',{ a=>'expirelist' } );
     }
+    if( defined @::index_action ){
+        unshift( @::index_action , 
+            '<div><input type="submit" name="a" value="expire" /></div>'
+        );
+    }
 }
 
 $::action_plugin{expire} = sub{
     goto &::action_signin unless &::is_signed();
-    my $title=$::form{p};
-    my @attach=&::list_attachment($title);
-    my @tm=localtime;
-    my $prefix=sprintf('%04d%02d%02d%02d%02d%02d'
-            , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0]);
+    foreach my $title ( @{$::forms{p}} ){
+        my @attach=&::list_attachment($title);
+        my @tm=localtime;
+        my $prefix=sprintf('%04d%02d%02d%02d%02d%02d'
+                , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0]);
 
-    my @renlist = map{ &expire($prefix,$title,$_) } @attach;
-    &renames( @renlist , &expire($prefix,$title) );
+        my @renlist = map{ &expire($prefix,$title,$_) } @attach;
+        &renames( @renlist , &expire($prefix,$title) );
+    }
     &::transfer_url($::me.'?a=recent');
 };
 
