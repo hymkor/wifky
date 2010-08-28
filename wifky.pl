@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.5_0';
+$::version  = '1.5.6_0';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -161,6 +161,8 @@ sub init_globals{
         'tools'         => \&action_tools ,
         'preferences'   => \&action_preferences ,
         'new'           => \&action_new ,
+        'Freeze'        => \&action_freeze_multipage ,
+        'Fresh'         => \&action_fresh_multipage ,
         'Freeze/Fresh'  => \&action_freeze_or_fresh ,
         'signin'        => \&action_signin ,
         'signout'       => \&action_signout ,
@@ -394,6 +396,8 @@ a.tag{ font-size:80%; background-color:#CCF }
 
 span.tagnum{ font-size:70% ; color:blue }
 
+span.frozen{ font-size:80% ; color:#008 ; font-weight:bold }
+
 @media screen{
  div.sidebar{ float:right; width:25% ; word-break: break-all;font-size:90%}
  div.main{ float:left; width:70% }
@@ -420,9 +424,11 @@ HERE
     );
 
     @::index_action = (
-        '<div><input type="text" name="tag" />'.
-        '<input type="submit" name="a" value="+tag" />'.
-        '<input type="submit" name="a" value="-tag" /></div>' ,
+        '<input type="submit" name="a" value="Freeze" />'
+        . '<input type="submit" name="a" value="Fresh" /> '
+        . '<input type="text" name="tag" />'
+        . '<input type="submit" name="a" value="+tag" />'
+        . '<input type="submit" name="a" value="-tag" />'
     );
 }
 
@@ -684,7 +690,7 @@ sub form_attachment{
                     onClick="this.select();">', $attach, length($attach)+4 );
             &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$attach } ).':' );
             &putenc('%d bytes, at %s', (stat $fn)[7],&mtime($fn));
-            &puts('<strong>frozen</strong>') unless &w_ok();
+            &puts(' <span class="frozen">&lt;frozen&gt;</span>') unless &w_ok();
             &puts(')<br>');
         }
         &puts('</p>');
@@ -1394,6 +1400,18 @@ sub action_delete{
     &select_attachment_do(sub{ unlink( $_[1] ) or rmdir( $_[1] ); },@_ );
 }
 
+sub action_freeze_multipage{
+    goto &action_signin unless &is_signed();
+    chmod( 0444 , &title2fname($_) ) for(@{$::forms{p}});
+    &transfer( url=> &myurl( {a=>'index'} ) );
+}
+
+sub action_fresh_multipage{
+    goto &action_signin unless &is_signed();
+    chmod( 0600 , &title2fname($_) ) for(@{$::forms{p}});
+    &transfer( url=> &myurl( {a=>'index'} ) );
+}
+
 sub action_freeze_or_fresh{
     goto &action_signin unless &is_signed();
 
@@ -1441,7 +1459,12 @@ sub do_index_header_{
         unshift( @::index_columns , sub{
                 '<input type="checkbox" name="p" value="'.&enc($_[0]->{title}).'" />'
             }
-        )
+        );
+        push( @::index_columns , sub{
+                &is_frozen($_[0]->{title}) ? ' <span class="frozen">&lt;frozen&gt;</span>' : ''
+            }
+        );
+        &putenc('<input type="hidden" name="from" value="index" />');
     }
     &puts( '<ul><li><tt>' );
     if( &is_signed() ){
@@ -1451,8 +1474,9 @@ sub do_index_header_{
 
 sub do_index_footer_{
     if( &is_signed() ){
-        shift( @::index_columns );
-        &puts( join("\n",@::index_action) );
+        shift( @::index_columns ); # check box
+        pop( @::index_columns ); # frozen mark
+        &puts( '<div>'.join("\n",@::index_action).'</div>' );
         &putenc( '</form>' );
     }
 }
