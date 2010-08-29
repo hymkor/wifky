@@ -812,6 +812,24 @@ a.page_not_found{
     }
 }
 
+sub print_footer{ ### deprecate ###
+    if( $::flag{userheader} ){
+        return if $::flag{userheader} eq 'template';
+        &puts('<div class="copyright footer">',@::copyright,'</div>') if @::copyright;
+        &puts('</div><!-- main --><div class="sidebar">');
+        &print_page( title=>'Sidebar' );
+    }
+    &puts('</div>');
+    &puts( $messages ) if $::config{debugmode} && $messages;
+    &puts('</body></html>');
+}
+
+sub print_sidebar_and_footer{ ### deprecate ###
+    @::copyright=();
+    &print_footer();
+}
+sub print_copyright{} ### deprecate ###
+
 sub is_frozen{
     if( -r &title2fname(  $#_>=0            ? $_[0]
                         : exists $::form{p} ? $::form{p}
