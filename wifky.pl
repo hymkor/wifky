@@ -1155,11 +1155,12 @@ sub action_tools{
     goto &action_signin unless &is_signed();
 
     &browser_cache_off();
-    push( @::html_header , <<HEADER );
+    push( @::html_header , <<'HEADER' );
 <script language="JavaScript">
 <!--
-    function hide(id){ document.getElementById(id).style.display = 'none'; }
-    function show(id){ document.getElementById(id).style.display = '';     }
+    function $(id){ return document.getElementById(id); }
+    function hide(id){ $(id).style.display = 'none'; }
+    function show(id){ $(id).style.display = '';     }
     var lastid="*General Options*";
 // -->
 </script>
@@ -1484,7 +1485,7 @@ sub do_index_header_{
         );
         &putenc('<input type="hidden" name="from" value="index" />');
     }
-    &puts( '<ul><li><tt>' );
+    &puts( '<ul class="pageindex"><li><tt>' );
     if( &is_signed() ){
         &puts( '<input type="checkbox" name="all" onClick="(function(){ var p=document.indecs.p ; for( e in p ){ p[e].checked = document.indecs.all.checked } } )();" />');
     }
@@ -1494,7 +1495,7 @@ sub do_index_footer_{
     if( &is_signed() ){
         shift( @::index_columns ); # check box
         pop( @::index_columns ); # frozen mark
-        &puts( '<div>'.join("\n",@::index_action).'</div>' );
+        &puts( '<div class="indexaction">'.join("\n",@::index_action).'</div>' );
         &putenc( '</form>' );
     }
 }
