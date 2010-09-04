@@ -205,6 +205,7 @@ sub init_globals{
             &anchor('Sidebar',{p=>'Sidebar'}) ,
             &anchor('Header' ,{p=>'Header'}) ,
             &anchor('Footer' ,{p=>'Footer'}) ,
+            &anchor('CSS'    ,{p=>$::config{CSS}} ) ,
         );
 
         $::menubar{'900_Sign'} = [
