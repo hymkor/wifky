@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.6_0';
+$::version  = '1.5.6_1';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -1450,8 +1450,12 @@ sub action_comment{
     my $comment = $::form{comment};
 
     if( length($comment) > 0 ){
-        utime( time , time , &title2fname($title) ) <= 0
+        my $fn=&title2fname($title);
+        my $frozen=&is_frozen($title);
+        chmod(0644,$fn) if $frozen;
+        utime( time , time , $fn ) <= 0
             and die("unable to comment to unexistant page.");
+        chmod(0444,$fn) if $frozen;
         &cacheoff;
         my $fname  = &title2fname($title,"comment.$comid");
         local *FP;
