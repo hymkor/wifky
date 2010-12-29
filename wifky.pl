@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.6_1';
+$::version  = '1.5.6_2';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -1791,6 +1791,7 @@ sub action_cat{
     printf qq(Last-Modified: %s, %02d %s %04d %s GMT\r\n) ,
                 (split(' ',scalar(gmtime((stat(FP))[9]))))[0,2,1,4,3];
     print  qq(\r\n);
+    eval{ alarm(0); };
     print <FP>;
     close(FP);
     exit(0);
