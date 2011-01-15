@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.6_2';
+$::version  = '1.5.6_3';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -209,11 +209,11 @@ sub init_globals{
         );
 
         $::menubar{'900_Sign'} = [
-            &anchor('SignOut',{a=>'signout'},{ref=>'nofollow'}) ,
-            &anchor('ChangeSign',{a=>'passwd'},{ref=>'nofollow'}) ,
+            &anchor('SignOut',{a=>'signout'},{rel=>'nofollow'}) ,
+            &anchor('ChangeSign',{a=>'passwd'},{rel=>'nofollow'}) ,
         ];
         $::menubar{'500_Tools'} = [
-            &anchor('Tools',{a=>'tools'},{ref=>'nofollow'})
+            &anchor('Tools',{a=>'tools'},{rel=>'nofollow'})
         ];
     }else{
         my $p={a=>'signin'};
@@ -222,7 +222,7 @@ sub init_globals{
                 $p->{$key} ||= $val ;
             }
         }
-        $::menubar{'900_SignIn'} = &anchor('SignIn',$p,{ref=>'nofollow'});
+        $::menubar{'900_SignIn'} = &anchor('SignIn',$p,{rel=>'nofollow'});
     }
 
     ### menubar ###
