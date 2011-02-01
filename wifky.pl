@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.6_3';
+$::version  = '1.5.6_4';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -833,7 +833,7 @@ sub print_copyright{} ### deprecate ###
 
 sub is_frozen{
     if( -r &title2fname(  $#_>=0            ? $_[0]
-                        : exists $::form{p} ? $::form{p}
+                        : $::form{p} && length($::form{p})>0 ? $::form{p}
                         : $::config{FrontPage}))
     {
         ! &w_ok();
