@@ -315,7 +315,11 @@ sub action_rss{
                     $item{url} = sprintf('%s?p=%s#p%d',$::me,$pageurl,++$id) ;
                     $item{desc} = [];
                     my $title = &::preprocess($1,$session);
-                    $title =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
+                    if( defined &::unverb ){
+                        &::unverb( \$title );
+                    }else{
+                        $title =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
+                    }
                     $title =~ s/\<[^\>]*\>\s*//g;
                     $item{title} = &::denc($title);
                 }
