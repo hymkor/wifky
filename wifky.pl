@@ -2327,11 +2327,19 @@ sub preprocess_plugin{
     &preprocess_plugin_after( $$text );
 }
 
+sub preprocess_rawurl_sub{
+    my $u=shift;
+    if( $u =~ /\.gif$/i || $u =~ /\.jpe?g$/i || $u =~ /\.png$/ ){
+        &verb(qq'<img src="$u" />');
+    }else{
+        &verb(qq'<a href="$u"$::target>$u</a>');
+    }
+}
 sub preprocess_rawurl{
     my $text=shift;
     $$text = " $$text";
     $$text =~ s/([^-\"\>\w\.!~'\(\);\/?\@&=+\$,%#])($::RXURL)/
-        $1.&verb(sprintf('<a href="%s"%s>',$2,$::target)).$2.'<\/a>'/goe;
+        $1.&preprocess_rawurl_sub($2)/goe;
     substr($$text,0,1)='';
 }
 
