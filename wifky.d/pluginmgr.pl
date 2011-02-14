@@ -5,7 +5,7 @@ package wifky::pluginmgr;
 
 # use strict;use warnings; 
 
-my $version='1.1';
+my $version='1.2';
 
 -d 'plugins/.' or mkdir('plugins',0755) or die('can not mkdir plugins directory');
 
@@ -128,6 +128,44 @@ $::action_plugin{'pluginmgr_erase'} = sub {
 };
 
 ###
+### Plugin Downloader
+###
+
+$::action_plugin{'pluginmgr_download'} = sub {
+    if( defined &::is_signed ){
+        goto &::action_signin unless &::is_signed();
+    }else{
+        &::ninsho();
+    }
+    my $fn=$::form{target};
+    local *FP;
+    unless( $fn =~ /^([0-9a-f][0-9a-f])+$/ && open(FP,"./plugins/$fn") ){
+        die("!Invalied plugin-filename $fn!");
+    }
+    binmode(STDOUT);
+
+    my $attach = pack('h*',$fn);
+
+    if( $ENV{HTTP_USER_AGENT} =~ /Fire/  ||
+        $ENV{HTTP_USER_AGENT} =~ /Opera/ ){
+        printf qq(Content-Disposition: attachment; filename*=%s''%s\r\n),
+            $::charset , $attach ;
+    }else{
+        printf qq(Content-Disposition: attachment; filename=%s\r\n),
+            &::percent($attach);
+    }
+    print  qq(Content-Type: text/plain\r\n);
+    printf qq(Content-Length: %d\r\n),( stat(FP) )[7];
+    printf qq(Last-Modified: %s, %02d %s %04d %s GMT\r\n) ,
+                (split(' ',scalar(gmtime((stat(FP))[9]))))[0,2,1,4,3];
+    print  qq(\r\n);
+    eval{ alarm(0); };
+    print <FP>;
+    close(FP);
+    exit(0);
+};
+
+###
 ### Plugin Manager Menu
 ###
 
@@ -168,16 +206,18 @@ HTML
     , $::postme , $::charset );
     foreach my $p (@plugins){
         my @stat=stat('plugins/'.$p->{hexnm});
-        &::putenc('<div><input type="checkbox" name="%s" value="1"%s><strong>%s</strong> (installed on %s)</em></div>'
+        &::putenc('<div><input type="checkbox" name="%s" value="1"%s><a href="%s?a=pluginmgr_download&amp;target=%s">%s</a> (installed on %s)</em></div>'
             , $p->{key} 
             , $::config{$p->{key}} ? ' checked':''
+            , $::me
+            , unpack('h*',$p->{name})
             , $p->{name} 
             , scalar(localtime($stat[9]))
         );
     }
     foreach my $nm ( sort grep(/\.pl$/,&::directory() )){
         my @stat=stat($nm);
-        &::putenc('<input type="checkbox" checked disabled><strong>%s</strong> (hand-installed on %s)<br>'
+        &::putenc('<input type="checkbox" checked disabled>%s (hand-installed on %s)<br>'
             , $nm , scalar(localtime($stat[9])) );
     }
     &::putenc(<<HTML
