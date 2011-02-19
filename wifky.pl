@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.6_4';
+$::version  = '1.5.7_0';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -626,9 +626,9 @@ sub is{ $::config{$_[0]} && $::config{$_[0]} ne 'NG' ; }
 
 sub form_mode{
     if( $::config{archivemode} ){
-        &puts('<div class="archivemode">archive mode</div>');
+        &puts('<div style="clear:both" class="archivemode">archive mode</div>');
     }else{
-        &puts('<div class="noarchivemode">no archive mode</div>');
+        &puts('<div style="clear:both" class="noarchivemode">no archive mode</div>');
     }
 }
 sub form_label{
