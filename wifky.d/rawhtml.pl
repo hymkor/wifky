@@ -2,7 +2,7 @@ package Wifky::MacroPlugin;
 
 # use strict; use warnings;
 
-my $version='2.1';
+my $version='2.2';
 my $rows=8;
 
 my $pref=[];
@@ -33,7 +33,7 @@ for my $i (0..$maxn){
         $::inline_plugin{$name} = sub{ 
             my $html=$code;
             $html =~ s/\$(\w~?)/&macro_param($1,@_)/ge;
-            $html;
+            &::verb($html);
         };
     }
 }
@@ -53,7 +53,7 @@ $::inline_plugin{html} = sub{
 
     my $html=$::config{"htmlcode_$no"};
     $html =~ s/\$(\w~?)/&macro_param($1,@_)/ge;
-    $html;
+    &::verb($html);
 };
 
 ### insert header ###
