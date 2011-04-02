@@ -1519,8 +1519,10 @@ sub do_index{
         main  => sub{
             &begin_day('IndexPage');
             &do_index_header_();
-            &puts( &anchor(' Last Modified Time' , { a=>$t } ) .
-                    '&nbsp;&nbsp;&nbsp;' . &anchor('Page Title' , { a=>$n } ) .
+            my %tag;
+            $tag{tag}=$::form{tag} if exists $::form{tag};
+            &puts( &anchor(' Last Modified Time' , { a=>$t , %tag } ) .
+                    '&nbsp;&nbsp;&nbsp;' . &anchor('Page Title' , { a=>$n , %tag } ) .
                     '</tt></li>' . &ls(@param) . '</ul>' );
             &do_index_footer_();
             &end_day();
