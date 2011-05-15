@@ -22,8 +22,8 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.1.0_3';
-my ($nextday , $prevday , $nextmonth , $prevmonth , $startday , $endday );
+my $version='1.1.1_0';
+my ($nextday_url , $prevday_url , $nextmonth_url , $prevmonth_url , $startday_url , $endday_url );
 
 if( exists $::menubar{'200_New'} ){
     my @now=localtime();
@@ -38,18 +38,11 @@ if( exists $::menubar{'200_New'} ){
 }
 
 $::inline_plugin{'nikky.pl_version'} = sub{ "nikky.pl $version" };
-$::inline_plugin{lastdiary}=\&lastdiary;
-$::inline_plugin{olddiary}=\&olddiary;
-$::inline_plugin{newdiary}=\&newdiary;
-$::inline_plugin{recentdiary}=\&recentdiary;
-$::inline_plugin{referer}=\&referer;
-$::inline_plugin{calender}= \&calender;
-$::inline_plugin{prevday}=\&prevday;
-$::inline_plugin{nextday}=\&nextday;
-$::inline_plugin{prevmonth}=\&prevmonth;
-$::inline_plugin{nextmonth}=\&nextmonth;
-$::inline_plugin{startday}=\&startday;
-$::inline_plugin{endday}=\&endday;
+$::inline_plugin{referer}     = \&inline_referer;
+$::inline_plugin{prevday}     = \&inline_prevday;
+$::inline_plugin{nextday}     = \&inline_nextday;
+$::inline_plugin{startday}    = \&inline_startday;
+$::inline_plugin{endday}      = \&inline_endday;
 $::inline_plugin{a_nikky} = sub {
     qq(<a href="$::me?a=nikky">) .  join(' ',@_[1..$#_]) . '</a>';
 };
@@ -59,10 +52,8 @@ $::inline_plugin{nikky_comment} = sub {
 };
 $::inline_plugin{nikky_referer} = sub {
     (defined $::form{p} && $::form{p} =~ /^\(\d\d\d\d\.\d\d.\d\d\)/ )
-    ? &wifky::nikky::referer(@_) : '';
+    ? &wifky::nikky::inline_referer(@_) : '';
 };
-
-$::action_plugin{rss} = \&action_rss ;
 
 $::form{a}='date' if $::form{date};
 
@@ -138,8 +129,10 @@ unshift( @::copyright ,
 &init();
 
 sub concat_article{
+    # 引数で与えられた「ページ名」を全て Footer 付きで連結して出力する。
+    # undef なページ名・本文が存在しないページは無視する。
     foreach my $p (@_){
-        next unless -f $p->{fname};
+        next unless defined $p && -f $p->{fname};
         my $pagename=$p->{title};
         &::puts('<div class="day">');
         &::putenc('<h2><span class="title"><a href="%s">%s</a></span></h2><div class="body">',
@@ -151,33 +144,34 @@ sub concat_article{
     }
 }
 
-sub lastdiary{
+$::inline_plugin{lastdiary} = sub {
     local $::inline_plugin{lastdiary}=sub{};
     local $::print='';
     my $days = $#_ >= 1 ? $_[1] : 3;
     my @list=&::ls_core( {} , '(????.??.??)*' );
     my @tm=localtime(time+24*60*60);
     my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
-    &concat_article( &lastN($days,grep( $_->{title} lt $tomorrow && -f $_->{fname} , @list )));
+    my @list=grep{ $_->{title} lt $tomorrow && -f $_->{fname} } @list;
+    &concat_article( reverse @list[-3 .. -1] );
 
     $::print;
-}
+};
 
-sub olddiary{
+$::inline_plugin{olddiary} = sub {
     local $::inline_plugin{olddiary}=sub{};
     local $::print='';
-    &concat_article( &firstN($#_ >0 ? $_[1] : 3 ,@nikky) );
+    &concat_article( @nikky[0.. (($_[1]||3)-1) ] );
     $::print;
-}
+};
 
-sub newdiary{
+$::inline_plugin{newdiary} = sub {
     local $::inline_plugin{newdiary}=sub{};
     local $::print='';
-    &concat_article( &lastN($#_ >= 1 ? $_[1] : 3,@nikky));
+    &concat_article( reverse @nikky[-($_[1]||3)..-1] );
     $::print;
-}
+};
 
-sub recentdiary{
+$::inline_plugin{recentdiary} = sub {
     my ($session,$day)=@_;
     my @list=&::ls_core({ r=>1 , number=>$day } , '(????.??.??)*' );
     if( $#list >= 0 ){
@@ -188,9 +182,9 @@ sub recentdiary{
     }else{
         '';
     }
-}
+};
 
-sub referer{
+sub inline_referer{
     my $session=shift;
     my @exclude=@_;
     my @title=($::form{p} || 'FrontPage' , 'referer.txt' );
@@ -224,7 +218,7 @@ sub referer{
     }
 };
 
-sub action_rss{
+$::action_plugin{rss}= sub {
     $::me = 'http://' . (
                     defined $ENV{'HTTP_HOST'}
                   ? $ENV{'HTTP_HOST'}
@@ -399,6 +393,7 @@ sub action_rss{
     exit(0);
 };
 
+## foo=>bar... を <foo>bar</foo> という形式に直して、標準出力に出す.
 sub printag{
     my %tags=(@_);
     while( my ($tag,$val)=each %tags){
@@ -407,6 +402,7 @@ sub printag{
 }
 
 sub init{
+    ### @nikky,%nikky の初期化 ###
     my $seq=0;
     @nikky = map{
         my $title = $_->{title};
@@ -416,11 +412,12 @@ sub init{
 
     my $nextnikky;
     my $prevnikky;
-    if( exists $::form{date} && $::form{date} =~ /^(\d{4})(\d\d)(\d\d)?$/ ){
-        if( defined $3 ){ ### YYYYMMDD
+    ### アクションプラグインとしての指定が検出された時
+    if( $::form{date} && $::form{date} =~ /^(\d{4})(\d\d)(\d\d)?$/ ){
+        if( defined $3 ){ ### date=YYYYMMDD の時
             my $ymd=sprintf('(%4s.%2s.%2s)',$1,$2,$3);
             my @region = grep(substr($_->{title},0,12) eq $ymd, @nikky);
-            set_view_thosenikky(
+            &set_action_plugin(
                 title  => $ymd ,
                 action => 'date' ,
                 region => \@region ,
@@ -428,10 +425,10 @@ sub init{
                 next   => \$nextnikky ,
             );
             $::form{a} = 'date';
-        }else{ ### YYYYMM
+        }else{ ### date=YYYYMM の時
             my $ymd=sprintf('(%4s.%2s.',$1,$2);
             my @region=grep(substr($_->{title},0,9) eq $ymd, @nikky);
-            &set_view_thosenikky(
+            &set_action_plugin(
                 title  => sprintf('(%04s.%02s)',$1,$2) ,
                 action => 'date' ,
                 region => \@region ,
@@ -441,11 +438,13 @@ sub init{
             $::form{a} = 'date';
         }
     }elsif( exists $::form{a} && $::form{a} eq 'nikky' ){
+        # 明示的に a=nikky と指定された時
         my @tm=localtime(time+24*60*60);
         my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
         my $days = &nvl($::config{nikky_days},3); 
-        my @region=&lastN($days,grep($_->{title} lt $tomorrow , @nikky));
-        &set_view_thosenikky(
+        my @region=grep{ $_->{title} lt $tomorrow } @nikky;
+        @region=reverse grep{ defined $_ } @region[ -($days) .. -1 ];
+        &set_action_plugin(
             action => 'nikky' ,
             region => \@region ,
             prev   => \$prevnikky ,
@@ -458,13 +457,15 @@ sub init{
     }else{
         $prevnikky = $nikky[ $#nikky ];
     }
+
+    ### <link>属性に前後関係を記述 ###
     if( $prevnikky ){
-        $prevday = &::title2url($prevnikky->{title});
-        push(@::html_header, sprintf('<link rel="next" href="%s">' , $prevday ) );
+        $prevday_url = &::title2url($prevnikky->{title});
+        push(@::html_header, sprintf('<link rel="next" href="%s">' , $prevday_url ) );
     }
     if( $nextnikky ){
-        $nextday = &::title2url($nextnikky->{title});
-        push( @::html_header , sprintf('<link ref="prev" href="%s">' ,$nextday ) );
+        $nextday_url = &::title2url($nextnikky->{title});
+        push( @::html_header , sprintf('<link ref="prev" href="%s">' ,$nextday_url ) );
     }
 
     my $p=$::form{p};
@@ -474,26 +475,21 @@ sub init{
         my @tm=localtime(time);
         $p = sprintf( "(%04d.%02d.%02d)\xFF", 1900+$tm[5], 1+$tm[4], $tm[3] );
     }
+
+    ### 月初・月末の URL を作成する.
     my $month_first=substr($p,0,9).'00)';
     my $month_end  =substr($p,0,9).'99)';
+    my ($p,$n);
     foreach(@nikky){
-        $prevmonth   = $_ if $_->{title} lt $month_first;
-        $nextmonth ||= $_ if $_->{title} gt $month_end  ;
+        $p   = $_ if $_->{title} lt $month_first;
+        $n ||= $_ if $_->{title} gt $month_end  ;
     }
-    $prevmonth = &::title2url($prevmonth->{title}) if $prevmonth;
-    $nextmonth = &::title2url($nextmonth->{title}) if $nextmonth;
-    if( defined(%::menubar) ){
-        $::menubar{'050_prevday'} = &prevday();
-    }else{
-        unshift(@::menubar,&prevday);
-    }
-    if( defined(%::menubar) ){
-        $::menubar{'950_nextday'} = &nextday();
-    }else{
-        push(@::menubar,&nextday);
-    }
-    $startday = &::title2url($nikky[ 0]->{title}) if @nikky;
-    $endday   = &::title2url($nikky[-1]->{title}) if @nikky;
+    $prevmonth_url = &::title2url($p->{title}) if $p;
+    $nextmonth_url = &::title2url($n->{title}) if $n;
+    $::menubar{'050_prevday'} = &inline_prevday();
+    $::menubar{'950_nextday'} = &inline_nextday();
+    $startday_url = &::title2url($nikky[ 0]->{title}) if @nikky;
+    $endday_url   = &::title2url($nikky[-1]->{title}) if @nikky;
 }
 
 sub date_anchor{
@@ -505,13 +501,19 @@ sub date_anchor{
     : qq(<span class="no${xxxxday}">$symbol</span>) ;
 }
 
-sub prevday  { &date_anchor('prevday'  ,$prevday ,'<' , $_[1]); }
-sub nextday  { &date_anchor('nextday'  ,$nextday ,'>' , $_[1]); }
-sub prevmonth{ &date_anchor('prevmonth',$prevmonth ,'<<', $_[1]); }
-sub nextmonth{ &date_anchor('nextmonth',$nextmonth ,'>>', $_[1]); }
-sub startday { &date_anchor('startday' ,$startday  ,'|' , $_[1]); }
-sub endday   { &date_anchor('endday'   ,$endday    ,'|' , $_[1]); }
+sub inline_prevday  { &date_anchor('prevday'  ,$prevday_url ,'<' , $_[1]); }
+sub inline_nextday  { &date_anchor('nextday'  ,$nextday_url ,'>' , $_[1]); }
 
+$::inline_plugin{prevmonth} = sub {
+    &date_anchor('prevmonth',$prevmonth_url ,'<<', $_[1]); 
+};
+$::inline_plugin{nextmonth} = sub {
+    &date_anchor('nextmonth',$nextmonth_url ,'>>', $_[1]);
+};
+sub inline_startday { &date_anchor('startday' ,$startday_url  ,'|' , $_[1]); }
+sub inline_endday   { &date_anchor('endday'   ,$endday_url    ,'|' , $_[1]); }
+
+### 新規にっき作成 ###
 $::action_plugin{today} = sub {
     my @tm = localtime;
     &::print_header( divclass=>'max' );
@@ -527,7 +529,8 @@ $::action_plugin{today} = sub {
     &::print_footer;
 };
 
-sub query_wday { ### query week day.
+### カレンダー関連 ###
+sub query_wday { 
     my ($y,$m) = @_;
     my ($zy,$zm)=( $m<=2 ? ($y-1,12+$m) : ($y,$m) );
 
@@ -574,7 +577,7 @@ sub query_current_month{
     @r;
 }
 
-sub calender{
+$::inline_plugin{calender} = sub {
     my $session=shift;
     my ($y,$m,$today) = &query_current_month();
     my $mode;
@@ -601,7 +604,7 @@ sub calender{
     if( defined($mode) && $mode eq 'f' ) {
         my $buffer = sprintf(
             '<div class="calender_flat"><span class="calender_header">%s%s %s/</span>'
-            , &startday()
+            , &inline_startday()
             , $::inline_plugin{prevmonth}->($session)
             , $title
         );
@@ -611,16 +614,16 @@ sub calender{
         }
         $buffer . sprintf( '<span class="calender_footer">%s%s</span></div>'
             , $::inline_plugin{nextmonth}->($session)
-            , &endday()
+            , &inline_endday()
         );
     }else{
         my $buffer = sprintf(
             '<table class="calender"><caption>%s%s %s %s%s</caption><tr nowrap>%s'
-            , &startday()
+            , &inline_startday()
             , $::inline_plugin{prevmonth}->($session)
             , $title
             , $::inline_plugin{nextmonth}->($session)
-            , &endday()
+            , &inline_endday()
             , '<td></td>'x $wday
         );
         foreach my $d (1..$max_mdays){
@@ -632,14 +635,14 @@ sub calender{
         }
         $buffer . '<td></td>'x( 7-$wday ) . '</tr></table>';
     }
-}
+};
 
 sub stamp_format{
     sprintf("%s, %02d %s %04d %s GMT",
         (split(/\s+/,gmtime( $_[0] )))[0,2,1,4,3]);
 }
 
-$::inline_plugin{'archives'} = sub {
+$::inline_plugin{archives} = sub {
     my (undef,$backMonths)=@_;
 
     my $startym='1900.00';
@@ -669,7 +672,7 @@ $::inline_plugin{'archives'} = sub {
     $html . '</ul>';
 };
 
-$::inline_plugin{'packedarchives'} = sub {
+$::inline_plugin{packedarchives} = sub {
     my %diary;
     for my $fn ( &::list_page() ){
         if( &::fname2title($fn) =~ /^\((\d+)\.(\d\d)\.\d\d\)/ ){
@@ -689,7 +692,7 @@ $::inline_plugin{'packedarchives'} = sub {
 
 sub year_and_month{
     my ($y,$m)=@_;
-    if( &::is('nikky_calendertype') ){
+    if( $::config{nikky_calendertype} ){
         sprintf('%s %d' , ( qw/January February March April May June July 
                             August September October November December/ )[$m-1],$y);
     }else{
@@ -706,31 +709,27 @@ sub nvl{
     }
 }
 
-sub firstN{
-    my $n=shift; grep( $n-- > 0 , @_ );
-}
+sub set_action_plugin{
+    # a=date や a=nikky 等のアクションプラグイン登録を行う
+    # in
+    #   action => プラグイン名
+    #   region => 表示範囲の配列への参照
+    #   title  => <title> に書くタイトル
+    # out
+    #   prev   =>「<<」につながるページ構造体の代入先
+    #   next   =>「>>」につながるページ構造体の代入先
 
-sub lastN{
-    my @result;
-    my $n=shift;
-    push(@result,pop(@_)) while( $n-- > 0 && @_ );
-    @result;
-}
-
-sub set_view_thosenikky{
     my %o=@_;
-
-    my ($prevnikky,$nextnikky);
-    my $max=-1;
-    my $min=$#nikky+1;
+    my $region_max=-1;
+    my $region_min=$#nikky+1;
     for( @{$o{region}} ){
-        $max = $_->{seq} if $_->{seq} > $max;
-        $min = $_->{seq} if $_->{seq} < $min;
+        $region_max = $_->{seq} if $_->{seq} > $region_max;
+        $region_min = $_->{seq} if $_->{seq} < $region_min;
     }
-    ${$o{next}} = $nikky[ $max + 1 ] if $max < $#nikky ;
-    ${$o{prev}} = $nikky[ $min - 1 ] if $min > 0;
-    $::action_plugin{$o{action}} = sub {
-        if( defined &::print_template ){
+    ${$o{next}} = $nikky[ $region_max + 1 ] if $region_max < $#nikky ;
+    ${$o{prev}} = $nikky[ $region_min - 1 ] if $region_min > 0;
+    if( exists $o{action} ){
+        $::action_plugin{$o{action}} = sub {
             &::print_template(
                 template => $wifky::nikky::template ,
                 Title => $o{title} || '',
@@ -738,16 +737,7 @@ sub set_view_thosenikky{
                     &concat_article( @{$o{region}} );
                 }
             );
-        }else{
-            if( $o{title} ){
-                &::print_header( userheader=>'YES' , title=> $o{title}  );
-            }else{
-                &::print_header( userheader=>'YES' );
-            }
-            &concat_article( @{$o{region}} );
-            &::puts(qq(<div class="copyright footer">),@::copyright,'</div>');
-            &::print_sidebar_and_footer;
-        }
-    } if exists $o{action};
+        }; 
+    }
 }
 1;
