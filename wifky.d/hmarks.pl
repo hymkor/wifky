@@ -1,7 +1,7 @@
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.6_0";
+my $version="1.7_0";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -71,7 +71,13 @@ sub marking{
     my $bookmark_url = &::myurl( { p=>$session->{title} } , $sharp||'' );
     (my $bookmark_entry_url = $bookmark_url)=~s/\#/\%23/g;
 
-    $title ||= $session->{title};
+    if( defined $title ){
+        $title = &::preprocess($title);
+        &::unverb( \$title );
+        $title =~ s/\<.*?\>//g;
+    }else{
+        $title = $session->{title};
+    }
     $title =~ s/^ +//;
     my $fulltitle = $::config{sitename} . ' - ' . $title;
 
