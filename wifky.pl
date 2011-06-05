@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.7_0';
+$::version  = '1.5.8_0';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -205,6 +205,7 @@ sub init_globals{
             &anchor('Sidebar',{p=>'Sidebar'}) ,
             &anchor('Header' ,{p=>'Header'}) ,
             &anchor('Footer' ,{p=>'Footer'}) ,
+            &anchor('Footest',{p=>'Footest'}) ,
             &anchor('CSS'    ,{p=>$::config{CSS}} ) ,
         );
 
@@ -336,6 +337,9 @@ sub init_globals{
                 </div>
             </div>
             <div class="autopagerize_insert_before"></div>
+            <div class="footest">
+                %{Footest}
+            </div>
             <div class="copyright footer">
                 &{copyright}
             </div><!-- copyright -->
@@ -2065,6 +2069,7 @@ sub plugin_outline{
             foreach my $p( @::outline ){
                 next if $p->{title} eq 'Header' ||
                         $p->{title} eq 'Footer' ||
+                        $p->{title} eq 'Footest' ||
                         $p->{title} eq 'Sidebar' ;
 
                 my $diff=$p->{depth} - $depth;
