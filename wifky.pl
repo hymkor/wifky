@@ -1230,6 +1230,17 @@ HEADER
                                   ? ' checked' : '' )
                                 , $p->[1] );
                         }
+                    }elsif( $i->{type} eq 'select' ){
+                        &putenc('%s <select name="config__%s">',$i->{desc}, $i->{name});
+                        foreach my $p (@{$i->{option}}){
+                            &putenc('<option value="%s"%s>%s</option>'
+                                , $p->[0]
+                                , ( defined($::config{$i->{name}}) &&
+                                    $::config{$i->{name}} eq $p->[0]
+                                  ? ' selected' : '' )
+                                , $p->[1] );
+                        }
+                        &puts('</select>');
                     }elsif( $i->{type} eq 'a' ){
                         &putenc('<a href="%s">%s</a><br>',$i->{href},$i->{desc} );
                     }elsif( $i->{type} eq 'rem' ){
