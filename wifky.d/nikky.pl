@@ -694,6 +694,7 @@ $::inline_plugin{packedarchives} = sub {
 };
 
 sub year_and_month{
+    # 設定に応じて、月・日を文字列化する。
     my ($y,$m)=@_;
     if( $::config{nikky_calendertype} ){
         sprintf('%s %d' , ( qw/January February March April May June July 
@@ -704,6 +705,7 @@ sub year_and_month{
 }
 
 sub nvl{
+    # 第一引数が数値なら第一引数、さもなければ第二引数を返す.
     my ($n,$default)=@_;
     if( defined($n) && $n =~ /^\d+$/ ){
         $n;

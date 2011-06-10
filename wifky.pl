@@ -380,15 +380,14 @@ a{ text-decoration:none }
 
 a:hover{ text-decoration:underline }
 
-blockquote{ background-color:#DDF }
+pre,blockquote{ background-color:#DDD ; border:solid 1px #888 }
 
 table.block{ margin-left:1cm ; border-collapse: collapse;}
 
 table.block th,table.block td{ border:solid 1px gray;padding:1pt}
 
 pre{
- background-color:#DDF;
- margin-left: 1cm;
+ margin: 5mm;
  white-space: -moz-pre-wrap; /* Mozilla */
  white-space: -o-pre-wrap; /* Opera 7 */
  white-space: pre-wrap; /* CSS3 */
