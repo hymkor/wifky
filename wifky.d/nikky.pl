@@ -25,7 +25,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.1.1_0';
+my $version='1.1.1_1';
 my ($nextday_url , $prevday_url , $nextmonth_url , $prevmonth_url , $startday_url , $endday_url );
 
 if( exists $::menubar{'200_New'} ){
@@ -150,12 +150,12 @@ sub concat_article{
 $::inline_plugin{lastdiary} = sub {
     local $::inline_plugin{lastdiary}=sub{};
     local $::print='';
-    my $days = $#_ >= 1 ? $_[1] : 3;
+    my $days = &nvl($_[1],3);
     my @list=&::ls_core( {} , '(????.??.??)*' );
     my @tm=localtime(time+24*60*60);
     my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
     my @list=grep{ $_->{title} lt $tomorrow && -f $_->{fname} } @list;
-    &concat_article( reverse @list[-3 .. -1] );
+    &concat_article( reverse( scalar(@list) > $days ? @list[-($days)..-1] : @list) );
 
     $::print;
 };
@@ -163,14 +163,16 @@ $::inline_plugin{lastdiary} = sub {
 $::inline_plugin{olddiary} = sub {
     local $::inline_plugin{olddiary}=sub{};
     local $::print='';
-    &concat_article( @nikky[0.. (($_[1]||3)-1) ] );
+    my $days=&nvl($_[1],3);
+    &concat_article( scalar(@nikky) > $days ? @nikky[0..($days-1)] : @nikky );
     $::print;
 };
 
 $::inline_plugin{newdiary} = sub {
     local $::inline_plugin{newdiary}=sub{};
     local $::print='';
-    &concat_article( reverse @nikky[-($_[1]||3)..-1] );
+    my $days=&nvl($_[1],3);
+    &concat_article( reverse(scalar(@nikky) > $days ? @nikky[-($days)..-1] : @nikky) );
     $::print;
 };
 
@@ -446,8 +448,7 @@ sub init{
         my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
         my $days = &nvl($::config{nikky_days},3); 
         my @region=grep{ $_->{title} lt $tomorrow } @nikky;
-        @region=reverse grep{ defined $_ } 
-            ( scalar(@region) > $days ?  @region[ -($days) .. -1 ] : @region );
+        @region=reverse(scalar(@region) > $days ? @region[-($days) .. -1] : @region);
         &set_action_plugin(
             action => 'nikky' ,
             region => \@region ,
