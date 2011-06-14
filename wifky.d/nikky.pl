@@ -446,7 +446,8 @@ sub init{
         my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
         my $days = &nvl($::config{nikky_days},3); 
         my @region=grep{ $_->{title} lt $tomorrow } @nikky;
-        @region=reverse grep{ defined $_ } @region[ -($days) .. -1 ];
+        @region=reverse grep{ defined $_ } 
+            ( scalar(@region) > $days ?  @region[ -($days) .. -1 ] : @region );
         &set_action_plugin(
             action => 'nikky' ,
             region => \@region ,
