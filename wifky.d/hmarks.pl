@@ -1,7 +1,7 @@
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.8_0";
+my $version="1.8_1";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -99,7 +99,7 @@ sub marking{
             , $::config{hmark_bookmark_style} || 'standard' ) .
         # [Twitter mark]
         sprintf(
-            ' <a href="http://twitter.com/share" class="twitter-share-button" data-url="%s" data-text="&quot;%s&quot;" data-count="%s" %s data-lang="ja">Tweet</a><script type="text/javascript" src="http://platform.twitter.com/widgets.js"></script>'
+            ' <a href="http://twitter.com/share" class="twitter-share-button" data-url="%s" data-text="&quot;%s&quot;" data-count="%s" %s data-lang="ja">Tweet</a><script type="text/javascript" charset="utf-8" src="http://platform.twitter.com/widgets.js"></script>'
             , &::enc($tweet_url)
             , &::enc($fulltitle)
             , $::config{hmark_tweet_style} || 'none'
