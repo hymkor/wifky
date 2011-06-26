@@ -391,7 +391,6 @@ span.frozen{ font-size:80% ; color:#008 ; font-weight:bold }
 HERE
     &title2fname(".Header") => <<HERE ,
 ((menubar))
-
 ! ((sitename))
 HERE
     );
@@ -2429,7 +2428,7 @@ sub call_block{
         }elsif( $line =~ /^\/\// ){
             $line = shift(@line);
         }else{
-            &puts(&preprocess($line,$session),'<br />');
+            &puts('<div>'.&preprocess($line,$session),'</div>');
             $line = shift(@line);
         }
     }
