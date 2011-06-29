@@ -252,6 +252,8 @@ sub init_globals{
         '*General Options*' => [
             { desc=>'Debug mode' , name=>'debugmode' , type=>'checkbox' } ,
             { desc=>'Archive mode' , name=>'archivemode' , type=>'checkbox' } ,
+            { desc=>'Convert CRLF to <br>' ,
+              name=>'autocrlf' , type=>'checkbox' } ,
             { desc=>'The sitename', name=>'sitename', size=>40 },
             { desc=>'Enable link to file://...', name=>'locallink' ,
               type=>'checkbox' },
@@ -337,6 +339,22 @@ sub init_globals{
             </div><!-- copyright -->
         </div><!-- max -->
         &{message}';
+    
+    $::edit_template ||= '
+        <div class="main">
+            <div class=".Header">
+                &{menubar}
+                <h1>&{Title}</h1>
+            </div><!-- .Header -->
+            &{main}
+            <div class="copyright footer">
+                &{copyright}
+            </div><!-- copyright -->
+        </div><!-- main -->
+        <div class="sidebar">
+            %{.Help}
+        </div>
+        &{message}';
 
     %::default_contents = (
         &title2fname('CSS') => <<'HERE' ,
@@ -391,7 +409,86 @@ span.frozen{ font-size:80% ; color:#008 ; font-weight:bold }
 HERE
     &title2fname(".Header") => <<HERE ,
 ((menubar))
-! ((sitename))
+!!!! ((sitename))
+HERE
+    &title2fname(".Help") => <<HERE ,
+!!! 書き方
+
+!! 任意のURLへのリンク
+
+ [テキスト|URL]
+
+!! Wikiページへのリンク
+
+ [[ページ名]]
+
+!! 文字修飾
+
+ ''イタリック''
+ '''ボールド'''
+ ''''倍角表現''''
+ __下線__
+ ==取り消し線==
+ ==取り消し=={訂正}
+
+* 強調はシングルクォート(')です。
+
+!! 見出し
+
+ !!!! 特大見出し(<h1>)
+ !!! 大見出し(<h3>)
+ !! 中見出し(<h4>)
+ ! 小見出し(<h5>)
+
+<h2> はページ名表示のために使われます。
+
+!! 箇条書き
+
+ * アイテム1
+ ** アイテム1.1
+ ** アイテム1.2
+
+!! 箇条書き（数字）
+
+ +その1
+ +その2
+ ++その2.1
+
+!! 表・テーブル
+
+ || 1-1 | 1-2 | 1-3
+ || 2-1 | 2-2 | 2-3
+
+!! 定義
+
+ : 定義
+ :: 説明
+
+!! 引用
+
+ <<
+ 引用テキスト
+ >>
+
+!! 整形済みテキスト
+
+ <<<
+ 整形済みテキスト
+ >>>
+
+* 空白から始まる行も整形済みテキストになります
+
+!! 水平線
+
+ ----
+
+!! コメント
+
+ // コメント
+
+!! 画像・添付ファイル
+
+ ((ref ファイル名))
 HERE
     );
 
@@ -623,7 +720,7 @@ sub form_label{
 }
 
 sub form_textarea{
-    &putenc('<textarea cols="80" rows="20" name="text_t">%s</textarea><br>'
+    &putenc('<textarea style="width:100%" cols="80" rows="20" name="text_t">%s</textarea><br>'
             , ${$_[0]} );
 }
 
@@ -1645,7 +1742,7 @@ sub do_preview{
     my @param=@_;
     my $title = $::form{p};
     &print_template(
-        template => $::system_template ,
+        template => $::edit_template ,
         main=>sub{
             &puts(@param ? '<div class="warning">'.&errmsg($param[0]).'</div>' : '');
             &begin_day('Preview:'.$::form{p} );
@@ -1664,7 +1761,7 @@ sub action_edit{
     my @attachment=&list_attachment($title);
 
     &print_template(
-        template => $::system_template ,
+        template => $::edit_template ,
         Title => 'Edit' ,
         main  => sub {
             &begin_day( $title );
@@ -2395,8 +2492,8 @@ sub call_block{
         }elsif( $line =~ /^!+/ ){
             my $body = $';
             my $level=length($&);
-            if( $level > 1 ){
-                &midashi($level-2,$body,$session);
+            if( $level < 4 ){
+                &midashi(3-$level,$body,$session);
             }else{
                 &midashi(-1,$body,$session);
             }
@@ -2427,9 +2524,48 @@ sub call_block{
             }
         }elsif( $line =~ /^\/\// ){
             $line = shift(@line);
-        }else{
-            &puts('<div>'.&preprocess($line,$session),'</div>');
+        }elsif( $line =~ /^\|\|/ ){
+            &puts('<table class="block">');
+            do{
+                &puts('<tr>');
+                my $body=$';
+                chomp($body);
+                &puts( map{'<td>'.&preprocess($_).'</td>'} split(/\|/,$body) );
+                &puts('</tr>');
+                $line = shift(@line);
+            }while( defined($line) && $line =~ /^\|\|/ );
+            &puts('</table>');
+        }elsif( $line =~ /^:/ ){
+            &puts('<dl>');
+            do{
+                chomp($line);
+                if( $line =~ /^::/ ){
+                    &puts('<dd>'.&preprocess($').'</dd>');
+                }else{
+                    &puts('<dt>'.&preprocess(substr($line,1)).'</dd>');
+                }
+                $line = shift(@line);
+            }while( defined($line) && $line =~ /^:/ );
+        }elsif( $line =~ /^-----*$/ ){
+            &puts('<hr />');
             $line = shift(@line);
+        }else{
+            my $block=$line;
+            for(;;){
+                $line = shift(@line);
+                last if !defined($line) || $line =~ /^[\*\+\!\s\:]/ ||
+                    $line =~ /^&lt;&lt;/ || $line =~ /^\/\// ||
+                    $line =~ /^\|\|/ || $line =~ /^-----*$/ ||
+                    $line =~ /^$/;
+                $block .= '<br />' if $block ne "" && $::config{autocrlf};
+                $block .= $line;
+            }
+            $block = &preprocess($block,$session);
+            if( $block =~ /\A<(\w+).*<\/\1>\Z/ ){
+                &puts( $block );
+            }elsif( $block ne "" ){
+                &puts("<p>$block</p>");
+            }
         }
     }
 }
