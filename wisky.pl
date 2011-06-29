@@ -201,6 +201,7 @@ sub init_globals{
             &anchor('.Header' ,{p=>'.Header'}) ,
             &anchor('.Signature' ,{p=>'.Signature'}) ,
             &anchor('.Footer',{p=>'.Footer'}) ,
+            &anchor('.Help'  ,{p=>'.Help'}) ,
             &anchor('CSS'    ,{p=>$::config{CSS}} ) ,
         );
 
