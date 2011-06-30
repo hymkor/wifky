@@ -1544,7 +1544,7 @@ sub action_comment{
             and die("unable to comment to unexistant page.");
         chmod(0444,$fn) if $frozen;
         &cacheoff;
-        my $fname  = &title2fname($title,"comment.$comid");
+        my $fname  = &title2fname($title,"comment${comid}.txt");
         local *FP;
         open(FP,">>$fname") or die("Can not open $fname for append");
             my @tm=localtime;
@@ -1868,11 +1868,7 @@ sub action_cat{
         printf qq(Content-Disposition: attachment; filename*=%s''%s\r\n),
             $::charset , $attach ;
     }else{
-        if( $::charset eq 'EUC-JP' ){
-            $attach =~ s/([\x80-\xFF])([\x80-\xFF])/&euc2sjis($1,$2)/ge;
-        }else{
-            $attach = &percent($attach);
-        }
+        $attach = &percent($attach);
         printf qq(Content-Disposition: attachment; filename=%s\r\n),$attach;
     }
     print  qq(Content-Type: $type\r\n);
@@ -1884,24 +1880,6 @@ sub action_cat{
     print <FP>;
     close(FP);
     exit(0);
-}
-
-sub euc2sjis{
-    my $c1=ord(shift) & 0x7F;
-    my $c2=ord(shift) & 0x7F;
-    if( $c1 & 1 ){
-        $c2 += 0x1F;
-    }else{
-        $c2 += 0x7D;
-    }
-    if( $c2 >= 0x7F ){
-        ++$c2;
-    }
-    $c1 = ($c1-0x21)/2 + 0x81;
-    if( $c1 > 0x9F ){
-        $c1 += 0x40;
-    }
-    pack("C2",$c1,$c2);
 }
 
 sub cache_update{
@@ -2235,7 +2213,7 @@ sub plugin_comment{
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
                 $caption );
-    for(split(/\r?\n/,&read_text($::form{p} , "comment.$comid"))){
+    for(split(/\r?\n/,&read_text($::form{p} , "comment${comid}.txt"))){
         my ($dt,$who,$say) = split(/\t/,$_,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
         $buf .= sprintf('<p><span class="commentator">%s</span>'.
