@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.8_0';
+$::version  = '1.5.9_0';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -206,6 +206,7 @@ sub init_globals{
             &anchor('Header' ,{p=>'Header'}) ,
             &anchor('Footer' ,{p=>'Footer'}) ,
             &anchor('Footest',{p=>'Footest'}) ,
+            &anchor('Help'   ,{p=>'Help'}) ,
             &anchor('CSS'    ,{p=>$::config{CSS}} ) ,
         );
 
@@ -362,6 +363,22 @@ sub init_globals{
         </div><!-- max -->
         &{message}';
 
+    $::edit_template ||= '
+        <div class="main">
+            <div class=".Header">
+                &{menubar}
+                <h1>&{Title}</h1>
+            </div><!-- .Header -->
+            &{main}
+            <div class="copyright footer">
+                &{copyright}
+            </div><!-- copyright -->
+        </div><!-- main -->
+        <div class="sidebar">
+            %{Help}
+        </div>
+        &{message}';
+
     %::default_contents = (
         &title2fname('CSS') => <<'HERE' ,
 p.centering,big{ font-size:200% }
@@ -417,6 +434,78 @@ HERE
 ((menubar))
 
 !!!! ((sitename))
+HERE
+    &title2fname("Help") => <<HERE ,
+!!! Syntax Help
+
+!! URL Link
+
+```[text|http://example.com//]
+http://example.com/to{text}```
+
+!! Page Link
+
+```[[PageName]]
+>>{PageName}```
+
+!! Text Decoration
+
+```'' Italic ''
+''' Bold '''
+'''' Large-font ''''
+__ Underline __
+== Strike ==
+== DEL =={ INS }
+((br)) line feed```
+
+!! Headline
+
+```!!!! site-name
+
+!!! section-name
+!! subsection-name
+! subsubsectino-name
+
+<< section-name >>
+<<< subsection-name >>>
+<<<< subsubsection-name >>>>
+
+>> Centering and Large-font <<```
+
+!! Itemize
+
+```* item1
+** item1-1
+** item1-2```
+
+!! Enumerate
+
+```+ item1
++ item2
+++ item2-1```
+
+!! Table
+
+```|| 1-1 | 1-2 | 1-3
+|| 2-1 | 2-2 | 2-3```
+
+!! Description
+
+```:item
+::description```
+
+!! Quotation
+
+```6<
+ quotation
+>9```
+
+!! Preformatted text
+
+``8((lt))((br)) preformatted-lines((br))((gt))8``
+
+`|``x` preformatted-words `x``|` ((br))( ``x`` : any charactor)
+
 HERE
     );
 
@@ -648,8 +737,7 @@ sub form_label{
 }
 
 sub form_textarea{
-    &putenc('<textarea cols="80" rows="20" name="text_t">%s</textarea><br>'
-            , ${$_[0]} );
+    &putenc('<textarea style="width:100%%" cols="80" rows="20" name="text_t">%s</textarea><br>' , ${$_[0]} );
 }
 
 sub form_preview_button{
@@ -1670,7 +1758,7 @@ sub do_preview{
     my @param=@_;
     my $title = $::form{p};
     &print_template(
-        template => $::system_template ,
+        template => $::edit_template ,
         main=>sub{
             &puts(@param ? '<div class="warning">'.&errmsg($param[0]).'</div>' : '');
             &begin_day('Preview:'.$::form{p} );
@@ -1689,7 +1777,7 @@ sub action_edit{
     my @attachment=&list_attachment($title);
 
     &print_template(
-        template => $::system_template ,
+        template => $::edit_template ,
         Title => 'Edit' ,
         main  => sub {
             &begin_day( $title );
@@ -2080,7 +2168,8 @@ sub plugin_outline{
                 next if $p->{title} eq 'Header' ||
                         $p->{title} eq 'Footer' ||
                         $p->{title} eq 'Footest' ||
-                        $p->{title} eq 'Sidebar' ;
+                        $p->{title} eq 'Sidebar' ||
+                        $p->{title} eq 'Help';
 
                 my $diff=$p->{depth} - $depth;
                 if( $diff > 0 ){
