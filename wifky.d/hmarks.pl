@@ -1,7 +1,7 @@
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.8_1";
+my $version="1.9_0";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -28,7 +28,9 @@ sub new_midashi{
         $session->{title} ne 'Footer'  &&
         $session->{title} ne 'Sidebar' &&
         $session->{title} ne 'Header'  &&
-        $session->{title} ne 'Footest' )
+        $session->{title} ne 'Footest' &&
+        $session->{title} ne 'Help' &&
+        $session->{title} !~ /^\./ )
     {
         &org_midashi(
             $depth ,
@@ -52,7 +54,9 @@ if( $::config{hmark_each_page} ){
         if( $session->{title} ne 'Footer'  &&
             $session->{title} ne 'Sidebar' &&
             $session->{title} ne 'Header'  &&
-            $session->{title} ne 'Footest' )
+            $session->{title} ne 'Footest' &&
+            $session->{title} ne 'Help'    &&
+            $session->{title} !~ /^\./ )
         {
             &::puts('<div align="right" class="hatenabookmark">'
                 .&marking($session).'</div>' );
