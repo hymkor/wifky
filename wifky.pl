@@ -446,13 +446,22 @@ http://example.com/to{text}```
 !! Page Link
 
 ```[[PageName]]
->>{PageName}```
+[[text|PageName]]
+>>{PageName}
+>>{PageName}{text}```
+
+!! Image or Attachment
+
+```<<{filename}
+<<{filename}{text}```
 
 !! Text Decoration
 
 ```'' Italic ''
 ''' Bold '''
 '''' Large-font ''''
+`` Typewriter ``
+`?` Preformatted `?`
 __ Underline __
 == Strike ==
 == DEL =={ INS }
@@ -502,9 +511,7 @@ __ Underline __
 
 !! Preformatted text
 
-``8((lt))((br)) preformatted-lines((br))((gt))8``
-
-`|``x` preformatted-words `x``|` ((br))( ``x`` : any charactor)
+``8((lt))((br)) preformatted-text((br))((gt))8``
 
 HERE
     );
