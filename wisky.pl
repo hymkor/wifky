@@ -762,9 +762,10 @@ sub form_attachment{
             if( !&is_signed() && ! &w_ok($fn) ){
                 &puts(' disabled');
             }
-            &putenc('><input type="text" name="dummy" readonly value="((ref %s))"
+            &putenc('><input type="text" name="dummy" readonly 
+                    value="((ref &quot;%s&quot;))"
                     size="%d" style="font-family:monospace"
-                    onClick="this.select();">', $attach, length($attach)+8 );
+                    onClick="this.select();">', $attach, length($attach)+10 );
             &puts('('.&anchor('download',{ a=>'cat' , p=>$::form{p} , f=>$attach } ).':' );
             &putenc('%d bytes, at %s', (stat $fn)[7],&mtime($fn));
             &puts(' <span class="frozen">&lt;frozen&gt;</span>') unless &w_ok();
@@ -1626,7 +1627,8 @@ sub action_upload{
     }else{
         &write_file( $fn , \$::form{'newattachment_b'} );
         if( $::form{append_tag} ){
-            $::form{text_t} .= "\n((ref ".$::form{'newattachment_b.filename'}.'))';
+            $::form{text_t} .= 
+                "\n((ref \"".$::form{'newattachment_b.filename'}.'"))';
         }
         &do_preview();
     }
