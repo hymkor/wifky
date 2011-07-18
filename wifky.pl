@@ -1286,7 +1286,7 @@ HEADER
             }
             &puts('</select></form>');
 
-            while( my $section=each %::preferences ){
+            foreach my $section (keys %::preferences){
                 if( $section eq '*General Options*' ){
                     &putenc('<div id="%s" class="section">', $section );
                 }else{
@@ -1717,7 +1717,7 @@ sub do_submit{
     if( &lockdo( sub{
         my $label=$::contents_label{$fn};
         if( defined $label ){
-            while( my (undef,$labelfname)=each %{$label}){
+            foreach my $labelfname (values %{$label}){
                 unlink( $labelfname );
             }
         }
