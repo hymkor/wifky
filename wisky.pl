@@ -276,7 +276,9 @@ sub init_globals{
         ],
     );
     %::inline_syntax_plugin = (
+        '100_innerlink1' => \&preprocess_innerlink1 ,
         '200_innerlink2' => \&preprocess_innerlink2 ,
+        '300_outerlink1' => \&preprocess_outerlink1  ,
         '400_outerlink2' => \&preprocess_outerlink2 ,
         '700_decoration' => \&preprocess_decorations ,
         '800_plugin'     => \&preprocess_plugin ,
@@ -417,11 +419,13 @@ HERE
 
 !! 任意のURLへのリンク
 
- [テキスト|URL]
+ [text|http://example.com/]
+ http://example/{text}
 
 !! Wikiページへのリンク
 
- [[ページ名]]
+ [[text|pagename]]
+ >>{pagename}{text}
 
 !! 文字修飾
 
@@ -2292,10 +2296,21 @@ sub cr2br{
     $s;
 }
 
+sub preprocess_innerlink1{ ### >>{ ... }{ ... } ###
+    my ($text,$session)=@_;
+    $$text =~ s|&gt;&gt;\{([^\}]+)\}(?:\{([^\}]*)\})?|
+        &inner_link($session,defined($2)?$2:$1,$1)|ge;
+}
+
 sub preprocess_innerlink2{ ### [[ ... | ... ] ###
     my ($text,$session)=@_;
     $$text =~ s!\[\[(?:([^\|\]]+)\|)?(.+?)\]\]!
         &inner_link($session,defined($1)?$1:$2,$2)!ge;
+}
+
+sub preprocess_outerlink1{ ### http://...{ ... } style ###
+    ${$_[0]} =~ s!($::RXURL)\{([^\}]+)\}!
+        &verb(sprintf('<a href="%s"%s>',$1,$::target)).$2.'</a>'!goe;
 }
 
 sub preprocess_outerlink2{ ### [...|http://...] style ###
