@@ -21,7 +21,7 @@ if( &::is_signed() ){
         my @attachment=&::list_attachment($title);
 
         &::print_template(
-            template => $::system_template ,
+            template => $::edit_template || $::system_template ,
             Title => 'Edit(load draft)' ,
             main  => sub {
                 &::begin_day( $title );
