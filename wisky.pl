@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -T
 
 use strict; use warnings;
 
@@ -637,12 +637,12 @@ sub deyen{
     $s ;
 }
 
-sub timestamp{
+sub mtimeraw{
     $::timestamp{$_[0]} ||= (-f $_[0] ? ( stat(_) )[9] : 0);
 }
 
 sub mtime{
-    &ymdhms( &timestamp(@_) );
+    &ymdhms( &mtimeraw(@_) );
 }
 
 sub ymdhms{
@@ -1882,7 +1882,7 @@ sub cache_update{
                     title=>$title ,
                     attach=>{} ,
                     label=>{} ,
-                    timestamp => &timestamp($x[0]) ,
+                    timestamp => &mtimeraw($x[0]) ,
                     mtime => &mtime($x[0]) ,
                 };
                 if( $x[1] ){
@@ -1904,6 +1904,10 @@ sub cache_update{
 
 sub etcfiles{
     &cache_update() ; @::etcfiles;
+}
+
+sub directory{
+    &cache_update() ; @::contents;
 }
 
 sub list_page{ ### deprecated ###
