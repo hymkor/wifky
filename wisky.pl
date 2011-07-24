@@ -39,12 +39,12 @@ if( $0 eq __FILE__ ){
 
         &read_form;
         &chdir_and_code;
-        foreach my $pl (sort map(/^([-\w\.]+\.plg)$/ ? $1 : (),&directory) ){
+        foreach my $pl (sort map(/^([-\w\.]+\.plg)$/ ? $1 : (),&etcfiles) ){
             do "./$pl"; die($@) if $@;
         }
         &load_config;
         &init_globals;
-        foreach my $pl (sort map(/^([-\w\.]+\.pl)$/ ? $1 : (),&directory) ){
+        foreach my $pl (sort map(/^([-\w\.]+\.pl)$/ ? $1 : (),&etcfiles) ){
             do "./$pl"; die($@) if $@;
         }
 
@@ -499,7 +499,7 @@ HERE
 
     @::index_columns = (
         sub{ $_[1]->{l} ? '<tt>'.$_[0]->{mtime}.'</tt>' : '' } ,
-        sub{ $_[1]->{i} ? '<tt>'.(1+@{$::contents{ $_[0]->{fname} }}).'</tt>' : '' } ,
+        sub{ $_[1]->{i} ? '<tt>'.(1+scalar(keys %{$_[0]->{attach}})).'</tt>' : '' } ,
         sub{ anchor( &enc($_[0]->{title}) , { p=>$_[0]->{title} } ) } ,
         sub{ $_[1]->{l} ? &label2html($_[0]->{title},'span') : '' } ,
     );
@@ -637,12 +637,12 @@ sub deyen{
     $s ;
 }
 
-sub mtimeraw{
-    $::mtime_cache{$_[0]} ||= (-f $_[0] ? ( stat(_) )[9] : 0);
+sub timestamp{
+    $::timestamp{$_[0]} ||= (-f $_[0] ? ( stat(_) )[9] : 0);
 }
 
 sub mtime{
-    &ymdhms( &mtimeraw(@_) );
+    &ymdhms( &timestamp(@_) );
 }
 
 sub ymdhms{
@@ -653,15 +653,12 @@ sub ymdhms{
 }
 
 sub cacheoff{
-    undef %::mtime_cache;
-    undef @::contents;
+    undef %::timestamp;
+    undef @::etcfiles;
     undef %::contents;
-    undef %::contents_label;
     undef %::label_contents;
 }
-sub title2mtime{
-    &mtime( &title2fname(@_) );
-}
+
 sub fname2title{
     pack('h*',$_[0]);
 }
@@ -714,8 +711,9 @@ sub form_mode{
 sub form_label{
     my $label='';
     if( $::form{a} eq 'edt' ){
-        my $t=$::contents_label{&title2fname($::form{p})};
-        $label = join(' ',keys %{$t}) if defined $t;
+        if( my $p=$::contents{$::form{p}} ){
+            $label = join(' ',keys %{$p->{label}});
+        }
     }else{
         $label = $::form{label_t};
         $label =~ s/ +/ /;
@@ -741,8 +739,8 @@ sub form_signarea{
     &puts('checked') if &is_frozen();
     &puts(' >freeze');
 
-    my $fname=&title2fname( $::form{p} );
-    if( &mtimeraw($fname) ){
+    my $p=$::contents{ $::form{p} };
+    if( $p && $p->{timestamp} ){
         &puts('<input type="checkbox" name="sage" value="1">sage');
     }
 }
@@ -893,24 +891,6 @@ a.page_not_found{
                      source=>\$::default_contents{ &title2fname('.Header')} );
     }
 }
-
-sub print_footer{ ### deprecate ###
-    if( $::flag{userheader} ){
-        return if $::flag{userheader} eq 'template';
-        &puts('<div class="copyright footer">',@::copyright,'</div>') if @::copyright;
-        &puts('</div><!-- main --><div class="sidebar">');
-        &print_page( title=>'.Sidebar' );
-    }
-    &puts('</div>');
-    &puts( $messages ) if $::config{debugmode} && $messages;
-    &puts('</body></html>');
-}
-
-sub print_sidebar_and_footer{ ### deprecate ###
-    @::copyright=();
-    &print_footer();
-}
-sub print_copyright{} ### deprecate ###
 
 sub is_frozen{
     if( -r &title2fname(  $#_>=0            ? $_[0]
@@ -1380,11 +1360,12 @@ sub action_rename{
         die("!The new page name '$newtitle' is already used.!") if -f $newfname;
 
         my @list = map {
-            my $older="${fname}__$_" ;
-            my $newer="${newfname}__$_";
+            my $aname=unpack('h*',$_);
+            my $older="${fname}__${aname}" ;
+            my $newer="${newfname}__${aname}";
             die("!The new page name '$newtitle' is already used.!") if -f $newer;
             [ $older , $newer ];
-        } @{$::contents{$fname}};
+        } keys %{$::contents{$title}->{attach}};
 
         rename( $fname , $newfname );
         rename( $_->[0] , $_->[1] ) foreach @list;
@@ -1455,14 +1436,15 @@ sub action_seek{
             &begin_day( qq(Seek: "$keyword") );
             &do_index_header_();
             &puts(' Last Modified Time&nbsp;Page Title</tt></li>');
-            foreach my $fn ( &list_page() ){
-                my $title  = &fname2title( $fn );
+            foreach my $p ( values %::contents ){
+                my $title = $p->{title};
+                my $fname = $p->{fname};
                 if( index($title ,$keyword) >= 0 ){
-                    &action_seek_found_($title,$fn);
-                }elsif( open(FP,$fn) ){
+                    &action_seek_found_($title,$fname);
+                }elsif( open(FP,$fname) ){
                     while( <FP> ){
                         if( index($_,$keyword) >= 0 ){
-                            &action_seek_found_($title,$fn);
+                            &action_seek_found_($title,$fname);
                             last;
                         }
                     }
@@ -1490,7 +1472,7 @@ sub select_attachment_do{
 }
 
 sub select_clipboard{
-    map{ /^__((?:[0-9a-f][0-9a-f])+)/ ? $1 : () } @::contents; 
+    map{ /^__((?:[0-9a-f][0-9a-f])+)/ ? $1 : () } @::etcfiles; 
 }
 
 sub action_cut{
@@ -1681,7 +1663,7 @@ sub lockdo{
 sub do_submit{
     my $title=$::form{p};
     my $fn=&title2fname($title);
-    my $sagetime=&mtimeraw($fn);
+    my $p=$::contents{$title};
 
     chmod(0644,$fn) if &is_frozen();
 
@@ -1689,11 +1671,10 @@ sub do_submit{
     if( $::form{text_t} ne $::form{orgsrc_t}  &&  $::config{archivemode} ){
         &archive();
     }
-    cache_update() unless %::contents_label;
+    cache_update() unless %::contents;
     if( &lockdo( sub{
-        my $label=$::contents_label{$fn};
-        if( defined $label ){
-            foreach my $labelfname (values %{$label}){
+        if( $p ){
+            foreach my $labelfname (values %{$p->{label}}){
                 unlink( $labelfname );
             }
         }
@@ -1711,8 +1692,8 @@ sub do_submit{
         if( $::form{to_freeze} ){
             chmod(0444,$fn);
         }
-        if( $::form{sage} ){
-            utime($sagetime,$sagetime,$fn)
+        if( $::form{sage} && $p ){
+            utime($p->{timestamp},$p->{timestamp},$fn)
         }
         &transfer_page();
     }else{
@@ -1781,10 +1762,11 @@ sub action_edit{
 
 sub label2html{
     my ($title,$tag)=@_;
-    my $t=$::contents_label{&title2fname($title)};
-    if( defined $t ){
+    my $p=$::contents{$title};
+    if( $p && $p->{label} ){
         qq{ <$tag class="tag">} .
-        join(' ',map{ &anchor(&enc($_),{ tag=>$_,a=>'index'},{ class=>'tag'}) } keys %{$t}) .
+        join(' ',map{ &anchor(&enc($_),{ tag=>$_,a=>'index'},{ class=>'tag'}) }
+            keys %{$p->{label}}) .
         "</$tag> ";
     }else{
         '';
@@ -1892,41 +1874,50 @@ sub cache_update{
     unless( defined(%::contents) ){
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
-            if( $fn=~/^((?:[0-9a-f][0-9a-f])+)(?:__((?:[0-9a-f][0-9a-f])+))?$/ ){
-                $::contents{$1} ||= [];
-                if( $2 ){
-                    push(@{$::contents{$1}},$2);
-                    if( substr($2,0,2) eq '00' ){
-                        my $label=pack('h*',substr($2,2));
-                        push( @{$::label_contents{$label}} , $1 );
-                        $::contents_label{$1}->{$label} = $&;
+            if( my @x=($fn=~/^((?:[0-9a-f][0-9a-f])+)(?:__((?:[0-9a-f][0-9a-f])+))?$/)){
+                $fn=$&; # for taint mode
+                my $title=pack('h*',$x[0]);
+                my $p=$::contents{$title} ||= {
+                    fname=>$x[0] ,
+                    title=>$title ,
+                    attach=>{} ,
+                    label=>{} ,
+                    timestamp => &timestamp($x[0]) ,
+                    mtime => &mtime($x[0]) ,
+                };
+                if( $x[1] ){
+                    my $aname=pack('h*',$x[1]);
+                    $p->{attach}->{$aname} = $fn;
+                    if( substr($x[1],0,2) eq '00' ){
+                        my $label=pack('h*',substr($x[1],2));
+                        push( @{$::label_contents{$label}} , $p );
+                        $p->{label}->{$label} = $fn;
                     }
                 }
             }else{
-                push( @::contents , $fn );
+                push( @::etcfiles , $fn );
             }
         }
         closedir(DIR);
     }
 }
 
-sub directory{
-    &cache_update() ; @::contents;
+sub etcfiles{
+    &cache_update() ; @::etcfiles;
 }
 
-sub list_page{
+sub list_page{ ### deprecated ###
     &cache_update() ; keys %::contents;
 }
 
 sub object_exists{
-    &cache_update() ; exists $::contents{ &title2fname($_[0]) }
+    &cache_update() ; exists $::contents{ $_[0] }
 }
 
 sub list_attachment{
     &cache_update();
-    my $fn=&title2fname($_[0]);
-    return () unless exists $::contents{$fn};
-    map{ &fname2title($_) } @{$::contents{$fn}};
+    my $p=$::contents{$_[0]};
+    $p ? keys %{$p->{attach}} : ();
 }
 
 sub print_page{
@@ -1944,7 +1935,8 @@ sub print_page{
     my %attachment;
     foreach my $attach ( &list_attachment($title) ){
         my $attach_ = &enc( $attach );
-        my $url=&attach2url($title,$attach);
+        my $url=&myurl( { p=>$title , f=>$attach } );
+        
         $attachment{ $attach_ } = {
             # for compatible #
             name => $attach ,
@@ -2131,42 +2123,38 @@ sub plugin_outline{
     );
 }
 
-sub has_label{
-    my ($page,$arglabel)=@_;
-
-    my $pagelabel=$::contents_label{$page};
-    foreach my $T (@{$arglabel}){
-        return 0 unless exists $pagelabel->{$T};
+sub has_all_label{
+    my ($page_label,$seek_label)=@_;
+    foreach my $p (@{$seek_label}){
+        return 0 unless exists $page_label->{$p};
     }
-    return 1;
+    1;
 }
 
 sub ls_core{
     my ($opt,@args) = @_;
     push(@args,'*') unless @args;
 
-    my @list;
-    foreach my $pat (@args){
-        $pat =~ s/([^\*\?]+)/unpack('h*',$1)/eg;
-        $pat =~ s/\?/../g;
-        $pat =~ s/\*/.*/g;
-        $pat = '^' . $pat . '$';
-        push(@list, map{
-             +{ fname  => $_ ,
-                title  => &fname2title($_) ,
-                mtimeraw => &mtimeraw($_) ,
-                mtime  => &mtime($_)
-              }
-            }grep{
-                (  exists $opt->{a}
-                ? ($_ =~ $pat )
-                : ($_ =~ $pat && !/^e2/ && -f $_ ) )
-                && 
-                ( ! exists $opt->{'+'} || &has_label( $_ , $opt->{'+'} ) )
-            }
-            &list_page()
-        );
-    }
+    my @patterns = map {
+        s/([^\*\?]+)/unpack('h*',$1)/eg;
+        s/\?/../g;
+        s/\*/.*/g;
+        '^'.$_.'$';
+    } @args;
+
+    my @list = grep{
+        if( exists $opt->{'+'} && ! &has_all_label($_->{label},$opt->{'+'}) ){
+            0;
+        }elsif( !exists $opt->{a} && $_->{title} =~ /^\./ ){
+            0;
+        }elsif( ! -f $_->{fname} ){
+            0;
+        }else{
+            my $fn=$_->{fname};
+            (grep{ $fn =~ $_ } @patterns) > 0;
+        }
+    } values %::contents;
+
     if( exists $opt->{t} ){
         @list = sort{ $a->{mtime} cmp $b->{mtime} } @list;
     }else{
