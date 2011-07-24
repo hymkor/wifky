@@ -658,7 +658,9 @@ sub cacheoff{
     undef %::contents;
     undef %::label_contents;
 }
-
+sub title2mtime{
+    &mtime( &title2fname(@_) );
+}
 sub fname2title{
     pack('h*',$_[0]);
 }
