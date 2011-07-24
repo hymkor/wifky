@@ -1889,20 +1889,21 @@ sub action_cat{
 }
 
 sub cache_update{
-    unless( defined(@::contents) ){
+    unless( defined(%::contents) ){
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
-            push( @::contents , $fn );
-            if( $fn =~ /^([0-9a-f][0-9a-f])+$/ ){
-                $::contents{$&} ||= [];
-            }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__00((?:[0-9a-f][0-9a-f])+)$/ ){
-                $::contents_label{$1} ||= {};
-                my $label=pack('h*',$2);
-                $::contents_label{$1}->{$label} = $&;
-                push(@{$::label_contents{$label}} , $1 );
-                push(@{$::contents{$1}},"00$2");
-            }elsif( $fn =~ /^((?:[0-9a-f][0-9a-f])+)__((?:[0-9a-f][0-9a-f])+)$/ ){
-                push(@{$::contents{$1}},$2);
+            if( $fn=~/^((?:[0-9a-f][0-9a-f])+)(?:__((?:[0-9a-f][0-9a-f])+))?$/ ){
+                $::contents{$1} ||= [];
+                if( $2 ){
+                    push(@{$::contents{$1}},$2);
+                    if( substr($2,0,2) eq '00' ){
+                        my $label=pack('h*',substr($2,2));
+                        push( @{$::label_contents{$label}} , $1 );
+                        $::contents_label{$1}->{$label} = $&;
+                    }
+                }
+            }else{
+                push( @::contents , $fn );
             }
         }
         closedir(DIR);
