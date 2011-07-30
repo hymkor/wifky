@@ -2245,9 +2245,7 @@ sub ls_core{
     my @list = grep{
         if( exists $opt->{'+'} && ! &has_all_label($_->{label},$opt->{'+'}) ){
             0;
-        }elsif( !exists $opt->{a} && $_->{title} =~ /^\./ ){
-            0;
-        }elsif( ! -f $_->{fname} ){
+        }elsif( !exists $opt->{a} && ($_->{title} =~ /^\./ || ! -f $_->{fname} ) ){
             0;
         }else{
             my $fn=$_->{fname};
