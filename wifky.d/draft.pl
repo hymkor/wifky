@@ -9,6 +9,10 @@ if( &::is_signed() ){
     $::action_plugin{SaveAsDraft} = sub{
         my $title=$::form{p};
         &::write_object($title,'draft.txt',$::form{text_t});
+        my $label=$::form{label_t};
+        if( $label ){
+            &::write_object($title,'draft_label.txt',$label);
+        }
         &::transfer_page();
     };
     $::action_plugin{edt} = sub{
@@ -19,6 +23,9 @@ if( &::is_signed() ){
         goto &::action_edit if $body_time ge $draft_time ;
 
         my @attachment=&::list_attachment($title);
+
+        local $::form{a} = 'draftedit';
+        local $::form{label_t} = &::read_object($title,'draft_label.txt') || '';
 
         &::print_template(
             template => $::edit_template || $::system_template ,
@@ -35,6 +42,7 @@ if( &::is_signed() ){
     my $hook_submit=$::hook_submit;
     $::hook_submit = sub{
         &::write_object($::form{p},'draft.txt','');
+        &::write_object($::form{p},'draft_label.txt','');
         $hook_submit->(@_) if $hook_submit;
     };
 }
