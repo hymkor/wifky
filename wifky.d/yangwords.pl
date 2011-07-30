@@ -39,8 +39,11 @@ sub new_comment{
         }
     }
     if( $::config{yangwords_record_ip} ){
+        unless( -f &::title2fname($::form{p}) ){
+            die("There are no pages called '$::form{p}'");
+        }
         my $fname=&::title2fname($::form{p},'comment_ip.txt');
-        open(FP,">>$fname") or ("Can not open $fname for append");
+        open(FP,">>$fname") or die("Can not open $fname for append");
             my @tm=localtime;
             printf FP "%04d/%02d/%02d %02d:%02d:%02d\t%s\r\n"
                 , 1900+$tm[5],1+$tm[4],@tm[3,2,1,0]
