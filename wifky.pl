@@ -683,6 +683,7 @@ sub cacheoff{
     undef %::timestamp;
     undef @::etcfiles;
     undef %::contents;
+    undef %::xcontents;
     undef %::label_contents;
 }
 sub title2mtime{
@@ -1944,7 +1945,7 @@ sub cache_update{
             if( my @x=($fn=~/^((?:[0-9a-f][0-9a-f])+)(?:__((?:[0-9a-f][0-9a-f])+))?$/)){
                 $fn=$&; # for taint mode
                 my $title=pack('h*',$x[0]);
-                my $p=$::contents{$title} ||= {
+                my $p= $::contents{$title} ||= $::xcontents{$x[0]} ||={
                     fname=>$x[0] ,
                     title=>$title ,
                     attach=>{} ,
@@ -1978,8 +1979,8 @@ sub directory{
     &cache_update() ; @::contents;
 }
 
-sub list_page{
-    &cache_update() ; keys %::contents;
+sub list_page{ # deprecated
+    &cache_update() ; keys %::xcontents;
 }
 
 sub object_exists{
