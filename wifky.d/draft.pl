@@ -1,6 +1,6 @@
 package wifky::draft;
 
-use strict;use warnings;
+# use strict;use warnings;
 
 if( &::is_signed() ){
     $::form_list{'350_draft'} = sub{
@@ -45,4 +45,31 @@ if( &::is_signed() ){
         &::write_object($::form{p},'draft_label.txt','');
         $hook_submit->(@_) if $hook_submit;
     };
+    push( @{$::menubar{'600_Index'}} , &::anchor('DraftList',{a=>'draftlist'}));
+    $::action_plugin{draftlist} = \&action_draft_list;
+}
+
+sub action_draft_list{
+    &::print_template(
+        template => $::system_template ,
+        main => sub{
+            &::begin_day('Draft List');
+            &::puts('<ul>');
+            my $pattern='__'.unpack('h*','draft.txt');
+            my $len=length($pattern);
+            my $cnt=0;
+            foreach my $p (&::directory()){
+                if( length($p) > $len && substr($p,-$len) eq $pattern ){
+                    my $title=pack('h*',substr($p,0,-$len));
+                    &::puts('<li>'.&::anchor($title,{p=>$title,a=>'edt'}).'</li>');
+                    ++$cnt;
+                }
+            }
+            unless( $cnt ){
+                &::puts('<li>no draft pages</li>');
+            }
+            &::puts('</ul>');
+            &::end_day();
+        },
+    );
 }
