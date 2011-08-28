@@ -39,6 +39,29 @@ if( &::is_signed() ){
             }
         );
     };
+    if( exists $::form{p} &&
+        grep($_ eq "draft.txt",(my @attach=&::list_attachment($::form{p})))<=0 )
+    {
+        push( @{$::menubar{'300_Edit'}} , 
+              &::anchor('Hide',{ a=>'hide' , p=>$::form{p}},{ rel=>'nofollow' }) );
+
+        $::action_plugin{hide} = sub {
+            rename( &::title2fname($::form{p}) ,
+                    &::title2fname($::form{p},"draft.txt") );
+            my @labels = grep(/^\0/,@attach);
+            if( @labels ){
+                &::write_object(
+                    $::form{p} ,
+                    "draft_label.txt" ,
+                    join(" ",map{ substr($_,1) } @labels )
+                );
+                foreach my $label (@labels){
+                    &::write_object( $::form{p} , $label , '' );
+                }
+            }
+            &::transfer_page();
+        };
+    }
     my $hook_submit=$::hook_submit;
     $::hook_submit = sub{
         &::write_object($::form{p},'draft.txt','');
