@@ -25,7 +25,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.1.1_1';
+my $version='1.1.2_0';
 my ($nextday_url , $prevday_url , $nextmonth_url , $prevmonth_url , $startday_url , $endday_url );
 
 if( exists $::menubar{'200_New'} ){
@@ -57,7 +57,16 @@ $::inline_plugin{nikky_referer} = sub {
     (defined $::form{p} && $::form{p} =~ /^\(\d\d\d\d\.\d\d.\d\d\)/ )
     ? &wifky::nikky::inline_referer(@_) : '';
 };
-
+$::inline_plugin{on_nikky} = sub {
+    unless( defined $::form{p} && $::form{p} =~ /^\(\d\d\d\d\.\d\d\.\d\d\)/ ){
+        return '';
+    }
+    my $session=shift or return '';
+    my $command=shift or return '';
+    $command = $::inline_plugin{$command} or return '';
+    $session->{argv} =~ s/^\S+\s*//;
+    $command->($session,@_);
+};
 $::form{a}='date' if $::form{date};
 
 if( &::is('nikky_front') &&
@@ -506,8 +515,35 @@ sub date_anchor{
     : qq(<span class="no${xxxxday}">$symbol</span>) ;
 }
 
-sub inline_prevday  { &date_anchor('prevday'  ,$prevday_url ,'<' , $_[1]); }
-sub inline_nextday  { &date_anchor('nextday'  ,$nextday_url ,'>' , $_[1]); }
+sub inline_prevday {
+    if( $::form{p} && $::form{p} =~ /^\(\d{4}\.\d\d\.\d\d\)/ ){
+        my $prev;
+        foreach my $p ( &::ls_core( {} , '(????.??.??)*' ) ){
+            if( $p->{title} lt $::form{p} ){
+                $prev = $p;
+            }
+        }
+        if( $prev ){
+            return &date_anchor('prevday',&::title2url($prev->{title}),'<',$_[1]);
+        }
+    }
+    &date_anchor('prevday'  ,$prevday_url ,'<' , $_[1]); 
+}
+
+sub inline_nextday {
+    if( $::form{p} && $::form{p} =~ /^\(\d{4}\.\d\d\.\d\d\)/ ){
+        my $next;
+        foreach my $p ( &::ls_core( {} , '(????.??.??)*' ) ){
+            if( $p->{title} gt $::form{p} ){
+                $next ||= $p;
+            }
+        }
+        if( $next ){
+            return &date_anchor('nextday',&::title2url($next->{title}),'>',$_[1]);
+        }
+    }
+    &date_anchor('nextday'  ,$nextday_url ,'>' , $_[1]); 
+}
 
 $::inline_plugin{prevmonth} = sub {
     &date_anchor('prevmonth',$prevmonth_url ,'<<', $_[1]); 
