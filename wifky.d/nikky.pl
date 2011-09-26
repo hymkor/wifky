@@ -25,7 +25,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.1.2_0';
+my $version='1.1.2_1';
 my ($nextday_url , $prevday_url , $nextmonth_url , $prevmonth_url , $startday_url , $endday_url );
 
 if( exists $::menubar{'200_New'} ){
@@ -58,7 +58,8 @@ $::inline_plugin{nikky_referer} = sub {
     ? &wifky::nikky::inline_referer(@_) : '';
 };
 $::inline_plugin{on_nikky} = sub {
-    unless( defined $::form{p} && $::form{p} =~ /^\(\d\d\d\d\.\d\d\.\d\d\)/ ){
+    unless( ($::form{p} && $::form{p} =~ /^\(\d\d\d\d\.\d\d\.\d\d\)/) ||
+             $::form{date} || ($::form{a} && $::form{a} eq 'nikky') ){
         return '';
     }
     my $session=shift or return '';
