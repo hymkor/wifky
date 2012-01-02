@@ -25,8 +25,8 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.1.2_1';
-my ($nextday_url , $prevday_url , $nextmonth_url , $prevmonth_url , $startday_url , $endday_url );
+my $version='1.1.3_0';
+my ($nextday_info , $prevday_info , $nextmonth_url , $prevmonth_url , $startday_url , $endday_url );
 
 if( exists $::menubar{'200_New'} ){
     my @now=localtime();
@@ -475,12 +475,20 @@ sub init{
 
     ### <link>属性に前後関係を記述 ###
     if( $prevnikky ){
-        $prevday_url = &::title2url($prevnikky->{title});
-        push(@::html_header, sprintf('<link rel="next" href="%s">' , $prevday_url ) );
+        $prevday_info = {
+            url=>&::title2url($prevnikky->{title}),
+            title=>$prevnikky->{title}
+        };
+        push(@::html_header,
+            sprintf('<link rel="next" href="%s">' , $prevday_info->{url} ) );
     }
     if( $nextnikky ){
-        $nextday_url = &::title2url($nextnikky->{title});
-        push( @::html_header , sprintf('<link ref="prev" href="%s">' ,$nextday_url ) );
+        $nextday_info = {
+            url=>&::title2url($nextnikky->{title}),
+            title=>$nextnikky->{title} 
+        };
+        push( @::html_header ,
+            sprintf('<link ref="prev" href="%s">' ,$nextday_info->{url} ) );
     }
 
     my $p=$::form{p};
@@ -501,8 +509,8 @@ sub init{
     }
     $prevmonth_url = &::title2url($p->{title}) if $p;
     $nextmonth_url = &::title2url($n->{title}) if $n;
-    $::menubar{'050_prevday'} = &inline_prevday();
-    $::menubar{'950_nextday'} = &inline_nextday();
+    $::menubar{'050_prevday'} = &inline_prevday(undef,'<');
+    $::menubar{'950_nextday'} = &inline_nextday(undef,'>');
     $startday_url = &::title2url($nikky[ 0]->{title}) if @nikky;
     $endday_url   = &::title2url($nikky[-1]->{title}) if @nikky;
 }
@@ -525,10 +533,16 @@ sub inline_prevday {
             }
         }
         if( $prev ){
-            return &date_anchor('prevday',&::title2url($prev->{title}),'<',$_[1]);
+            return &date_anchor('prevday',&::title2url($prev->{title}),
+                    '<'.$prev->{title},$_[1]);
         }
     }
-    &date_anchor('prevday'  ,$prevday_url ,'<' , $_[1]); 
+    if( $prevday_info ){
+        &date_anchor('prevday'  ,$prevday_info->{url} ,
+                    '<'.$prevday_info->{title} , $_[1]); 
+    }else{
+        '';
+    }
 }
 
 sub inline_nextday {
@@ -540,10 +554,16 @@ sub inline_nextday {
             }
         }
         if( $next ){
-            return &date_anchor('nextday',&::title2url($next->{title}),'>',$_[1]);
+            return &date_anchor('nextday',&::title2url($next->{title}),
+                $next->{title}.'>',$_[1]);
         }
     }
-    &date_anchor('nextday'  ,$nextday_url ,'>' , $_[1]); 
+    if( $nextday_info ){
+        &date_anchor('nextday'  ,$nextday_info->{url} ,
+                     $nextday_info->{title}.'>' , $_[1]); 
+    }else{
+        '';
+    }
 }
 
 $::inline_plugin{prevmonth} = sub {
