@@ -1,7 +1,7 @@
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.9_0";
+my $version="1.10_0";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -110,6 +110,10 @@ sub marking{
             , $::config{hmark_twitter_id} 
                 ? 'data-via="'.&::enc($::config{hmark_twitter_id}).'"'
                 : ''
+        ) .
+        # [facebook button]
+        sprintf('<iframe src="http://www.facebook.com/plugins/like.php?href=%s&amp;layout=button_count&amp;show_faces=false&amp;width=100&amp;action=like&amp;colorscheme=light&amp;height=21" scrolling="no" frameborder="0" style="border:none; overflow:hidden; width:100px; height:21px;" allowTransparency="true"></iframe>',
+            , &::percent($bookmark_url)
         )
     );
 }
