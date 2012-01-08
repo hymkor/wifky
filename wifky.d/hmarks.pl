@@ -1,7 +1,7 @@
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.10_0";
+my $version="1.10_1";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -15,15 +15,16 @@ if( ! exists $::form{p} && exists $::form{hp} ){
 }
 
 if( $::config{hmark_each_section} ){
-    (*::midashi,*org_midashi ) = (*new_midashi,*::midashi);
+    (*::headline,*org_headline ) = (*new_headline,*::headline);
 }
 
 ###
 ### Hatena Bookmark Secion ###
 ###
 
-sub new_midashi{
-    my ($depth,$text,$session)=@_;
+sub new_headline{
+    my %arg = @_;
+    my ($depth,$text,$session)=($arg{n}-3,$arg{body},$arg{session});
     if( $depth == 0 &&
         $session->{title} ne 'Footer'  &&
         $session->{title} ne 'Sidebar' &&
@@ -32,17 +33,15 @@ sub new_midashi{
         $session->{title} ne 'Help' &&
         $session->{title} !~ /^\./ )
     {
-        &org_midashi(
-            $depth ,
-            $text . &marking(
-                $session,
-                "#p". ( exists $session->{section} ? 1+$session->{section}->[$depth] : 1),
-                $text
-            ) ,
-            $session
+        $arg{body} .= &marking(
+            $session,
+            "#p". ( exists $session->{section} ? 1+$session->{section}->[$depth] : 1),
+            $text
         );
+
+        &org_headline( %arg );
     }else{
-        &org_midashi($depth,$text,$session);
+        &org_headline( %arg );
     }
 }
 
