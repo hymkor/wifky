@@ -8,10 +8,13 @@ if( &::is_signed() ){
     };
     $::action_plugin{SaveAsDraft} = sub{
         my $title=$::form{p};
-        &::write_object($title,'draft.txt',$::form{text_t});
+        my $fn = &::title2fname($title,'draft.txt');
+        chmod(0666,$fn);
+        &::write_file($fn,$::form{text_t});
         my $label=$::form{label_t};
         if( $label ){
-            &::write_object($title,'draft_label.txt',$label);
+            my $afn = &::title2fname($title,'draft_label.txt');
+            &::write_file($afn,$label);
         }
         &::transfer_page();
     };
