@@ -1,11 +1,10 @@
-# Plugin Manager
-# support wifky 1.3.2+  1.2.0  1.0.3.2
+# 1.3_0 # Plugin Manager
 
 package wifky::pluginmgr;
 
 # use strict;use warnings; 
 
-my $version='1.2';
+my $version='1.3_0';
 
 -d 'plugins/.' or mkdir('plugins',0755) or die('can not mkdir plugins directory');
 
@@ -206,19 +205,21 @@ HTML
     , $::postme , $::charset );
     foreach my $p (@plugins){
         my @stat=stat('plugins/'.$p->{hexnm});
-        &::putenc('<div><input type="checkbox" name="%s" value="1"%s><a href="%s?a=pluginmgr_download&amp;target=%s">%s</a> (installed on %s)</em></div>'
+        &::putenc('<div><input type="checkbox" name="%s" value="1"%s><a href="%s?a=pluginmgr_download&amp;target=%s">%s</a> %s (installed on %s)</em></div>'
             , $p->{key} 
             , $::config{$p->{key}} ? ' checked':''
             , $::me
             , unpack('h*',$p->{name})
             , $p->{name} 
+            , &plugin_comment('plugins/'.$p->{hexnm})
             , scalar(localtime($stat[9]))
         );
     }
     foreach my $nm ( sort grep(/\.pl$/,&::directory() )){
         my @stat=stat($nm);
-        &::putenc('<input type="checkbox" checked disabled>%s (hand-installed on %s)<br>'
-            , $nm , scalar(localtime($stat[9])) );
+        &::putenc(
+            '<input type="checkbox" checked disabled>%s %s (hand-installed on %s)<br>'
+            , $nm , &plugin_comment($nm) , scalar(localtime($stat[9])) );
     }
     &::putenc(<<HTML
 <p>
@@ -267,4 +268,17 @@ HTML
 </div><!-- day -->
 HTML
     );
+}
+
+sub plugin_comment{
+    my $comment='';
+    local *FP;
+    if( open(FP,$_[0]) ){
+        my $line=<FP>;
+        if( $line =~ /^\#([^\#]+)#/ ){
+            $comment = $1;
+        }
+        close(FP);
+    }
+    $comment;
 }
