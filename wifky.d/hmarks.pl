@@ -1,7 +1,9 @@
+# 1.10_2 # hmarks.pl
+
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.10_1";
+my $version="1.10_2";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -35,7 +37,7 @@ sub new_headline{
     {
         $arg{body} .= &marking(
             $session,
-            "#p". ( exists $session->{section} ? 1+$session->{section}->[$depth] : 1),
+            "#p". ( exists $session->{section} ? $session->{section}->[$depth] : 1),
             $text
         );
 
