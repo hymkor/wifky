@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.10_0';
+$::version  = '1.5.11_0';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -1544,13 +1544,13 @@ sub action_delete{
 sub action_freeze_multipage{
     goto &action_signin unless &is_signed();
     chmod( 0444 , &title2fname($_) ) for(@{$::forms{p}});
-    &transfer( url=> &myurl( {a=>'index'} ) );
+    &transfer( url=> &myurl( &filter_underscore_form() ) );
 }
 
 sub action_fresh_multipage{
     goto &action_signin unless &is_signed();
     chmod( 0600 , &title2fname($_) ) for(@{$::forms{p}});
-    &transfer( url=> &myurl( {a=>'index'} ) );
+    &transfer( url=> &myurl( &filter_underscore_form() ) );
 }
 
 sub action_freeze_or_fresh{
@@ -1622,6 +1622,10 @@ sub do_index_footer_{
         shift( @::index_columns ); # check box
         pop( @::index_columns ); # frozen mark
         &puts( '<div class="indexaction">'.join("\n",@::index_action).'</div>' );
+        foreach my $key (keys %::form){
+            &putenc('<input type="hidden" name="_%s" value="%s" />' ,
+                $key , $::form{$key} );
+        }
         &putenc( '</form>' );
     }
 }
@@ -1666,6 +1670,14 @@ sub action_upload{
     }
 }
 
+sub filter_underscore_form{
+    my %cgiprm;
+    foreach my $key (keys %::form){
+        $cgiprm{ $' } = $::form{$key} if $key =~ /^_/;
+    }
+    \%cgiprm;
+}
+
 sub do_tagging{
     my $action=shift;
     foreach my $tag ( split(/\s+/,$::form{tag}) ){
@@ -1676,7 +1688,7 @@ sub do_tagging{
             }
         }
     }
-    &transfer( url=>&myurl({a=>'index'}) );
+    &transfer( url=>&myurl( &filter_underscore_form() ) );
 }
 
 sub action_tagplus{
