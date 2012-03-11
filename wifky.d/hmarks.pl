@@ -1,9 +1,9 @@
-# 1.10_2 # hmarks.pl
+# 1.11_0 # hmarks.pl
 
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.10_2";
+my $version="1.11_0";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -97,8 +97,8 @@ sub marking{
     $tweet_url =~ s/\+/\%20/g;
 
     # [Bookmark anchor]
-    &::verb( 
-        sprintf('<a href="http://b.hatena.ne.jp/entry/%s" class="hatena-bookmark-button" data-hatena-bookmark-title="%s" data-hatena-bookmark-layout="%s" title="Add this entry to add hatena bookmark"><img src="http://b.st-hatena.com/images/entry-button/button-only.gif" alt="Add this entry to add hatena bookmark" width="20" height="20" style="border: none;" /></a><script type="text/javascript" src="http://b.st-hatena.com/js/bookmark_button.js" charset="utf-8" async="async"></script>'
+    &::verb(
+        sprintf('<a href="http://b.hatena.ne.jp/entry/%s" class="hatena-bookmark-button" data-hatena-bookmark-title="%s" data-hatena-bookmark-layout="%s" title="[Add this entry to hatena bookmark]"><img src="http://b.st-hatena.com/images/entry-button/button-only.gif" alt="[Add this entry to hatena bookmark]" width="20" height="20" style="border: none;" /></a><script type="text/javascript" src="http://b.st-hatena.com/js/bookmark_button_wo_al.js" charset="utf-8" async="async"></script>'
             , $bookmark_url
             , &::enc( $fulltitle ) 
             , $::config{hmark_bookmark_style} || 'standard' ) .
