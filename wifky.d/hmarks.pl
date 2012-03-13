@@ -88,10 +88,19 @@ sub marking{
     $title = $::config{sitename} . ' - ' . $title;
 
     &::verb(
-        &anchor_hatena  ($url,$title,$session) .
-        &anchor_twitter ($url,$title,$session) .
-        &anchor_facebook($url,$title,$session)
+        &anchor_livedoor_clip($url,$title,$session) .
+        &anchor_hatena       ($url,$title,$session) .
+        &anchor_twitter      ($url,$title,$session) .
+        &anchor_facebook     ($url,$title,$session)
     );
+}
+
+sub anchor_livedoor_clip{
+    my ($url,$title)=@_;
+    sprintf('<a href="http://clip.livedoor.com/redirect?link=%s&title=%s&ie=%s" class="ldclip-redirect" title="[Clip this article]"><img src="http://parts.blog.livedoor.jp/img/cmn/clip_16_16_w.gif" width="16" height="16" alt="[Clip this article]" style="border: none" /></a>'
+        , &::enc( $url )
+        , &::enc( $title ) 
+        , $::charset );
 }
 
 sub anchor_hatena{
