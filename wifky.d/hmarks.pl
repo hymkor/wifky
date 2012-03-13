@@ -106,11 +106,17 @@ sub anchor_livedoor_clip{
 sub anchor_hatena{
     my ($url,$title,$session)=@_;
 
-    sprintf('<a href="http://b.hatena.ne.jp/entry/%s" class="hatena-bookmark-button" data-hatena-bookmark-title="%s" data-hatena-bookmark-layout="%s" title="[Add this entry to hatena bookmark]"><img src="http://b.st-hatena.com/images/entry-button/button-only.gif" alt="[Add this entry to hatena bookmark]" width="20" height="20" style="border: none;" /></a><script type="text/javascript" src="http://b.st-hatena.com/js/bookmark_button_wo_al.js" charset="utf-8" async="async"></script>'
-            , $url
-            , &::enc( $title )
-            , $::config{hmark_bookmark_style} || 'standard'
-    );
+    if( $::config{hmark_bookmark_style} &&
+        $::config{hmark_bookmark_style} ne 'off' )
+    {
+        sprintf('<a href="http://b.hatena.ne.jp/entry/%s" class="hatena-bookmark-button" data-hatena-bookmark-title="%s" data-hatena-bookmark-layout="%s" title="[Add this entry to hatena bookmark]"><img src="http://b.st-hatena.com/images/entry-button/button-only.gif" alt="[Add this entry to hatena bookmark]" width="20" height="20" style="border: none;" /></a><script type="text/javascript" src="http://b.st-hatena.com/js/bookmark_button_wo_al.js" charset="utf-8" async="async"></script>'
+                , $url
+                , &::enc( $title )
+                , $::config{hmark_bookmark_style}
+        );
+    }else{
+        '';
+    }
 }
 
 sub anchor_twitter{
@@ -182,7 +188,12 @@ $::preferences{"Heading marks ${version}"} = [
         option=>[['horizontal','horizontal'],['vertical','vertical'],['none','simple']] },
     { desc=>'HatenaStar: Token', name=>'hatenastar_token', type=>'text', size=>41 },
     { desc=>'HatenaBookmark Style', name=>'hmark_bookmark_style', type=>'radio' ,
-        option=>[['standard','horizontal'],['vertical','vertical'],['simple','simple']] } ,
+        option=>[
+            ['off','off'],
+            ['standard','horizontal'],
+            ['vertical','vertical'],
+            ['simple','simple']
+        ] } ,
 ];
 
 # vim:set sw=4 et notextmode:
