@@ -88,6 +88,7 @@ sub marking{
     $title = $::config{sitename} . ' - ' . $title;
 
     &::verb(
+        &anchor_delicous     ($url,$title,$session) .
         &anchor_livedoor_clip($url,$title,$session) .
         &anchor_hatena       ($url,$title,$session) .
         &anchor_twitter      ($url,$title,$session) .
@@ -143,6 +144,15 @@ sub anchor_facebook{
 
     sprintf('<iframe src="http://www.facebook.com/plugins/like.php?href=%s&amp;layout=button_count&amp;show_faces=false&amp;width=100&amp;action=like&amp;colorscheme=light&amp;height=21" scrolling="no" frameborder="0" style="border:none; overflow:hidden; width:100px; height:21px;" allowTransparency="true"></iframe>',
             , &::percent($url)
+    );
+}
+
+sub anchor_delicous{
+    my ($url,$title,$session)=@_;
+
+    sprintf(q| <a href="http://www.delicious.com/save" onclick="window.open('http://www.delicious.com/save?v=5&noui&jump=close&url='+encodeURIComponent('%s')+'&title='+encodeURIComponent('%s'), 'delicious','toolbar=no,width=550,height=550'); return false;" title="[Delicous]"><img src="http://www.delicious.com/static/img/delicious.small.gif" height="10" width="10" alt="[Delicious]" border="0" /></a> |
+        , &::enc($url)
+        , &::enc($title)
     );
 }
 
