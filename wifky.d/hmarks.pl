@@ -98,7 +98,7 @@ sub marking{
 
 sub anchor_livedoor_clip{
     my ($url,$title)=@_;
-    sprintf('<a href="http://clip.livedoor.com/redirect?link=%s&title=%s&ie=%s" class="ldclip-redirect" title="[Clip this article]"><img src="http://parts.blog.livedoor.jp/img/cmn/clip_16_16_w.gif" width="16" height="16" alt="[Clip this article]" style="border: none" /></a>'
+    sprintf(' <a href="http://clip.livedoor.com/redirect?link=%s&title=%s&ie=%s" class="ldclip-redirect" title="[Livedoor Clip]"><img src="http://parts.blog.livedoor.jp/img/cmn/clip_16_16_w.gif" width="16" height="16" alt="[Livedoor Clip]" style="border: none" /></a> '
         , &::enc( $url )
         , &::enc( $title ) 
         , $::charset );
