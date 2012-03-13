@@ -122,7 +122,8 @@ sub anchor_hatena{
 sub anchor_twitter{
     my ($url,$title,$session)=@_;
     if( $::charset eq 'EUC-JP' ){
-        $url = &::myurl( { hp=>unpack('h*',$session->{title}) } , $sharp||'');
+        # $url = &::myurl( { hp=>unpack('h*',$session->{title}) } , $sharp||'');
+        return '';
     }
     $url =~ s/\+/\%20/g;
 
