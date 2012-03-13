@@ -1,9 +1,9 @@
-# 1.11_0 # hmarks.pl
+# 1.12_0 # hmarks.pl
 
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.11_0";
+my $version="1.12_0";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -75,8 +75,7 @@ sub marking{
                   : $ENV{'SERVER_NAME'}
             ) . $ENV{'SCRIPT_NAME'};
     local $::postme=$::me;
-    my $bookmark_url = &::myurl( { p=>$session->{title} } , $sharp||'' );
-    (my $bookmark_entry_url = $bookmark_url)=~s/\#/\%23/g;
+    my $url = &::myurl( { p=>$session->{title} } , $sharp||'' );
 
     if( defined $title ){
         $title = &::preprocess($title);
@@ -86,36 +85,48 @@ sub marking{
         $title = $session->{title};
     }
     $title =~ s/^ +//;
-    my $fulltitle = $::config{sitename} . ' - ' . $title;
+    $title = $::config{sitename} . ' - ' . $title;
 
-    my $tweet_url;
-    if( $::charset eq 'EUC-JP' ){
-        $tweet_url = &::myurl( { hp=>unpack('h*',$session->{title}) } , $sharp||'');
-    }else{
-        $tweet_url = $bookmark_url;
-    }
-    $tweet_url =~ s/\+/\%20/g;
-
-    # [Bookmark anchor]
     &::verb(
-        sprintf('<a href="http://b.hatena.ne.jp/entry/%s" class="hatena-bookmark-button" data-hatena-bookmark-title="%s" data-hatena-bookmark-layout="%s" title="[Add this entry to hatena bookmark]"><img src="http://b.st-hatena.com/images/entry-button/button-only.gif" alt="[Add this entry to hatena bookmark]" width="20" height="20" style="border: none;" /></a><script type="text/javascript" src="http://b.st-hatena.com/js/bookmark_button_wo_al.js" charset="utf-8" async="async"></script>'
-            , $bookmark_url
-            , &::enc( $fulltitle ) 
-            , $::config{hmark_bookmark_style} || 'standard' ) .
-        # [Twitter mark]
-        sprintf(
-            ' <a href="http://twitter.com/share" class="twitter-share-button" data-url="%s" data-text="&quot;%s&quot;" data-count="%s" %s data-lang="ja">Tweet</a><script type="text/javascript" charset="utf-8" src="http://platform.twitter.com/widgets.js"></script>'
-            , &::enc($tweet_url)
-            , &::enc($fulltitle)
-            , $::config{hmark_tweet_style} || 'none'
-            , $::config{hmark_twitter_id} 
-                ? 'data-via="'.&::enc($::config{hmark_twitter_id}).'"'
-                : ''
-        ) .
-        # [facebook button]
-        sprintf('<iframe src="http://www.facebook.com/plugins/like.php?href=%s&amp;layout=button_count&amp;show_faces=false&amp;width=100&amp;action=like&amp;colorscheme=light&amp;height=21" scrolling="no" frameborder="0" style="border:none; overflow:hidden; width:100px; height:21px;" allowTransparency="true"></iframe>',
-            , &::percent($bookmark_url)
-        )
+        &anchor_hatena  ($url,$title,$session) .
+        &anchor_twitter ($url,$title,$session) .
+        &anchor_facebook($url,$title,$session)
+    );
+}
+
+sub anchor_hatena{
+    my ($url,$title,$session)=@_;
+
+    sprintf('<a href="http://b.hatena.ne.jp/entry/%s" class="hatena-bookmark-button" data-hatena-bookmark-title="%s" data-hatena-bookmark-layout="%s" title="[Add this entry to hatena bookmark]"><img src="http://b.st-hatena.com/images/entry-button/button-only.gif" alt="[Add this entry to hatena bookmark]" width="20" height="20" style="border: none;" /></a><script type="text/javascript" src="http://b.st-hatena.com/js/bookmark_button_wo_al.js" charset="utf-8" async="async"></script>'
+            , $url
+            , &::enc( $title )
+            , $::config{hmark_bookmark_style} || 'standard'
+    );
+}
+
+sub anchor_twitter{
+    my ($url,$title,$session)=@_;
+    if( $::charset eq 'EUC-JP' ){
+        $url = &::myurl( { hp=>unpack('h*',$session->{title}) } , $sharp||'');
+    }
+    $url =~ s/\+/\%20/g;
+
+    sprintf(
+        ' <a href="http://twitter.com/share" class="twitter-share-button" data-url="%s" data-text="&quot;%s&quot;" data-count="%s" %s data-lang="ja">Tweet</a><script type="text/javascript" charset="utf-8" src="http://platform.twitter.com/widgets.js"></script>'
+        , &::enc($url)
+        , &::enc($title)
+        , $::config{hmark_tweet_style} || 'none'
+        , $::config{hmark_twitter_id} 
+            ? 'data-via="'.&::enc($::config{hmark_twitter_id}).'"'
+            : ''
+    );
+}
+
+sub anchor_facebook{
+    my ($url,$title,$session)=@_;
+
+    sprintf('<iframe src="http://www.facebook.com/plugins/like.php?href=%s&amp;layout=button_count&amp;show_faces=false&amp;width=100&amp;action=like&amp;colorscheme=light&amp;height=21" scrolling="no" frameborder="0" style="border:none; overflow:hidden; width:100px; height:21px;" allowTransparency="true"></iframe>',
+            , &::percent($url)
     );
 }
 
