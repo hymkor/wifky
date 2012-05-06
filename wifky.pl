@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.10_0';
+$::version  = '1.5.11_0';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -2569,9 +2569,13 @@ sub syntax_engine{
 
 sub call_block{
     my ($ref2html,$session)=@_;
-    foreach my $fragment( split(/\r?\n\r?\n/,$$ref2html) ){
-        foreach my $p (sort keys %::block_syntax_plugin){
-            $::block_syntax_plugin{$p}->($fragment,$session) and last;
+    my @lines=split(/\n/,$$ref2html);
+    while( scalar(@lines) > 0 ){
+        foreach my $key (sort keys %::block_syntax_plugin){
+            if( $::block_syntax_plugin{$key}->(\@lines,$session) ){
+                # &puts("&lt;$key&gt;");
+                last;
+            }
         }
     }
 }
@@ -2582,9 +2586,32 @@ sub call_close_sections{
         grep( $_ && &puts('</div></div>'),@{$session->{section}} );
 }
 
+sub cut_until_blankline{
+    my $lines=shift;
+    my $mode =shift || '';
+    my $fragment=shift(@{$lines});
+    while( scalar(@{$lines}) > 0 ){
+        if( $lines->[0] =~ /^\s*$/ ){
+            shift(@{$lines});
+            last;
+        }
+        last if $lines->[0] =~ /^\s*!/;
+        last if $lines->[0] =~ /^\s*\-\-\-\s*$/;
+        last if $mode ne '|' && $lines->[0] =~ /^\s*\|\|/;
+        last if $mode ne '*' && $lines->[0] =~ /^\s*[\*\+]/;
+        last if $mode ne ':' && $lines->[0] =~ /^\s*\:/;
+        last if $mode ne '<' && $lines->[0] =~ /^\s*(&lt;){2,6}(?!\{)/;
+        last if $mode ne '>' && $lines->[0] =~ /^\s*&gt;&gt;(?!\{)/;
+        $fragment .= "\n";
+        $fragment .= shift(@{$lines});
+    }
+    $fragment;
+}
+
 sub block_listing{ ### <UL><OL>... block ###
-    my ($fragment,$session)=@_;
-    return 0 unless $fragment =~ /\A\s*[\*\+]/;
+    my ($lines,$session)=@_;
+    return 0 unless $lines->[0] =~ /^\s*[\*\+]/;
+    my $fragment=&cut_until_blankline($lines,'*');
 
     my @stack;
     foreach( split(/\n[ \t]*(?=[\*\+])/,&preprocess($fragment,$session))){
@@ -2611,41 +2638,73 @@ sub block_listing{ ### <UL><OL>... block ###
 }
 
 sub block_definition{ ### <DL>...</DL> block ###
-    my ($fragment,$session)=@_;
-    return 0 unless $fragment =~ /\A\s*\:/;
+    my ($lines,$session)=@_;
+    return 0 unless $lines->[0] =~ /^\s*\:/;
 
-    my @s=split(/\n\s*:/, &preprocess($',$session) );
+    my $fragment=&cut_until_blankline($lines,':');
+    $fragment =~ s/\A\s*://;
+
+    my @s=split(/\n\s*:/, &preprocess($fragment,$session) );
     &puts('<dl>',map( /^:/ ? "<dd>$'</dd>\r\n" : "<dt>$_</dt>\r\n",@s),'</dl>');
     1;
 }
 
 sub block_midashi1{ ### <<...>>
-    my ($fragment,$session)=@_;
-    return 0 unless $fragment =~ /\A\s*((?:\&lt;){2,6})(.*?)(?:\&gt;){2,6}\s*\Z/s;
-    &midashi( length($1)/4-2 , $2 , $session );
+    my ($lines,$session)=@_;
+    return 0 unless $lines->[0] =~ /^\s*((\&lt\;){2,6})(?!\{)/;
+    my $nest=length($1)/4-2;
+
+    $lines->[0] = $';
+    my $fragment="";
+    while( scalar(@{$lines}) > 0 ){
+        my $line=shift(@{$lines});
+        last if $line =~ /^\s*$/;
+        if( $line =~ /(\&gt;){2,6}\s*$/ ){
+            $fragment .= $`;
+            last;
+        }else{
+            $fragment .= $line;
+        }
+    }
+    &midashi( $nest , $fragment , $session );
     1;
 }
 
 sub block_midashi2{ ### !!!... ###
-    my ($fragment,$session)=@_;
-    return 0 unless $fragment =~ /\A\s*(\!{1,4})(.*)\Z/s;
+    my ($lines,$session)=@_;
+    return 0 unless $lines->[0] =~ /^\s*(\!{1,4})/s;
 
-    &midashi( 3 - length($1) , $2 , $session );
+    &midashi( 3 - length($1) , $' , $session );
+    shift(@{$lines});
     1;
 }
 
 sub block_centering{ ### >> ... <<
-    my ($fragment,$session)=@_;
-    return 0 unless $fragment =~ /\A\s*\&gt;&gt;\s*(.*)\s*\&lt;\&lt;\s*\Z/s;
+    my ($lines,$session)=@_;
+    return 0 unless $lines->[0] =~ /^\s*\&gt;\&gt;(?!\})/;
 
-    my $s=&preprocess($1,$session);
+    $lines->[0] = $';
+    my $fragment="";
+    while( scalar(@${lines}) > 0 ){
+        my $line=shift(@{$lines});
+        last if $line =~ /^\s*$/;
+        if( $line =~ /\&lt;\&lt;\s*$/ ){
+            $fragment .= $`;
+            last;
+        }else{
+            $fragment .= $line;
+        }
+    }
+    my $s=&preprocess($fragment,$session);
     &puts('<p class="centering block" align="center">',$s,'</p>');
     1;
 }
 
 sub block_quoting{ ### "" ...
-    my ($fragment,$session)=@_;
-    return 0 unless $fragment =~ /\A&quot;&quot;/s;
+    my ($lines,$session)=@_;
+    return 0 unless $lines->[0] =~ /^&quot;&quot;/s;
+
+    my $fragment = &cut_until_blankline($lines);
 
     $fragment =~ s/^&quot;&quot;//gm;
     $fragment =~ s/^$/<br><br>/gm;
@@ -2654,8 +2713,10 @@ sub block_quoting{ ### "" ...
 }
 
 sub block_table{ ### || ... | ... |
-    my ($fragment,$session)=@_;
-    return 0 unless $fragment =~ /\A\s*\|\|/;
+    my ($lines,$session)=@_;
+    return 0 unless $lines->[0] =~ /^\s*\|\|/;
+
+    my $fragment = &cut_until_blankline($lines,'|');
 
     my $i=0;
     &puts('<table class="block">');
@@ -2672,25 +2733,38 @@ sub block_table{ ### || ... | ... |
 }
 
 sub block_htmltag{ ### <blockquote> or <center>
-    my ($fragment,$session)=@_;
-    return 0 unless
-        $fragment =~ /\A\s*&lt;(blockquote|center)&gt;(.*)&lt;\/\1&gt;\s*\Z/si ;
-    my $tag=$1;
-    &puts( "<$tag>",&preprocess($2,$session),"</$tag>" );
+    my ($lines,$session)=@_;
+    return 0 unless $lines->[0] =~ /^\s*&lt;(blockquote|center)&gt;/si;
+    my $fragment=$'; 
+    my $tag=$1; 
+    shift(@{$lines});
+
+    while( scalar(@{$lines}) > 0 ){
+        my $line=shift(@{$lines});
+        if( $line =~ /&lt;\/${tag}&gt;/si ){
+            $fragment .= $`;
+            $lines->[0] = $';
+            last;
+        }else{
+            $fragment .= $line;
+        }
+    }
+    &puts( "<$tag>",&preprocess($fragment,$session),"</$tag>" );
     1;
 }
 
 sub block_separator{ ### ---
-    my ($fragment,$session)=@_;
-    return 0 unless $fragment =~ /\A\s*\-\-\-+\s*\Z/;
-
+    my ($lines,$session)=@_;
+    return 0 unless $lines->[0] =~ /^\s*\-\-\-+\s*$/;
+    shift(@{$lines});
     &puts( '<hr class="sep">' );
     1;
 }
 
 sub block_normal{
-    my ($fragment,$session)=@_;
-    if( (my $s = &preprocess($fragment,$session)) !~ /^\s*$/s ){
+    my ($lines,$session)=@_;
+    my $fragment = &cut_until_blankline($lines,'');
+    if( (my $s = &preprocess($fragment,$session)) !~ /\A\s*\Z/s ){
         if( $s =~ /\A\s*<(\w+).*<\/\1[^\/]*>\s*\Z/si ){
             &puts( "<div>$s</div>" );
         }else{
