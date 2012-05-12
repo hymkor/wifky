@@ -2719,8 +2719,9 @@ sub block_table{ ### || ... | ... |
     my $fragment = &cut_until_blankline($lines,'|');
 
     my $i=0;
+    $fragment =~ s/^\A\s*\|\|//;
     &puts('<table class="block">');
-    foreach my $tr ( split(/\|\|/,&preprocess($',$session) ) ){
+    foreach my $tr ( split(/\|\|/,&preprocess($fragment,$session) ) ){
         my $tag='td';
         if( $tr =~ /\A\|/ ){
             $tag = 'th'; $tr = $';
