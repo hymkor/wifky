@@ -2681,7 +2681,7 @@ sub block_midashi2{ ### !!!... ###
 
 sub block_centering{ ### >> ... <<
     my ($lines,$session)=@_;
-    return 0 unless $lines->[0] =~ /^\s*\&gt;\&gt;(?!\})/;
+    return 0 unless $lines->[0] =~ /^\s*\&gt;\&gt;(?!\{)/;
 
     $lines->[0] = $';
     my $fragment="";
