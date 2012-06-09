@@ -2363,7 +2363,8 @@ sub plugin_pagename{
 
 sub plugin_taglist{
     my $html='<div class="taglist">';
-    while( my ($label,$list)=each %::label_contents ){
+    foreach my $label(sort keys %::label_contents){
+        my $list=$::label_contents{$label};
         $html .= '<span class="taglist">';
         $html .= &anchor(&enc($label),{ tag=>$label,a=>'index'},{ class=>'tag'});
         $html .= sprintf('<span class="tagnum">(%d)</span></span> ',scalar(@{$list}));

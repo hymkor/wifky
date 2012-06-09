@@ -10,7 +10,8 @@ $::inline_plugin{tagcloud}=sub {
         [ 4,"88.8","bold"],
         [ 0,"88.8","normal"],
     );
-    while( my ($label,$list)=each %::label_contents ){
+    foreach my $label(sort keys %::label_contents){
+        my $list=$::label_contents{$label};
         my $style='';
         foreach my $s (@count_and_style){
             if( scalar(@{$list}) >= $s->[0] ){
