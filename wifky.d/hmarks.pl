@@ -1,9 +1,9 @@
-# 1.12_0 # hmarks.pl
+# 1.13_0 # hmarks.pl
 
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.12_0";
+my $version="1.13_0";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -89,19 +89,10 @@ sub marking{
 
     &::verb(
         &anchor_delicous     ($url,$title,$session) .
-        &anchor_livedoor_clip($url,$title,$session) .
         &anchor_hatena       ($url,$title,$session) .
         &anchor_twitter      ($url,$title,$session) .
         &anchor_facebook     ($url,$title,$session)
     );
-}
-
-sub anchor_livedoor_clip{
-    my ($url,$title)=@_;
-    sprintf(' <a href="http://clip.livedoor.com/redirect?link=%s&title=%s&ie=%s" class="ldclip-redirect" title="[Livedoor Clip]"><img src="http://parts.blog.livedoor.jp/img/cmn/clip_16_16_w.gif" width="16" height="16" alt="[Livedoor Clip]" style="border: none" /></a> '
-        , &::enc( $url )
-        , &::enc( $title ) 
-        , $::charset );
 }
 
 sub anchor_hatena{
