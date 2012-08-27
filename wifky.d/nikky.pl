@@ -1,3 +1,4 @@
+# 1.1.4_0 # Nikky Plugin
 package wifky::nikky;
 
 # use strict; use warnings;
@@ -25,7 +26,7 @@ $wifky::nikky::template ||= '
 
 my %nikky;
 my @nikky;
-my $version='1.1.3_0';
+my $version='1.1.4_0';
 my ($nextday_info , $prevday_info , $nextmonth_url , $prevmonth_url , $startday_url , $endday_url );
 
 if( exists $::menubar{'200_New'} ){
@@ -164,7 +165,7 @@ $::inline_plugin{lastdiary} = sub {
     my @list=&::ls_core( {} , '(????.??.??)*' );
     my @tm=localtime(time+24*60*60);
     my $tomorrow=sprintf('(%04d.%02d.%02d)',1900+$tm[5],1+$tm[4],$tm[3]);
-    my @list=grep{ $_->{title} lt $tomorrow && -f $_->{fname} } @list;
+    @list=grep{ $_->{title} lt $tomorrow && -f $_->{fname} } @list;
     &concat_article( reverse( scalar(@list) > $days ? @list[-($days)..-1] : @list) );
 
     $::print;
@@ -308,36 +309,55 @@ $::action_plugin{rss}= sub {
             url   => sprintf('%s?p=%s',$::me,$pageurl),
             title => $p->{title} ,
             timestamp => $p->{timestamp},
-            desc  => [] ,
+            desc  => "" ,
             attachment => $p->{attachment} ,
         );
 
         if( &::is('nikky_rssitemsize') ){
             ### 1 section to 1 rssitem ###
 
-            foreach my $frag ( split(/\r?\n\r?\n/,$text) ){
-                if( $frag =~ /^\s*&lt;&lt;(?!&lt;)(.*)&gt;&gt;\s*$/s ||
-                    $frag =~ /^!!!(.*)$/s )
-                {
-                    push(@topics , { %item } ) if @{$item{desc}};
-
-                    $item{url} = sprintf('%s?p=%s#p%d',$::me,$pageurl,++$id) ;
-                    $item{desc} = [];
-                    my $title = &::preprocess($1,$session);
-                    if( defined &::unverb ){
-                        &::unverb( \$title );
-                    }else{
-                        $title =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
-                    }
-                    $title =~ s/\<[^\>]*\>\s*//g;
-                    $item{title} = &::denc($title);
+            my @lines=split(/\n/,$text);
+            my $newitem = sub{
+                my $title=shift;
+                $item{url} = sprintf('%s?p=%s#p%d',$::me,$pageurl,++$id) ;
+                $item{desc} = "";
+                $title = &::preprocess($title,$session);
+                if( defined &::unverb ){
+                    &::unverb( \$title );
+                }else{
+                    $title =~ s|\a((?:[0-9a-f][0-9a-f])*)\a|pack('h*',$1)|ges;
                 }
-                push(@{$item{desc}}, $frag );
+                $title =~ s/\<[^\>]*\>\s*//g;
+                $item{title} = &::denc($title);
+            };
+            while( scalar(@lines) > 0 ){
+                if( $lines[0] =~ /^\s*&lt;&lt;(?!&lt;)(?!\{)/ ){
+                    push(@topics,{ %item } ) if $item{desc};
+                    my $title="";
+                    $lines[0] = $';
+                    while( scalar(@lines) > 0 ){
+                        if( $lines[0] =~ /&gt;&gt;\s*$/s ){
+                            $title .= $`;
+                            shift(@lines);
+                            last;
+                        }else{
+                            $title .= shift(@lines);
+                        }
+                    }
+                    $newitem->( $title );
+                }elsif( $lines[0] =~ /^\!\!\!(.*)$/s ){
+                    push(@topics,{ %item } ) if $item{desc};
+                    $newitem->( $1 );
+                    shift(@lines);
+                }else{
+                    $item{desc} .= "\n";
+                    $item{desc} .= shift(@lines);
+                }
             }
-            push(@topics , { %item } ) if @{$item{desc}};
+            push(@topics , { %item } ) if $item{desc};
         }else{
             ### blog-mode ( 1 page to 1 rss-item) ###
-            $item{desc} = [ $text ] ;
+            $item{desc} = $text;
             push(@topics , { %item } );
         }
         while( my ($name,$value)=each %{$p->{attachment}} ){
@@ -348,21 +368,18 @@ $::action_plugin{rss}= sub {
                                 unpack('h*',$p->{title}) ,
                                 unpack('h*',$id)) ;
             $item{title} = sprintf('Comment for %s', $p->{title} );
-            $item{desc} = [ 
-                &::verb(
-                    '<dl>' . join("\n",
-                        map{
-                            my ($dt,$who,$text)=
-                                map{ &::enc(&::deyen($_)) } split(/\t/,$_,3);
-                            "<dt>$who ($dt)</dt><dd>$text</dd>";
-                        } split(/\n/,&::read_object($p->{title},$name) )
-                    ) . '</dl>'
-                )
-            ];
+            $item{desc} = &::verb(
+                '<dl>' . join("\n",
+                    map{
+                        my ($dt,$who,$text)=
+                            map{ &::enc(&::deyen($_)) } split(/\t/,$_,3);
+                        "<dt>$who ($dt)</dt><dd>$text</dd>";
+                    } split(/\n/,&::read_object($p->{title},$name) )
+                ) . '</dl>'
+            );
             push(@topics , { %item } );
         }
     }
-
     ### write list ###
     print map(qq(<rdf:li rdf:resource=").$_->{url}.qq("/>\n),@topics);
 
@@ -395,7 +412,7 @@ $::action_plugin{rss}= sub {
             $ss->{attachment}->{$key}  = $val ;
         }
 
-        &::syntax_engine( join("\n\n",@{$t->{desc}}) , $ss ) ;  
+        &::syntax_engine( $t->{desc} , $ss );
         $::print =~ s/<!--- READ MORE --->.*\Z//s;
         
         print  '<description><![CDATA[';
@@ -502,7 +519,7 @@ sub init{
     ### 月初・月末の URL を作成する.
     my $month_first=substr($p,0,9).'00)';
     my $month_end  =substr($p,0,9).'99)';
-    my ($p,$n);
+    my $n;
     foreach(@nikky){
         $p   = $_ if $_->{title} lt $month_first;
         $n ||= $_ if $_->{title} gt $month_end  ;
