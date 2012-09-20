@@ -2318,7 +2318,9 @@ sub plugin_comment{
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
                 $caption );
-    for(split(/\r?\n/,&read_text($::form{p} , "comment.$comid"))){
+    my @comments = split(/\r?\n/,&read_text($::form{p} , "comment.$comid"));
+    @comments = reverse @comments if $opt{r};
+    for(@comments){
         my ($dt,$who,$say) = split(/\t/,$_,3);
         my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
         $buf .= sprintf('<p><span class="commentator">%s</span>'.
