@@ -1958,7 +1958,7 @@ sub euc2sjis{
 }
 
 sub cache_update{
-    unless( defined(%::contents) ){
+    unless( %::contents ){
         opendir(DIR,'.') or die('can\'t read work directory.');
         while( my $fn=readdir(DIR) ){
             if( my @x=($fn=~/^((?:[0-9a-f][0-9a-f])+)(?:__((?:[0-9a-f][0-9a-f])+))?$/)){
