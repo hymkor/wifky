@@ -277,7 +277,9 @@ sub init_globals{
             { desc=>'Subsection mark' , name=>'subsectionmark' , size=>3 } ,
             { desc=>'Subsubsection mark' , name=>'subsubsectionmark' , size=>3 } ,
             { desc=>'Ignore IP Address for Administrator' , name=>'ignore_addr' , 
-              type=>'checkbox' }
+              type=>'checkbox' },
+            { desc=>'Signin Timeout hours(default:24hours)' ,
+              name=>'signin_timeout' , size=>2 }
         ],
     );
     %::inline_syntax_plugin = (
@@ -1052,6 +1054,10 @@ sub local_cookie{
     $id;
 }
 
+sub int_or_default{
+    (defined($_[0]) && $_[0] =~ /^\d+$/) ? $_[0] : $_[1];
+}
+
 sub is_signed{
     return $::signed if defined $::signed;
 
@@ -1059,7 +1065,8 @@ sub is_signed{
 
     # time(TAB)ip(TAB)key
     for( split(/\n/,&read_textfile('session.cgi') ) ){
-        $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ && $1>time-24*60*60;
+        $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ 
+            && $1>time - &int_or_default($::config{signin_timeout},24)*60*60;
     }
 
     if( ($::form{signing} && &auth_check() ) ||
