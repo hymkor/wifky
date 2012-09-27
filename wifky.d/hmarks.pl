@@ -1,9 +1,9 @@
-# 1.13_0 # hmarks.pl
+# 1.14_0 # hmarks.pl
 
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.13_0";
+my $version="1.14_0";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -20,6 +20,18 @@ if( $::config{hmark_each_section} ){
     (*::headline,*org_headline ) = (*new_headline,*::headline);
 }
 
+push( @::copyright , <<HTML );
+<script type="text/javascript">
+  window.___gcfg = {lang: 'ja'};
+
+  (function() {
+    var po = document.createElement('script'); po.type = 'text/javascript'; po.async = true;
+    po.src = 'https://apis.google.com/js/plusone.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  })();
+</script>
+HTML
+
 ###
 ### Hatena Bookmark Secion ###
 ###
@@ -27,6 +39,7 @@ if( $::config{hmark_each_section} ){
 sub new_headline{
     my %arg = @_;
     my ($depth,$text,$session)=($arg{n}-3,$arg{body},$arg{session});
+    &org_headline( %arg );
     if( $depth == 0 &&
         $session->{title} ne 'Footer'  &&
         $session->{title} ne 'Sidebar' &&
@@ -35,15 +48,11 @@ sub new_headline{
         $session->{title} ne 'Help' &&
         $session->{title} !~ /^\./ )
     {
-        $arg{body} .= &marking(
+        &::puts( '<div align="right">'.&marking(
             $session,
             "#p". ( exists $session->{section} ? $session->{section}->[$depth] : 1),
             $text
-        );
-
-        &org_headline( %arg );
-    }else{
-        &org_headline( %arg );
+        ).'</div>' );
     }
 }
 
@@ -91,7 +100,8 @@ sub marking{
         &anchor_delicous     ($url,$title,$session) .
         &anchor_hatena       ($url,$title,$session) .
         &anchor_twitter      ($url,$title,$session) .
-        &anchor_facebook     ($url,$title,$session)
+        &anchor_facebook     ($url,$title,$session) .
+        &anchor_gplusone     ($url,$title,$session) 
     );
 }
 
@@ -145,6 +155,11 @@ sub anchor_delicous{
         , &::enc($url)
         , &::enc($title)
     );
+}
+
+sub anchor_gplusone{
+    my ($url,$title,$session)=@_;
+    sprintf('<div class="g-plusone" data-size="medium" data-annotation="none" data-width="300" data-href="%s"></div>',&::enc($url));
 }
 
 ###
