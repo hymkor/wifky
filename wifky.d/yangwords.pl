@@ -1,6 +1,10 @@
+# 0.3 # yangwords.pl
+
 package wifky::yangwords;
 
-$::preferences{'Yet Another NG-Words Plugin 0.2'} = [
+my $version = "0.3";
+
+$::preferences{"Yet Another NG-Words Plugin $version"} = [
     {
         desc=>'Only administrator can write ng words.' ,
         name=>'yangwords_admin_ok' ,
@@ -10,8 +14,12 @@ $::preferences{'Yet Another NG-Words Plugin 0.2'} = [
         name=>'yangwords',
         type=>'textarea',
         rows=>20,
-    },
-    {
+    },{
+        desc=>'NG IPs',
+        name=>'yangwords_ngips',
+        type=>'textarea',
+        rows=>20,
+    },{
         desc=>'record IP-address' ,
         name=>'yangwords_record_ip' ,
         type=>'checkbox' ,
@@ -24,7 +32,20 @@ if( !&::is_signed() || !$::config{yangwords_admin_ok} ){
     $::action_plugin{'comment'} = \&new_comment;
 }
 
+my %ng_ip;
+foreach my $ip ( split(/\s+/, $::config{yangwords_ngips}) ){
+    $ng_ip{$ip} = 1;
+}
+
+sub ip_check{
+    if( exists $ng_ip{ $ENV{REMOTE_ADDR} } ){
+        push( @::http_header , 'Status: 403 Forbidden' );
+        die("!403 Forbidden!");
+    }
+}
+
 sub new_submit{
+    &ip_check();
     if( defined(my $item=&found_ng( \$::form{text_t})) ){
         die(qq{!Your subject has NG word: "$item".!});
     }
@@ -32,6 +53,7 @@ sub new_submit{
 };
 
 sub new_comment{
+    &ip_check();
     my $remote_addr = '{'.$ENV{REMOTE_ADDR}.'}';
     foreach my $text ( \$::form{'who'}, \$::form{'comment'}, \$remote_addr ){
         if( defined(my $item=&found_ng($text)) ){
