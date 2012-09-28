@@ -85,6 +85,9 @@ sub marking{
             ) . $ENV{'SCRIPT_NAME'};
     local $::postme=$::me;
     my $url = &::myurl( { p=>$session->{title} } , $sharp||'' );
+    my $url2 = $::charset eq 'EUC-JP' 
+            ? &::myurl( { hp=>unpack('h*',$session->{title}) } , $sharp||'')
+            : $url ;
 
     if( defined $title ){
         $title = &::preprocess($title);
@@ -101,7 +104,7 @@ sub marking{
         &anchor_hatena       ($url,$title,$session) .
         &anchor_twitter      ($url,$title,$session) .
         &anchor_facebook     ($url,$title,$session) .
-        &anchor_gplusone     ($url,$title,$session) 
+        &anchor_gplusone     ($url2 , $title , $session) 
     );
 }
 
