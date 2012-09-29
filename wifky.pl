@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.11_0';
+$::version  = '1.5.11_1';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -301,13 +301,12 @@ sub init_globals{
         '500_centering'  => \&block_centering ,
         '600_quoting'    => \&block_quoting ,
         '700_table'      => \&block_table ,
-        '800_htmltag'    => \&block_htmltag ,
         '900_seperator'  => \&block_separator ,
         '990_normal'     => \&block_normal ,
     );
     %::call_syntax_plugin = (
         '100_verbatim'       => \&call_verbatim ,
-        '200_blockquote'     => \&call_blockquote ,
+        '200_blockhtml'      => \&call_blockhtml ,
         '500_block_syntax'   => \&call_block ,
         '800_close_sections' => \&call_close_sections ,
         '900_footer'         => \&call_footnote ,
@@ -2078,9 +2077,11 @@ sub call_verbatim{
     !gesm;
 }
 
-sub call_blockquote{
+sub call_blockhtml{
     ${$_[0]} =~
-    s!(?:&lt;blockquote&gt;|6&lt;)(.*?)(?:&lt;/blockquote&gt;|&gt;9)!&call_blockquote_sub($1,$_[1])!gesm;
+    s!(?:&lt;blockquote&gt;|6&lt;)(.*?)(?:&lt;/blockquote&gt;|&gt;9)!&call_blockhtml_sub($1,$_[1],'blockquote')!gesmi;
+    ${$_[0]} =~
+    s!&lt;center&gt;(.*?)&lt;/center&gt;!&call_blockhtml_sub($1,$_[1],'center')!gesmi;
 }
 
 sub midashi_bq{
@@ -2088,12 +2089,12 @@ sub midashi_bq{
     &puts('<div class="bqh'.($depth+1).'">'.&preprocess($text,$session).'</div>');
 }
 
-sub call_blockquote_sub{
-    my ($text,$request)=@_;
+sub call_blockhtml_sub{
+    my ($text,$request,$tag)=@_;
     local $::print='';
     local *::midashi=*::midashi_bq;
     &call_block( \$text , $request );
-    qq(\n\n<blockquote class="block">).&verb($::print)."</blockquote>\n\n";
+    qq(\n\n<${tag} class="block">).&verb($::print)."</${tag}>\n\n";
 }
 
 
@@ -2740,27 +2741,6 @@ sub block_table{ ### || ... | ... |
                map("<$tag>$_</$tag>",split(/\|/,$tr) ) , '</tr>' );
     }
     &puts('</table>');
-    1;
-}
-
-sub block_htmltag{ ### <blockquote> or <center>
-    my ($lines,$session)=@_;
-    return 0 unless $lines->[0] =~ /^\s*&lt;(blockquote|center)&gt;/si;
-    my $fragment=$'; 
-    my $tag=$1; 
-    shift(@{$lines});
-
-    while( scalar(@{$lines}) > 0 ){
-        my $line=shift(@{$lines});
-        if( $line =~ /&lt;\/${tag}&gt;/si ){
-            $fragment .= $`;
-            $lines->[0] = $';
-            last;
-        }else{
-            $fragment .= $line;
-        }
-    }
-    &puts( "<$tag>",&preprocess($fragment,$session),"</$tag>" );
     1;
 }
 
