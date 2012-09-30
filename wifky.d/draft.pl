@@ -1,4 +1,8 @@
+# 0.6_0 # draft.pl
+
 package wifky::draft;
+
+my $version = '0.6_0';
 
 # use strict;use warnings;
 
@@ -18,6 +22,19 @@ if( &::is_signed() ){
         }
         &::transfer_page();
     };
+    if( $::config{draft__autosave} ){
+        my %original_action;
+        foreach $a ('Preview' , 'Upload' , 'Freeze/Fresh' , 'Cut' , 'Delete'){
+            next unless $::action_plugin{$a};
+            $original_action{$a} = $::action_plugin{$a};
+            $::action_plugin{$a} = sub {
+                my $fn = &::title2fname($::form{p},'draft.txt');
+                chmod(0666,$fn);
+                &::write_file($fn,$::form{text_t});
+                $original_action{$::form{a}}->(@_);
+            };
+        }
+    }
     $::action_plugin{edt} = sub{
         my $title=$::form{p};
         my $body_time  = &::title2mtime($title);
@@ -73,6 +90,12 @@ if( &::is_signed() ){
     };
     push( @{$::menubar{'600_Index'}} , &::anchor('DraftList',{a=>'draftlist'}));
     $::action_plugin{draftlist} = \&action_draft_list;
+
+    $::preferences{"Draft Plugin $version"} = [
+        { desc=>'Auto Save' , 
+          name=>'draft__autosave' ,
+          type=>'checkbox' }
+    ];
 }
 
 sub action_draft_list{
