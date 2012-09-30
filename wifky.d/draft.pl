@@ -11,15 +11,7 @@ if( &::is_signed() ){
         &::puts('<input type="submit" name="a" value="SaveAsDraft">');
     };
     $::action_plugin{SaveAsDraft} = sub{
-        my $title=$::form{p};
-        my $fn = &::title2fname($title,'draft.txt');
-        chmod(0666,$fn);
-        &::write_file($fn,$::form{text_t});
-        my $label=$::form{label_t};
-        if( $label ){
-            my $afn = &::title2fname($title,'draft_label.txt');
-            &::write_file($afn,$label);
-        }
+        &save_draft();
         &::transfer_page();
     };
     if( $::config{draft__autosave} ){
@@ -28,9 +20,7 @@ if( &::is_signed() ){
             next unless $::action_plugin{$a};
             $original_action{$a} = $::action_plugin{$a};
             $::action_plugin{$a} = sub {
-                my $fn = &::title2fname($::form{p},'draft.txt');
-                chmod(0666,$fn);
-                &::write_file($fn,$::form{text_t});
+                &save_draft();
                 $original_action{$::form{a}}->(@_);
             };
         }
@@ -96,6 +86,18 @@ if( &::is_signed() ){
           name=>'draft__autosave' ,
           type=>'checkbox' }
     ];
+}
+
+sub save_draft{
+    my $title=$::form{p};
+    my $fn = &::title2fname($title,'draft.txt');
+    chmod(0666,$fn);
+    &::write_file($fn,$::form{text_t});
+    my $label=$::form{label_t};
+    if( $label ){
+        my $afn = &::title2fname($title,'draft_label.txt');
+        &::write_file($afn,$label);
+    }
 }
 
 sub action_draft_list{
