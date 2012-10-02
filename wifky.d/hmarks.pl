@@ -1,9 +1,9 @@
-# 1.14_0 # hmarks.pl
+# 1.14_1 # hmarks.pl
 
 package wifky::hmarks;
 #use strict;use warnings;
 
-my $version="1.14_0";
+my $version="1.14_1";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -153,6 +153,8 @@ sub anchor_facebook{
 
 sub anchor_delicous{
     my ($url,$title,$session)=@_;
+
+    $url =~ s/'/%27/g;
 
     sprintf(q| <a href="http://www.delicious.com/save" onclick="window.open('http://www.delicious.com/save?v=5&noui&jump=close&url='+encodeURIComponent('%s')+'&title='+encodeURIComponent('%s'), 'delicious','toolbar=no,width=550,height=550'); return false;" title="[Delicous]"><img src="http://www.delicious.com/static/img/delicious.small.gif" height="10" width="10" alt="[Delicious]" border="0" /></a> |
         , &::enc($url)
