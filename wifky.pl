@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.11_1';
+$::version  = '1.5.11_2';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -102,6 +102,8 @@ sub init_globals{
         $::PROTOCOL = '(?:s?https?|ftp|file)';
         $::RXURL    = '(?:s?https?|ftp|file)://[-\\w.!~*\'();/?:@&=+$,%#]+';
     }
+
+    $ENV{TZ} = $::config{TZ} if $::config{TZ};
 
     $::target = ( $::config{target}
                 ? sprintf(' target="%s"',$::config{target}) : '' );
@@ -279,7 +281,9 @@ sub init_globals{
             { desc=>'Ignore IP Address for Administrator' , name=>'ignore_addr' , 
               type=>'checkbox' },
             { desc=>'Signin Timeout hours(default:24hours)' ,
-              name=>'signin_timeout' , size=>2 }
+              name=>'signin_timeout' , size=>2 },
+	    { desc=>'Time Zone string(for example, JST-9 )' ,
+	      name=>'TZ' , size=>6 }
         ],
     );
     %::inline_syntax_plugin = (
@@ -526,7 +530,7 @@ HERE
     );
 
     @::index_columns = (
-        sub{ $_[1]->{l} ? '<tt>'.$_[0]->{mtime}.'</tt>' : '' } ,
+        sub{ $_[1]->{l} ? '<tt>'.&ymdhms($_[0]->{timestamp}).'</tt>' : '' } ,
         sub{ $_[1]->{i} ? '<tt>'.(1+scalar(keys %{$_[0]->{attach}})).'</tt>' : '' } ,
         sub{ anchor( &enc($_[0]->{title}) , { p=>$_[0]->{title} } ) } ,
         sub{ $_[1]->{l} ? &label2html($_[0]->{title},'span') : '' } ,
@@ -1473,7 +1477,7 @@ sub action_seek_found_{
     &puts(
         '<li>'.
         join(' ', map{ $_->(
-            { title=>$_[0] , fname=>$_[1] , mtime=>&mtime($_[1]) } , { l=>1 } )
+            { title=>$_[0] , fname=>$_[1] , timestamp=>&mtimeraw($_[1]) } , { l=>1 } )
         } @::index_columns ).
         "</li>\n"
     );
@@ -2274,7 +2278,7 @@ sub ls_core{
     } values %::contents;
 
     if( exists $opt->{t} ){
-        @list = sort{ $a->{mtime} cmp $b->{mtime} } @list;
+        @list = sort{ $a->{timestamp} cmp $b->{timestamp} } @list;
     }else{
         @list = sort{ $a->{title} cmp $b->{title} } @list;
     }
