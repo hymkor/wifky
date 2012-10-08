@@ -1,9 +1,10 @@
+# 0.9_0 # amazon.pl
 package wifky::amazon;
 
 use strict; use warnings;
-my $version='0.8_0';
+my $version='0.9_0';
 
-my $default_amazon_proxy = 'forgot.uh-oh.jp/amazon_proxy.cgi';
+my $default_amazon_proxy = 'wifky.sourceforge.jp/cgi-bin/amazon_proxy.cgi';
 
 $::preferences{"Amazon.pl $version"} = [
     {
