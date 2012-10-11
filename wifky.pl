@@ -2319,7 +2319,6 @@ sub plugin_comment{
 
     my $session=shift;
     &parse_opt( \my %opt , \my @arg , @_ );
-    my $title_= &enc($::form{p});
     my $comid = (shift(@arg) || '0');
     my $caption = @arg ? '<div class="caption">'.join(' ',@arg).'</div>' : '';
 
@@ -2330,23 +2329,12 @@ sub plugin_comment{
                 unpack('h*',$::form{p}) ,
                 unpack('h*',$comid) ,
                 $caption );
-    my @comments = split(/\r?\n/,&read_text($::form{p} , "comment.$comid"));
-    @comments = reverse @comments if $opt{r};
-    for(@comments){
-        my ($dt,$who,$say) = split(/\t/,$_,3);
-        my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
-        $buf .= sprintf('<p><span class="commentator">%s</span>'.
-            ' %s <span class="comment_date">(%s)</span></p>'
-                , &enc(&deyen($who)), $text , &enc($dt) );
-    }
-    unless( exists $opt{f} ){
-        my $comid_ = &enc($comid);
-        $buf .= <<HTML
+    my $input_form = $opt{f} ? '' : sprintf(<<HTML
 <div class="form">
-<form action="$::postme" method="post" class="comment">
-<input type="hidden" name="p" value="$title_">
+<form action="%s" method="post" class="comment">
+<input type="hidden" name="p" value="%s">
 <input type="hidden" name="a" value="comment">
-<input type="hidden" name="comid" value="$comid_">
+<input type="hidden" name="comid" value="%s">
 <div class="field name">
 <input type="text" name="who" size="10" class="field">
 </div><!-- div.field name -->
@@ -2359,7 +2347,19 @@ sub plugin_comment{
 </form>
 </div><!-- div.form -->
 HTML
+    , $::postme , &enc($::form{p}) , &enc($comid) );
+
+    $buf .= $input_form if $opt{r};
+    my @comments = split(/\r?\n/,&read_text($::form{p} , "comment.$comid"));
+    @comments = reverse @comments if $opt{r};
+    for(@comments){
+        my ($dt,$who,$say) = split(/\t/,$_,3);
+        my $text=&enc(&deyen($say)); $text =~ s/\n/<br>/g;
+        $buf .= sprintf('<p><span class="commentator">%s</span>'.
+            ' %s <span class="comment_date">(%s)</span></p>'
+                , &enc(&deyen($who)), $text , &enc($dt) );
     }
+    $buf .= $input_form unless $opt{r};
     $buf . '</div></div>';
 }
 
