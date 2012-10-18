@@ -519,13 +519,13 @@ sub init{
     ### 月初・月末の URL を作成する.
     my $month_first=substr($p,0,9).'00)';
     my $month_end  =substr($p,0,9).'99)';
-    my $n;
+    my $P,$N;
     foreach(@nikky){
-        $p   = $_ if $_->{title} lt $month_first;
-        $n ||= $_ if $_->{title} gt $month_end  ;
+        $P   = $_ if $_->{title} lt $month_first;
+        $N ||= $_ if $_->{title} gt $month_end  ;
     }
-    $prevmonth_url = &::title2url($p->{title}) if $p;
-    $nextmonth_url = &::title2url($n->{title}) if $n;
+    $prevmonth_url = &::title2url($P->{title}) if $P;
+    $nextmonth_url = &::title2url($N->{title}) if $N;
     $::menubar{'050_prevday'} = &inline_prevday(undef,'<');
     $::menubar{'950_nextday'} = &inline_nextday(undef,'>');
     $startday_url = &::title2url($nikky[ 0]->{title}) if @nikky;
