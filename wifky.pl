@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.11_2';
+$::version  = '1.5.11_3';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -750,7 +750,7 @@ sub form_label{
             $label = join(' ',keys %{$p->{label}});
         }
     }else{
-        $label = $::form{label_t};
+        $label = $::form{label_t} || '';
         $label =~ s/ +/ /;
     }
     &putenc('<div>Tag:<textarea cols="40" rows="1" name="label_t">%s</textarea></div>',
@@ -766,9 +766,10 @@ sub form_preview_button{
     &puts('<input type="submit" name="a" value="Preview">');
 }
 sub form_signarea{
-    &is_signed() or &is_frozen() or return;
+    my $token=&is_signed();
+    $token or &is_frozen() or return;
 
-    &puts('<input type="hidden" name="admin" value="admin">');
+    &putenc('<input type="hidden" name="admin" value="%s">',$token);
 
     &puts('<input type="checkbox" name="to_freeze" value="1"');
     &puts('checked') if &is_frozen();
@@ -969,8 +970,14 @@ sub print_signarea{
 }
 
 sub check_frozen{
-    if( !&is_signed() && &is_frozen() ){
-        die( '!This page is frozen.!');
+    if( &is_frozen() ){
+        my $token=&is_signed();
+        unless( $token ){
+            die( '!This page is frozen.!');
+        }
+        unless( $::form{admin} && $::form{admin} eq $token ){
+            die( '!CSRF Error!' );
+        }
     }
 }
 sub check_conflict{
@@ -1066,28 +1073,34 @@ sub is_signed{
 
     my $id=$::cookie{$::session_cookie} || &local_cookie() || rand();
 
-    # time(TAB)ip(TAB)key
+    # time(TAB)ip(TAB)cookie(TAB)onetimetoken
     for( split(/\n/,&read_textfile('session.cgi') ) ){
-        $::ip{$2}=[$3,$1] if /^\#(\d+)\t([^\t]+)\t(.*)$/ 
+        $::ip{$2}=[$3,$1,$4] if /^\#(\d+)\t([^\t]+)\t([^\t]+)\t(.*)$/ 
             && $1>time - &int_or_default($::config{signin_timeout},24)*60*60;
     }
 
-    if( ($::form{signing} && &auth_check() ) ||
-        ($::ip{$::remote_addr} && $::ip{$::remote_addr}->[0] eq $id ) )
-    {
+    my $t;
+    if( $::form{signing} && &auth_check() ){
+        # at login
         push( @::http_header , "Set-Cookie: $::session_cookie=$id" );
-        $::ip{$::remote_addr} = [ $id , time ];
-        &save_session();
-        $::signed=1;
+        $::ip{$::remote_addr} = [ $id , time , $::signed=rand() ];
+    }elsif( ($t=$::ip{$::remote_addr}) && $t->[0] eq $id ){
+        # in session
+        $t->[1] = time;
+        $::signed=$t->[2];
     }else{
-        $::signed=0;
+        # not in
+        return $::signed=0;
     }
+    &save_session();
+    $::signed;
 }
 
 sub save_session{
     &lockdo( sub{
         &write_file( 'session.cgi' ,
-            join("\n",map(sprintf("#%s\t%s\t%s",$::ip{$_}->[1],$_,$::ip{$_}->[0]),
+            join("\n",map(sprintf("#%s\t%s\t%s\t%s"
+                        ,$::ip{$_}->[1],$_,$::ip{$_}->[0],$::ip{$_}->[2]),
                  keys %::ip ))
         ); } , 'session.cgi'
     );
@@ -1271,7 +1284,8 @@ sub action_passwd{
 }
 
 sub action_tools{
-    goto &action_signin unless &is_signed();
+    my $token=&is_signed();
+    goto &action_signin unless $token;
 
     &browser_cache_off();
     push( @::html_header , <<'HEADER' );
@@ -1309,6 +1323,7 @@ HEADER
                 &putenc('<form action="%s" method="post" accept-charset="%s">',
                             $::postme,$::charset);
                 &putenc('<input type="hidden" name="section" value="%s">',$section);
+                &putenc('<input type="hidden" name="admin" value="%s">',$token);
 
                 &puts('<ul>');
                 foreach my $i ( @{$::preferences{$section}} ){
@@ -1381,7 +1396,9 @@ HEADER
 }
 
 sub action_preferences{
-    goto &action_signin unless &is_signed();
+    my $token=&is_signed();
+    goto &action_signin unless $token;
+    die('!CSRF Error!') unless $::form{admin} && $::form{admin} eq $token;
 
     foreach my $i ( @{$::preferences{$::form{section}}} ){
         next unless exists $i->{name};
