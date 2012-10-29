@@ -1532,7 +1532,11 @@ sub action_seek{
 }
 
 sub select_attachment_do{
-    goto &action_signin if &is_frozen() && !&is_signed();
+    if( &is_frozen() ){
+        my $token=&is_signed();
+        goto &action_signin unless $token;
+        die('!CSRF Error!') unless $::form{admin} && $::form{admin} eq $token;
+    }
     my $action=shift;
 
     foreach my $f ( @{$::forms{f}} ){
@@ -1581,7 +1585,9 @@ sub action_fresh_multipage{
 }
 
 sub action_freeze_or_fresh{
-    goto &action_signin unless &is_signed();
+    my $token=&is_signed();
+    goto &action_signin unless $token;
+    die('!CSRF Error!') unless $::form{admin} && $::form{admin} eq $token;
 
     foreach my $f ( @{$::forms{f}} ){
         my $fn=&title2fname( $::form{p} , $f );
