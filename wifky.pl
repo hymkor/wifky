@@ -1426,11 +1426,13 @@ sub action_preferences{
 }
 
 sub action_rename{
-    goto &action_signin unless &is_signed();
+    my $token=&is_signed();
+    goto &action_signin unless $token;
     my $title    = $::form{p};
     &transfer(page=>$title,message=>'Page not found') unless &object_exists($title);
 
     if( $::form{b} && $::form{b} eq 'body' ){
+        die("!CSRF Error!") unless $::form{admin} && $::form{admin} eq $token;
         my $newtitle = $::form{newtitle};
         my $fname    = &title2fname($title);
         my $newfname = &title2fname($newtitle);
@@ -1448,6 +1450,7 @@ sub action_rename{
         rename( $_->[0] , $_->[1] ) foreach @list;
         &transfer_page($newtitle);
     }elsif( $::form{b} && $::form{b} eq 'attachment' ){
+        die("!CSRF Error!") unless $::form{admin} && $::form{admin} eq $token;
         my $older=&title2fname($title,$::form{f1});
         my $newer=&title2fname($title,$::form{f2});
         die("!The new attachment name is null.!") unless $::form{f2};
@@ -1468,8 +1471,9 @@ sub action_rename{
                     <input type="hidden"  name="a" value="rename">
                     <input type="hidden"  name="b" value="body">
                     <input type="hidden"  name="p" value="%s">
+                    <input type="hidden"  name="admin" value="%s">
                     Title: <input type="text" name="newtitle" value="%s" size="80">'
-                    , $::postme , $title , $title );
+                    , $::postme , $title , $token , $title );
                 &puts('<br><input type="submit" name="ren" value="Submit"></form></p>');
 
                 if( @attachment ){
@@ -1477,8 +1481,9 @@ sub action_rename{
                         <form action="%s" method="post" name="rena">
                         <input type="hidden"  name="a" value="rename">
                         <input type="hidden"  name="b" value="attachment">
+                        <input type="hidden"  name="admin" value="%s">
                         <input type="hidden"  name="p" value="%s">'
-                        , $::postme , $title);
+                        , $::postme , $token , $title );
                     &puts('<select name="f1" onChange="document.rena.f2.value=this.options[this.selectedIndex].value;return false">');
                     &puts('<option value="" selected></option>');
                     foreach my $f (@attachment){
