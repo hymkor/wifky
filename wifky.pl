@@ -1179,9 +1179,11 @@ sub action_preview{
 }
 
 sub action_rollback{
-    goto &action_signin if &is_frozen() && !&is_signed();
+    my $token=&is_signed();
+    goto &action_signin unless $token;
 
     if( $::form{b} && $::form{b} eq 'Rollback' ){
+        die("!CSRF Error!") unless $::form{admin} && $::form{admin} eq $token;
         my $title=$::form{p};
         my $fn=&title2fname($title);
         my $frozen=&is_frozen();
@@ -1205,6 +1207,7 @@ sub action_rollback{
                     main=>1
                 );
                 &putenc('<form action="%s" method="post">',$::postme);
+                &putenc('<input type="hidden" name="admin" value="%s" />',$token );
                 &puts('<input type="hidden" name="a" value="rollback"> ');
                 &puts('<input type="submit" name="b" value="Rollback"> ');
                 &puts('<input type="submit" name="b" value="Cancel"> ');
