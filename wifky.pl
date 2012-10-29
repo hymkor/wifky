@@ -1411,9 +1411,7 @@ HEADER
 }
 
 sub action_preferences{
-    my $token=&is_signed();
-    goto &action_signin unless $token;
-    die('!CSRF Error!') unless $::form{admin} && $::form{admin} eq $token;
+    goto &action_signin unless &is_signed_csrf();
 
     foreach my $i ( @{$::preferences{$::form{section}}} ){
         next unless exists $i->{name};
@@ -1552,11 +1550,7 @@ sub action_seek{
 }
 
 sub select_attachment_do{
-    if( &is_frozen() ){
-        my $token=&is_signed();
-        goto &action_signin unless $token;
-        die('!CSRF Error!') unless $::form{admin} && $::form{admin} eq $token;
-    }
+    goto &action_signin if &is_frozen() && !&is_signed_csrf();
     my $action=shift;
 
     foreach my $f ( @{$::forms{f}} ){
