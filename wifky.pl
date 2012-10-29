@@ -1731,6 +1731,7 @@ sub filter_underscore_form{
 }
 
 sub do_tagging{
+    goto &action_signin unless &is_signed_csrf();
     my $action=shift;
     foreach my $tag ( split(/\s+/,$::form{tag}) ){
         my $suffix='__00'.unpack('h*',$tag);
