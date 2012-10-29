@@ -1096,6 +1096,18 @@ sub is_signed{
     $::signed;
 }
 
+sub is_signed_csrf{
+    if( my $token=&is_signed() ){
+        if( $::form{admin} && $::form{admin} eq $token ){
+            $token;
+        }else{
+            die('!CSRF Error!');
+        }
+    }else{
+        0;
+    }
+}
+
 sub save_session{
     &lockdo( sub{
         &write_file( 'session.cgi' ,
@@ -1581,21 +1593,19 @@ sub action_delete{
 }
 
 sub action_freeze_multipage{
-    goto &action_signin unless &is_signed();
+    goto &action_signin unless &is_signed_csrf();
     chmod( 0444 , &title2fname($_) ) for(@{$::forms{p}});
     &transfer( url=> &myurl( &filter_underscore_form() ) );
 }
 
 sub action_fresh_multipage{
-    goto &action_signin unless &is_signed();
+    goto &action_signin unless &is_signed_csrf();
     chmod( 0600 , &title2fname($_) ) for(@{$::forms{p}});
     &transfer( url=> &myurl( &filter_underscore_form() ) );
 }
 
 sub action_freeze_or_fresh{
-    my $token=&is_signed();
-    goto &action_signin unless $token;
-    die('!CSRF Error!') unless $::form{admin} && $::form{admin} eq $token;
+    goto &action_signin unless &is_signed_csrf();
 
     foreach my $f ( @{$::forms{f}} ){
         my $fn=&title2fname( $::form{p} , $f );
@@ -1659,7 +1669,7 @@ sub do_index_header_{
 }
 
 sub do_index_footer_{
-    if( &is_signed() ){
+    if( my $token=&is_signed() ){
         shift( @::index_columns ); # check box
         pop( @::index_columns ); # frozen mark
         &puts( '<div class="indexaction">'.join("\n",@::index_action).'</div>' );
@@ -1667,6 +1677,7 @@ sub do_index_footer_{
             &putenc('<input type="hidden" name="_%s" value="%s" />' ,
                 $key , $::form{$key} );
         }
+        &putenc( '<input type="hidden" name="admin" value="%s" />' , $token );
         &putenc( '</form>' );
     }
 }
