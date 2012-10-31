@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.11_3';
+$::version  = '1.5.11_4';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -2654,6 +2654,7 @@ sub cut_until_blankline{
         last if $mode ne ':' && $lines->[0] =~ /^\s*\:/;
         last if $mode ne '<' && $lines->[0] =~ /^\s*(&lt;){2,6}(?!\{)/;
         last if $mode ne '>' && $lines->[0] =~ /^\s*&gt;&gt;(?!\{)/;
+        last if $mode ne '"' && $lines->[0] =~ /^\s*&quot;&quot;/;
         $fragment .= "\n";
         $fragment .= shift(@{$lines});
     }
@@ -2756,7 +2757,7 @@ sub block_quoting{ ### "" ...
     my ($lines,$session)=@_;
     return 0 unless $lines->[0] =~ /^&quot;&quot;/s;
 
-    my $fragment = &cut_until_blankline($lines);
+    my $fragment = &cut_until_blankline($lines,'"');
 
     $fragment =~ s/^&quot;&quot;//gm;
     $fragment =~ s/^$/<br><br>/gm;
