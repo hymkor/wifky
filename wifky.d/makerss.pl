@@ -188,3 +188,12 @@ sub stamp_format{
     sprintf("%s, %02d %s %04d %s GMT",
         (split(/\s+/,gmtime( $_[0] )))[0,2,1,4,3]);
 }
+
+$::inline_plugin{read_more} = $::inline_plugin{'read-more'} = sub {
+    if( $::form{a} && ($::form{a} eq 'rss' || $::form{a} eq 'rssfeed') ){
+        &::anchor('(more...)',{ p=>$::form{p} } ) . '<!--- READ MORE --->';
+    }else{
+        '';
+    }
+};
+
