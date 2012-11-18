@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.11_4';
+$::version  = '1.5.11_5';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
@@ -2705,7 +2705,8 @@ sub block_definition{ ### <DL>...</DL> block ###
 sub block_midashi1{ ### <<...>>
     my ($lines,$session)=@_;
     return 0 unless $lines->[0] =~ /^\s*((\&lt\;){2,6})(?!\{)/;
-    my $nest=length($1)/4-2;
+    my $lt=$1;
+    my $nest=length($lt)/4-2;
 
     $lines->[0] = $';
     my $fragment="";
@@ -2714,12 +2715,13 @@ sub block_midashi1{ ### <<...>>
         last if $line =~ /^\s*$/;
         if( $line =~ /(\&gt;){2,6}\s*$/ ){
             $fragment .= $`;
-            last;
+            &midashi( $nest , $fragment , $session );
+            return 1;
         }else{
             $fragment .= $line;
         }
     }
-    &midashi( $nest , $fragment , $session );
+    &puts('<p>'.&preprocess($lt.$fragment).'</p>');
     1;
 }
 
@@ -2743,13 +2745,14 @@ sub block_centering{ ### >> ... <<
         last if $line =~ /^\s*$/;
         if( $line =~ /\&lt;\&lt;\s*$/ ){
             $fragment .= $`;
-            last;
+            my $s=&preprocess($fragment,$session);
+            &puts('<p class="centering block" align="center">',$s,'</p>');
+            return 1;
         }else{
             $fragment .= $line;
         }
     }
-    my $s=&preprocess($fragment,$session);
-    &puts('<p class="centering block" align="center">',$s,'</p>');
+    &puts('<p>'.&preprocess('&gt;&gt;'.$fragment).'</p>');
     1;
 }
 
