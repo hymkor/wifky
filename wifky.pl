@@ -2,7 +2,7 @@
 
 use strict; use warnings;
 
-$::version  = '1.5.11_5';
+$::version  = '1.5.11_6';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
