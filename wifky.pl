@@ -288,6 +288,8 @@ sub init_globals{
 	      name=>'TZ' , size=>6 } ,
             { desc=>'Default pagename format(macro:%Y,%y,%m,%d,%H,%M,%S)' ,
               name=>'default_pagename_format' , size=>40 },
+            { desc=>'Default <title> format(default: "%S %- %P %(%A%)" )' ,
+              name=>'default_titletag_format' , size=>20 },
         ],
     );
     %::inline_syntax_plugin = (
@@ -854,9 +856,16 @@ sub flush_header{
 sub print_header{
     $::final_plugin{'000_header'} = \&flush_header;
     my %arg=@_;
-    $::html_header_title = $::config{sitename};
-    $::html_header_title .= ' - '.$::form{p} if exists $::form{p};
-    $::html_header_title .= '('.$arg{title}.')' if exists $arg{title};
+    $::html_header_title = $::config{default_titletag_format}
+        || '%S %- %P %(%A%)';
+
+    $::html_header_title =~ s/\%S/$::config{sitename}||''/ge;
+    $::html_header_title =~ s/\%P/$::form{p}||''/ge;
+    $::html_header_title =~ s/\%A/$arg{title}||''/ge;
+    $::html_header_title =~ s/(\s*\%[^\%])*\s*$//g;
+    $::html_header_title =~ s/^\s*(\%[^\%]\s*)*//g;
+    $::html_header_title =~ s/\%([^\%])/$1/g;
+    
     push(@::html_header,'<title>' .
         &verb( sub{ &enc($::html_header_title) } ).'</title>');
 
