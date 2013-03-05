@@ -197,8 +197,9 @@ sub init_globals{
         ],
     );
     if( !&is('lonely') || &is_signed() ){
+        my $title=&make_default_title_();
         $::menubar{'200_New'} = [
-            qq|<a href="$::me?a=new" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new page','')){document.newpage.submit()};return false;">New</a>| ,
+            qq|<a href="$::me?a=new" onClick="JavaScript:if(document.newpage.p.value=prompt('Create a new page','$title')){document.newpage.submit()};return false;">New</a>| ,
         ];
     }
     @::menubar = ();
@@ -283,7 +284,9 @@ sub init_globals{
             { desc=>'Signin Timeout hours(default:24hours)' ,
               name=>'signin_timeout' , size=>2 },
 	    { desc=>'Time Zone string(for example, JST-9 )' ,
-	      name=>'TZ' , size=>6 }
+	      name=>'TZ' , size=>6 } ,
+            { desc=>'Default title format(macro:%Y,%y,%m,%d,%H,%M,%S)' ,
+              name=>'default_title_format' , size=>40 },
         ],
     );
     %::inline_syntax_plugin = (
@@ -1040,10 +1043,10 @@ sub action_new{
         main => sub {
             &begin_day();
             &putenc(qq(<form action="%s" method="post" accept-charset="%s">
-                <p><input type="text" name="p" size="40">
+                <p><input type="text" name="p" size="40" value="%s">
                 <input type="hidden" name="a" value="edt">
                 <input type="submit" value="Create"></p></form>)
-                , $::postme , $::charset );
+                , $::postme , $::charset , &make_default_title_ );
             &end_day();
         },
     );
@@ -2813,4 +2816,18 @@ sub block_normal{
 sub w_ok{ # equals "-w" except for root-user.
     my @stat=( $#_ < 0 ? stat(_) : stat($_[0]) );
     @stat ? $stat[2] & 0200 : -1 ;
+}
+
+sub make_default_title_{
+    my $title=$::config{default_title_format} || '';
+    my @tm=localtime;
+    my %tm=( y=>sprintf("%02d",$tm[5] % 100) ,
+             m=>sprintf("%02d",1+$tm[4] ),
+             d=>sprintf("%02d",$tm[3] ),
+             H=>sprintf("%02d",$tm[2] ),
+             M=>sprintf("%02d",$tm[1] ),
+             S=>sprintf("%02d",$tm[0] ),
+             Y=>sprintf("%04d",1900+$tm[5]) );
+    $title =~ s/%([ymdHMSY])/$tm{$1}/ge;
+    &enc($title);
 }
