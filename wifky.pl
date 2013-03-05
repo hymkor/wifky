@@ -143,6 +143,7 @@ sub init_globals{
         '#'        => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
         'remote_addr' => sub{ $::remote_addr; } ,
         'taglist'  => \&plugin_taglist ,
+        'setitle'  => sub{ $::html_header_title = $_[1]; '' },
     );
 
     %::action_plugin = (
@@ -840,19 +841,24 @@ sub print_form{
 }
 
 sub flush_header{
-    print join("\r\n",@::http_header);
+    my $header=join("\r\n",@::http_header);
+    &unverb(\$header);
+    print $header;
     print qq(\r\n\r\n<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">);
     print qq(\r\n<html lang="ja"><head>\r\n);
-    print join("\r\n",@::html_header),"\r\n";
+    $header=join("\r\n",@::html_header);
+    &unverb(\$header);
+    print $header,"\r\n";
 }
 
 sub print_header{
     $::final_plugin{'000_header'} = \&flush_header;
     my %arg=@_;
-    my $label = $::config{sitename};
-    $label .= ' - '.$::form{p} if exists $::form{p};
-    $label .= '('.$arg{title}.')' if exists $arg{title};
-    push(@::html_header,'<title>'.&enc($label).'</title>');
+    $::html_header_title = $::config{sitename};
+    $::html_header_title .= ' - '.$::form{p} if exists $::form{p};
+    $::html_header_title .= '('.$arg{title}.')' if exists $arg{title};
+    push(@::html_header,'<title>' .
+        &verb( sub{ &enc($::html_header_title) } ).'</title>');
 
     &puts('<style type="text/css"><!--
 div.menubar{
