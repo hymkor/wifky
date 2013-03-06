@@ -143,7 +143,7 @@ sub init_globals{
         '#'        => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
         'remote_addr' => sub{ $::remote_addr; } ,
         'taglist'  => \&plugin_taglist ,
-        'setitle'  => sub{ $::html_header_title = $_[1]; '' },
+        'title'  => sub{ $::page_alias = $_[0]->{argv}; },
     );
 
     %::action_plugin = (
@@ -856,18 +856,18 @@ sub flush_header{
 sub print_header{
     $::final_plugin{'000_header'} = \&flush_header;
     my %arg=@_;
-    $::html_header_title = $::config{default_titletag_format}
-        || '%S %- %P %(%A%)';
-
-    $::html_header_title =~ s/\%S/$::config{sitename}||''/ge;
-    $::html_header_title =~ s/\%P/$::form{p}||''/ge;
-    $::html_header_title =~ s/\%A/$arg{title}||''/ge;
-    $::html_header_title =~ s/(\s*\%[^\%])*\s*$//g;
-    $::html_header_title =~ s/^\s*(\%[^\%]\s*)*//g;
-    $::html_header_title =~ s/\%([^\%])/$1/g;
-    
     push(@::html_header,'<title>' .
-        &verb( sub{ &enc($::html_header_title) } ).'</title>');
+        &verb( sub{
+            my $title = $::config{default_titletag_format}
+                || '%S %- %P %(%A%)';
+            $title =~ s/\%S/$::config{sitename}||''/ge;
+            $title =~ s/\%P/($::form{p} && $::page_alias)||''/ge;
+            $title =~ s/\%A/$arg{title}||''/ge;
+            $title =~ s/(\s*\%[^\%])*\s*$//g;
+            $title =~ s/^\s*(\%[^\%]\s*)*//g;
+            $title =~ s/\%([^\%])/$1/g;
+            &enc($title) 
+        } ).'</title>');
 
     &puts('<style type="text/css"><!--
 div.menubar{
