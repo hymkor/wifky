@@ -861,7 +861,7 @@ sub print_header{
             my $title = $::config{default_titletag_format}
                 || '%S %- %P %(%A%)';
             $title =~ s/\%S/$::config{sitename}||''/ge;
-            $title =~ s/\%P/($::form{p} && $::page_alias)||''/ge;
+            $title =~ s/\%P/$::form{p} ? ($::page_alias || $::form{p}) : ''/ge;
             $title =~ s/\%A/$arg{title}||''/ge;
             $title =~ s/(\s*\%[^\%])*\s*$//g;
             $title =~ s/^\s*(\%[^\%]\s*)*//g;
