@@ -7,7 +7,7 @@ $::preferences{Timeline} = [
     { desc=>'filter' , name=>'timeline__filter' },
     { desc=>'default Frontpage' , name=>'timeline__default' , type=>'checkbox' } ,
     { desc=>'order by' , name=>'timeline__orderby' , type=>'select' ,
-      option=>[ ['name','name'],['timestamp','timestamp'] ] }
+      option=>[ ['timestamp','timestamp'],['name','name'] ] }
 ];
 
 $wifky::timeline::template ||= '
@@ -73,7 +73,7 @@ sub concat_article{
 
 sub mkopt{
     my $option={r=>1,@_};
-    if( $::config{timeline__orderby} eq 'timestamp' ){
+    if( $::config{timeline__orderby} ne 'name' ){
         $option->{t} = 1;
     }
     $option;
