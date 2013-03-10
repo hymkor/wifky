@@ -1,13 +1,15 @@
 package wifky::makerss;
 
-my $rssurl = ($::config{'makerss__proxy'} || "$::me?a=rssfeed");
+my $trigger=$::config{makerss__trigger} || 'rssfeed';
+my $rssurl = $::me.'?a='.&::percent($trigger);
+my $proxy = ($::config{'makerss__proxy'} || $rssurl);
 
 push( @::html_header ,
     qq(<link rel="alternate" type="application/rss+xml"
-        title="RSS" href="$rssurl">) );
+        title="RSS" href="$proxy">) );
 
 $::preferences{'makerss.pl'} = [
-    { 
+    {
         desc => 'Description' ,
         name => 'makerss__description' ,
         type => 'textarea'
@@ -28,13 +30,17 @@ $::preferences{'makerss.pl'} = [
         type => 'textarea' ,
     },
     {
+        desc => 'URL compatiblity(default="rssfeed)"' ,
+        name => 'makerss__trigger' ,
+    },
+    {
         desc => 'RSS Feed ProxyURL' ,
         name => 'makerss__proxy' ,
         type => 'text' ,
     },
 ];
 
-$::action_plugin{rssfeed} = sub {
+$::action_plugin{$trigger} = sub {
     $::me = 'http://' . (
                     defined $ENV{'HTTP_HOST'}
                   ? $ENV{'HTTP_HOST'}
@@ -87,7 +93,7 @@ $::action_plugin{rssfeed} = sub {
     print  qq{ xmlns:content="http://purl.org/rss/1.0/modules/content/"\r\n};
     print  qq{ xmlns:dc="http://purl.org/dc/elements/1.1/"\r\n};
     print  qq{ xml:lang="ja">\r\n};
-    printf qq{<channel rdf:about="%s?a=rssfeed">\r\n} , $::me;
+    printf qq{<channel rdf:about="%s">\r\n},$rssurl;
     &printag( title       => $::config{sitename} ,
               link        => $::me ,
               description => $::config{makerss__description} );
@@ -190,10 +196,9 @@ sub stamp_format{
 }
 
 $::inline_plugin{read_more} = $::inline_plugin{'read-more'} = sub {
-    if( $::form{a} && ($::form{a} eq 'rss' || $::form{a} eq 'rssfeed') ){
+    if( $::form{a} && ($::form{a} eq 'rss' || $::form{a} eq $trigger) ){
         &::anchor('(more...)',{ p=>$::form{p} } ) . '<!--- READ MORE --->';
     }else{
         '';
     }
 };
-
