@@ -1,4 +1,7 @@
+# 0.3_0 # makerss.pl
 package wifky::makerss;
+
+my $version = '0.3_0';
 
 my $trigger=$::config{makerss__trigger} || 'rssfeed';
 my $rssurl = $::me.'?a='.&::percent($trigger);
@@ -8,7 +11,7 @@ push( @::html_header ,
     qq(<link rel="alternate" type="application/rss+xml"
         title="RSS" href="$proxy">) );
 
-$::preferences{'makerss.pl'} = [
+$::preferences{"makerss.pl $version"} = [
     {
         desc => 'Description' ,
         name => 'makerss__description' ,
