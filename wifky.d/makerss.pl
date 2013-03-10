@@ -90,6 +90,7 @@ $::action_plugin{$trigger} = sub {
     printf qq{Content-Type: application/rss+xml; charset=%s\r\n} , $::charset ;
     printf qq{Last-Modified: %s\r\n\r\n} , &stamp_format($last_modified);
     printf qq{<?xml version="1.0" encoding="%s" ?>\r\n} , $::charset ;
+    print  qq{<!-- Feed by makerss.pl $version -->\n};
     print  qq{<rdf:RDF\r\n};
     print  qq{ xmlns="http://purl.org/rss/1.0/"\r\n};
     print  qq{ xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"\r\n};
