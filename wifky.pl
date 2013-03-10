@@ -48,8 +48,8 @@ if( $0 eq __FILE__ ){
             do "./$pl"; die($@) if $@;
         }
 
-        if( $::form{a} && $::action_plugin{$::form{a}} ){
-            $::action_plugin{ $::form{a} }->();
+        if( $::form{a} ){
+            ($::action_plugin{ $::form{a} } || \&action_not_found)->();
         }elsif( $::form{p} ){ # page view
             if( $::form{f} ){ # output attachment
                 &action_cat();
@@ -1952,6 +1952,17 @@ sub action_view{
                 &::puts( '<p>404 Page not found.</p>' );
             }
             &end_day();
+        }
+    );
+}
+
+sub action_not_found{
+    &print_template(
+        title => '404 Command not found.',
+        template => '&{main}' ,
+        main  => sub{
+            push(@::http_header,'Status: 404 Command not found.');
+            &puts( '<h1>404 Command not found.</h1>' );
         }
     );
 }
