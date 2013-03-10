@@ -6,6 +6,8 @@ $::preferences{Timeline} = [
     { desc=>'articles number' , name=>'timeline__count' },
     { desc=>'filter' , name=>'timeline__filter' },
     { desc=>'default Frontpage' , name=>'timeline__default' , type=>'checkbox' } ,
+    { desc=>'order by' , name=>'timeline__orderby' , type=>'select' ,
+      option=>[ ['name','name'],['timestamp','timestamp'] ] }
 ];
 
 $wifky::timeline::template ||= '
@@ -69,13 +71,21 @@ sub concat_article{
     }
 }
 
+sub mkopt{
+    my $option={r=>1,@_};
+    if( $::config{timeline__orderby} eq 'timestamp' ){
+        $option->{t} = 1;
+    }
+    $option;
+}
+
 sub action_timeline{
     &::print_template(
         template => $wifky::timeline::template ,
         main => sub {
             my $count=$::config{'timeline__count'} || 3;
             my $filter=$::config{'timeline__filter'} || '(????.??.??)*';
-            my @list=&::ls_core({r=>1,number=>$count+1},$filter);
+            my @list=&::ls_core(&mkopt(number=>$count+1),$filter);
             &concat_article( $count , @list );
         }
     );
@@ -90,8 +100,7 @@ if( $::config{'timeline__default'} ){
 sub neighbor{
     my $offset=(1+shift);
     my @list=&::ls_core(
-        {r=>1},
-        $::config{'timeline__filter'} || '(????.??.??)*');
+        &mkopt(),$::config{'timeline__filter'} || '(????.??.??)*');
     my $iter=&each_three(@list);
     while( my @neighbor=$iter->() ){
         if( $neighbor[1]->{title} eq $::form{p} ){
