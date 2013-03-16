@@ -1,6 +1,9 @@
 #!/usr/bin/perl
 
-use strict; use warnings;
+BEGIN{
+    eval{ require 'strict.pm';   }; strict  ->import() unless $@;
+    eval{ require 'warnings.pm'; }; warnings->import() unless $@;
+}
 
 $::version  = '1.5.12_0';
 $::PROTOCOL = '(?:s?https?|ftp)';
