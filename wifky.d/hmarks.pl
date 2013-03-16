@@ -1,9 +1,11 @@
-# 1.14_1 # hmarks.pl
-
+# 1.14_2 # hmarks.pl
 package wifky::hmarks;
-#use strict;use warnings;
+BEGIN{
+    eval{ require 'strict.pm';   }; strict  ->import() unless $@;
+    eval{ require 'warnings.pm'; }; warnings->import() unless $@;
+}
 
-my $version="1.14_1";
+my $version="1.14_2";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -156,7 +158,7 @@ sub anchor_delicous{
 
     $url =~ s/'/%27/g;
 
-    sprintf(q| <a href="http://www.delicious.com/save" onclick="window.open('http://www.delicious.com/save?v=5&noui&jump=close&url='+encodeURIComponent('%s')+'&title='+encodeURIComponent('%s'), 'delicious','toolbar=no,width=550,height=550'); return false;" title="[Delicous]"><img src="http://www.delicious.com/static/img/delicious.small.gif" height="10" width="10" alt="[Delicious]" border="0" /></a> |
+    sprintf(q| <a href="http://www.delicious.com/save" onclick="window.open('http://www.delicious.com/save?v=5&noui&jump=close&url='+encodeURIComponent('%s')+'&title='+encodeURIComponent('%s'), 'delicious','toolbar=no,width=550,height=550'); return false;" title="[Delicous]"><table cellpadding="0" cellspacing="0"><tr height="8px"><td width="8px" bgcolor="white"></td><td width="8px" bgcolor="blue"></td></tr><tr height="8px"><td width="8px" bgcolor="black"></td><td width="8px" bgcolor="gray"></td></tr></table></a> |
         , &::enc($url)
         , &::enc($title)
     );
