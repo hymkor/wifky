@@ -1961,11 +1961,11 @@ sub action_view{
 
 sub action_not_found{
     &print_template(
-        title => '404 Command not found.',
+        title => '400 Bad Request.',
         template => '&{main}' ,
         main  => sub{
-            push(@::http_header,'Status: 404 Command not found.');
-            &puts( '<h1>404 Command not found.</h1>' );
+            push(@::http_header,'Status: 400 Bad Request.');
+            &puts( '<h1>400 Bad Request.</h1>' );
         }
     );
 }
