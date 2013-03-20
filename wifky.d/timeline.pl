@@ -102,6 +102,7 @@ if( $::config{'timeline__default'} ){
 }
 
 sub neighbor{
+    return '' unless $::form{p};
     my $offset=(1+shift);
     my @list=&::ls_core(
         { r=>1 },$::config{'timeline__filter'} || '(????.??.??)*');
