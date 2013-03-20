@@ -1,6 +1,10 @@
-# 0.1_0 # timeline
+# 0.1_1 # timeline
 package wifky::timeline;
-#use strict; use warnings;
+
+BEGIN{
+    eval{ require 'strict.pm';   }; strict  ->import() unless $@;
+    eval{ require 'warnings.pm'; }; warnings->import() unless $@;
+}
 
 $::preferences{Timeline} = [
     { desc=>'articles number' , name=>'timeline__count' },
@@ -100,7 +104,7 @@ if( $::config{'timeline__default'} ){
 sub neighbor{
     my $offset=(1+shift);
     my @list=&::ls_core(
-        &mkopt(),$::config{'timeline__filter'} || '(????.??.??)*');
+        { r=>1 },$::config{'timeline__filter'} || '(????.??.??)*');
     my $iter=&each_three(@list);
     while( my @neighbor=$iter->() ){
         if( $neighbor[1]->{title} eq $::form{p} ){
