@@ -1,4 +1,4 @@
-# 0.1_0 # tcalendar.pl
+# 0.1_1 # tcalendar.pl
 package wifky::tcalendar;
 
 BEGIN{
@@ -11,7 +11,7 @@ foreach my $p (keys %::contents){
     if( $p =~ /^\((\d{4})\.(\d{2})\.\d{2}\)/ ){
         my $y = ($yearcalendar{$1} ||= {});
         if( !$y->{$2} || $p lt $y->{$2} ){
-            $y->{$2} = $p;
+            $y->{$2} = $p if $::contents{$p}->{timestamp};
         }
     }
 }
@@ -43,7 +43,7 @@ $::inline_plugin{mcalendar} = sub {
         next unless substr($p,0,9) eq $pattern && length($p)>=11;
         my $d = substr($p,9,2);
         if( ! $monthcalendar{$d} || $p lt $monthcalendar{$d} ){
-            $monthcalendar{$d} = $p;
+            $monthcalendar{$d} = $p if $::contents{$p}->{timestamp};
         }
     }
     my @buffer;
