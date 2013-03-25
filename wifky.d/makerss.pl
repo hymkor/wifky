@@ -1,7 +1,12 @@
-# 0.3_0 # makerss.pl
+# 0.4_0 # makerss.pl
 package wifky::makerss;
 
-my $version = '0.3_0';
+BEGIN{
+    eval{ require 'strict.pm';   }; strict  ->import() unless $@;
+    eval{ require 'warnings.pm'; }; warnings->import() unless $@;
+}
+
+my $version = '0.4_0';
 
 my $trigger=$::config{makerss__trigger} || 'rssfeed';
 my $rssurl = $::me.'?a='.&::percent($trigger);
@@ -157,9 +162,18 @@ $::action_plugin{$trigger} = sub {
 
     ### write description ###
     foreach my $t (@topics){
-        my @tm=gmtime($t->{timestamp});
+        local $::form{p}=$t->{page};
+        local $::print='';
+        local $::page_alias=$t->{title};
+        &::syntax_engine(
+            join("\n\n",@{$t->{desc}}) ,
+            { title => $t->{page} , attachment => $t->{attachment} }
+        );
+        $::print =~ s/<!--- READ MORE --->.*\Z//s;
+        
         printf qq{<item rdf:about="%s">\r\n}, $t->{url};
-        &printag( title         => $t->{title} ,
+        my @tm=gmtime($t->{timestamp});
+        &printag( title         => $::page_alias ,
                   link          => $t->{url} ,
                   lastBuildDate => &stamp_format( $t->{timestamp} ),
                   pubDate       => &stamp_format( $t->{timestamp} ) ,
@@ -167,17 +181,18 @@ $::action_plugin{$trigger} = sub {
                   'dc:creator'  => $::config{makerss__author} ,
                   'dc:date'     => sprintf('%04d-%02d-%02dT%02d:%02d:%02d+00:00' ,
                                 , $tm[5]+1900,$tm[4]+1,@tm[3,2,1,0] ) );
-        while( $t->{title} =~ /\[([^\]]+)\]/g ){
+
+        while( $::page_alias =~ /\[([^\]]+)\]/g ){
             print "<category>$1</category>\r\n";
         }
-        local $::form{p}=$t->{page};
-        local $::print='';
-        &::syntax_engine(
-            join("\n\n",@{$t->{desc}}) ,
-            { title => $t->{page} , attachment => $t->{attachment} }
-        );
-        $::print =~ s/<!--- READ MORE --->.*\Z//s;
-        
+        if( $t->{attachment} ){
+            foreach my $label ( keys %{$t->{attachment}} ){
+                if( substr($label,0,1) eq "\0" ){
+                    &printag( category => substr($label,1) );
+                }
+            }
+        }
+
         print  '<description><![CDATA[';
         &::flush;
         print  "]]></description>\r\n<content:encoded><![CDATA[";
