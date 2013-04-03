@@ -1,4 +1,4 @@
-# 0.1_1 # tcalendar.pl
+# 0.2_0 # tcalendar.pl
 package wifky::tcalendar;
 
 BEGIN{
@@ -29,14 +29,25 @@ $::inline_plugin{ycalendar} = sub{
     $html . "</ul>\n";
 };
 
+my %days_per_month1 = (
+    "01"=>31, "02"=>28, "03"=>31, "04"=>30, "05"=>31, "06"=>30,
+    "07"=>31, "08"=>31, "09"=>30, "10"=>31, "11"=>30, "12"=>31,
+);
+my %days_per_month2 = (
+    "01"=>31, "02"=>29, "03"=>31, "04"=>30, "05"=>31, "06"=>30,
+    "07"=>31, "08"=>31, "09"=>30, "10"=>31, "11"=>30, "12"=>31,
+);
+
 $::inline_plugin{mcalendar} = sub {
     my (undef,$del1,$del2)=@_;
-    my $pattern;
+    my ($pattern,$y,$m);
     if( $::form{p} && $::form{p} =~ /^\((\d{4})\.(\d{2})./ ){
+        $y = $1 ; $m = $2;
         $pattern = $&;
     }else{
         my @t=localtime;
-        $pattern = sprintf("(%04d.%02d.",1900 + $t[5],1 + $t[4]);
+        $y = 1900 + $t[5]; $m = sprintf("%02d",1 + $t[4]);
+        $pattern = "($y.$m.";
     }
     my %monthcalendar;
     foreach my $p (keys %::contents){
@@ -46,9 +57,23 @@ $::inline_plugin{mcalendar} = sub {
             $monthcalendar{$d} = $p if $::contents{$p}->{timestamp};
         }
     }
+    my $end;
+    if( $y % 400 == 0 ){ # uru
+        $end = $days_per_month2{ $m };
+    }elsif( $y % 100 == 0 ){ # not uru
+        $end = $days_per_month1{ $m };
+    }elsif( $y % 4 == 0 ){ # uru
+        $end = $days_per_month2{ $m };
+    }else{ # not uru
+        $end = $days_per_month1{ $m };
+    }
     my @buffer;
-    foreach my $d (sort keys %monthcalendar){
-        push(@buffer,&::anchor($d,{p=>$monthcalendar{$d}}));
+    for(my $i=1;$i <= $end ; ++$i ){
+        my $d = sprintf('%02d',$i);
+        if( exists $monthcalendar{$d} ){
+            $d = &::anchor($d,{p=>$monthcalendar{$d}});
+        }
+        push(@buffer,$d);
     }
     '<span>'.substr($pattern,1,7) .
     ($del1 || '.') .
