@@ -17,7 +17,7 @@ foreach my $p (keys %::contents){
 }
 
 $::inline_plugin{ycalendar} = sub{
-    my $html = "<ul>\n";
+    my $html = "<ul class=\"ycalendar\">\n";
     foreach my $y ( sort keys %yearcalendar ){
         $html .= '<li>'.$y;
         foreach my $m ( sort keys %{$yearcalendar{$y}} ){
@@ -72,10 +72,12 @@ $::inline_plugin{mcalendar} = sub {
         my $d = sprintf('%02d',$i);
         if( exists $monthcalendar{$d} ){
             $d = &::anchor($d,{p=>$monthcalendar{$d}});
+        }else{
+            $d = "<span>$d</span>"
         }
         push(@buffer,$d);
     }
-    '<span>'.substr($pattern,1,7) .
+    '<span class="mcalendar">'.substr($pattern,1,7) .
     ($del1 || '.') .
     join(($del2||"\n"),@buffer)."</span>";
 };
