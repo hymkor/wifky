@@ -51,6 +51,17 @@ if( $0 eq __FILE__ ){
             do "./$pl"; die($@) if $@;
         }
 
+        (my $xdir = __FILE__) =~ s/\.\w+((\.\w+)*)$/.x$1/;
+        local *DIR;
+        if( -d "$xdir/." && opendir(DIR,$xdir) ){
+            foreach my $pl (sort map{ /^([-\w\.]+\.pl)$/ ? $1 : () }
+                            readdir(DIR) )
+            {
+                do "$xdir/$pl"; die($@) if $@;
+            }
+            close(DIR);
+        }
+
         if( $::form{a} ){
             ($::action_plugin{ $::form{a} } || \&action_not_found)->();
         }elsif( $::form{p} ){ # page view
