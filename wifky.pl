@@ -5,7 +5,7 @@ BEGIN{
     eval{ require 'warnings.pm'; }; warnings->import() unless $@;
 }
 
-$::version  = '1.5.12_0';
+$::version  = '1.5.13_0';
 $::PROTOCOL = '(?:s?https?|ftp)';
 $::RXURL    = '(?:s?https?|ftp)://[-\\w.!~*\'();/?:@&=+$,%#]+' ;
 $::charset  = 'UTF-8';
