@@ -225,7 +225,7 @@ HTML
             , $nm , &plugin_comment($nm) , scalar(localtime($stat[9])) );
     }
 
-    (my $xdir = $0) =~ s|^.*?(\w+)\.\w+$|../$1.x/.|;
+    (my $xdir = $0) =~ s|^.*?(\w+)\.\w+$|../$1.s/.|;
     local *DIR;
     if( -d $xdir && opendir(DIR,$xdir) ){
         foreach my $nm ( sort grep{/\.pl$/} readdir(DIR) ){

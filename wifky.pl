@@ -51,7 +51,7 @@ if( $0 eq __FILE__ ){
             do "./$pl"; die($@) if $@;
         }
 
-        (my $xdir = __FILE__) =~ s|^.*?(\w+)\.\w+((\.\w+)*)$|../$1.x$2/.|;
+        (my $xdir = __FILE__) =~ s|^.*?(\w+)\.\w+((\.\w+)*)$|../$1.s$2/.|;
         local *DIR;
         if( -d $xdir && opendir(DIR,$xdir) ){
             foreach my $pl (sort map{ /^([-\w\.]+\.pl)$/ ? $1 : () }
