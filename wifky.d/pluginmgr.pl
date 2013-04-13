@@ -1,10 +1,13 @@
-# 1.3_0 # Plugin Manager
+# 1.4_0 # Plugin Manager
 
 package wifky::pluginmgr;
 
-# use strict;use warnings; 
+BEGIN{
+    eval{ require 'strict.pm';   }; strict  ->import() unless $@;
+    eval{ require 'warnings.pm'; }; warnings->import() unless $@;
+}
 
-my $version='1.3_0';
+my $version='1.4_0';
 
 -d 'plugins/.' or mkdir('plugins',0755) or die('can not mkdir plugins directory');
 
@@ -221,6 +224,20 @@ HTML
             '<input type="checkbox" checked disabled>%s %s (hand-installed on %s)<br>'
             , $nm , &plugin_comment($nm) , scalar(localtime($stat[9])) );
     }
+
+    (my $xdir = $0) =~ s|^.*?(\w+)\.\w+$|../$1.x/.|;
+    local *DIR;
+    if( -d $xdir && opendir(DIR,$xdir) ){
+        foreach my $nm ( sort grep{/\.pl$/} readdir(DIR) ){
+            (my $nm_ = "$xdir/$nm") =~ s|/\./|/|g;
+            my @stat=stat($nm_);
+            &::putenc(
+                '<input type="checkbox" checked disabled>%s %s (hand-installed on %s)<br>'
+                , $nm_ , &plugin_comment($nm_) , scalar(localtime($stat[9])) );
+        }
+        closedir(DIR);
+    }
+
     &::putenc(<<HTML
 <p>
 ${passwordfield}
