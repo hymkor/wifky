@@ -157,7 +157,7 @@ sub init_globals{
         '#'        => sub{ $::ref{$_[2]||0} = ++$::cnt{$_[1]||0} } ,
         'remote_addr' => sub{ $::remote_addr; } ,
         'taglist'  => \&plugin_taglist ,
-        'title'  => sub{ $::page_alias = $_[0]->{argv}; },
+        'title'  => sub{ ($::page_alias = $_[0]->{argv}) =~ s/<[^>]*>//g; $::page_alias },
     );
 
     %::action_plugin = (
