@@ -1160,7 +1160,7 @@ sub action_signin{
                 <p>Sign: <input type="password" name="password">
                 <input type="hidden" name="signing" value="Enter">
                 <input type="submit" value="Enter">)
-                , $::postme , $::charset , $ENV{REQUEST_METHOD} );
+                , $::postme , $::charset );
 
             while( my ($key,$val)=each %::form ){
                 if( $key =~ /_t$/ ){
