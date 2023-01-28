@@ -1928,7 +1928,7 @@ sub print_template{
         },
     );
     &print_header( userheader=>'template' );
-    $template =~ s/([\&\%]){(.*?)}/&template_callback(\%default,\%hash,$1,$2)/ge;
+    $template =~ s/([\&\%])\{(.*?)\}/&template_callback(\%default,\%hash,$1,$2)/ge;
     &puts( $template );
     &puts('</body></html>');
 }
@@ -2545,7 +2545,7 @@ sub preprocess_decorations{
     $$text =~ s|&#39;&#39;&#39;(.*?)&#39;&#39;&#39;|<strong>$1</strong>|gs;
     $$text =~ s|&#39;&#39;(.*?)&#39;&#39;|<em>$1</em>|gs;
     $$text =~ s|__(.*?)__|<u>$1</u>|gs;
-    $$text =~ s|==(.*?)=={(.*?)}|<del>$1</del><ins>$2</ins>|gs;
+    $$text =~ s|==(.*?)==\{(.*?)\}|<del>$1</del><ins>$2</ins>|gs;
     $$text =~ s|==(.*?)==|<strike>$1</strike>|gs;
     $$text =~ s|``(.*?)``|'<tt class="pre">'.&cr2br($1).'</tt>'|ges;
     $$text =~ s/\n/<br>\n/g if $::config{autocrlf} ;
