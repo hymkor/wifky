@@ -1,3 +1,4 @@
+# 0.3_1 # expire.pl
 package wifky::expire;
 
 # use strict; use warnings;
@@ -22,7 +23,7 @@ if( &::is_signed() ){
     }else{
         $::menubar{'556_expirelist'} = &::anchor('ExpireList',{ a=>'expirelist' } );
     }
-    if( defined @::index_action ){
+    if( @::index_action ){
         push( @::index_action , 
             ' <input type="submit" name="a" value="expire" />'
         );
