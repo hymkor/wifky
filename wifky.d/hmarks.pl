@@ -1,11 +1,11 @@
-# 1.14_2 # hmarks.pl
+# 1.14_3 # hmarks.pl
 package wifky::hmarks;
 BEGIN{
     eval{ require 'strict.pm';   }; strict  ->import() unless $@;
     eval{ require 'warnings.pm'; }; warnings->import() unless $@;
 }
 
-my $version="1.14_2";
+my $version="1.14_3";
 
 if( exists $::form{hp} ){
     print  "Status: 301 See Other\r\n";
@@ -21,18 +21,6 @@ if( ! exists $::form{p} && exists $::form{hp} ){
 if( $::config{hmark_each_section} ){
     (*::headline,*org_headline ) = (*new_headline,*::headline);
 }
-
-push( @::copyright , <<HTML );
-<script type="text/javascript">
-  window.___gcfg = {lang: 'ja'};
-
-  (function() {
-    var po = document.createElement('script'); po.type = 'text/javascript'; po.async = true;
-    po.src = 'https://apis.google.com/js/plusone.js';
-    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
-  })();
-</script>
-HTML
 
 ###
 ### Hatena Bookmark Secion ###
@@ -102,11 +90,9 @@ sub marking{
     $title = $::config{sitename} . ' - ' . $title;
 
     &::verb(
-        &anchor_delicous     ($url,$title,$session) .
         &anchor_hatena       ($url,$title,$session) .
         &anchor_twitter      ($url,$title,$session) .
-        &anchor_facebook     ($url,$title,$session) .
-        &anchor_gplusone     ($url2 , $title , $session) 
+        &anchor_facebook     ($url,$title,$session)
     );
 }
 
@@ -151,22 +137,6 @@ sub anchor_facebook{
     sprintf('<iframe src="http://www.facebook.com/plugins/like.php?href=%s&amp;layout=button_count&amp;show_faces=false&amp;width=100&amp;action=like&amp;colorscheme=light&amp;height=21" scrolling="no" frameborder="0" style="border:none; overflow:hidden; width:100px; height:21px;" allowTransparency="true"></iframe>',
             , &::percent($url)
     );
-}
-
-sub anchor_delicous{
-    my ($url,$title,$session)=@_;
-
-    $url =~ s/'/%27/g;
-
-    sprintf(q| <a href="http://www.delicious.com/save" onclick="window.open('http://www.delicious.com/save?v=5&noui&jump=close&url='+encodeURIComponent('%s')+'&title='+encodeURIComponent('%s'), 'delicious','toolbar=no,width=550,height=550'); return false;" title="[Delicous]"><table cellpadding="0" cellspacing="0"><tr height="8px"><td width="8px" bgcolor="white"></td><td width="8px" bgcolor="blue"></td></tr><tr height="8px"><td width="8px" bgcolor="black"></td><td width="8px" bgcolor="gray"></td></tr></table></a> |
-        , &::enc($url)
-        , &::enc($title)
-    );
-}
-
-sub anchor_gplusone{
-    my ($url,$title,$session)=@_;
-    sprintf('<div class="g-plusone" data-size="medium" data-annotation="none" data-width="300" data-href="%s"></div>',&::enc($url));
 }
 
 ###
