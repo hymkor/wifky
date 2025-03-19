@@ -1,3 +1,7 @@
+![A Single File Wiki - Wifky](A_single_file_wiki_wifky2.png)
+
+**English** / [Japanese](./README_ja.md)
+
 A Single File Wiki - Wifky
 ==========================
 
