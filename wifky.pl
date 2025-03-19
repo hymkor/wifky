@@ -860,7 +860,7 @@ sub flush_header{
     my $header=join("\r\n",@::http_header);
     &unverb(\$header);
     print $header;
-    print qq(\r\n\r\n<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">);
+    print qq(\r\n\r\n<!DOCTYPE html>);
     print qq(\r\n<html lang="ja"><head>\r\n);
     $header=join("\r\n",@::html_header);
     &unverb(\$header);
