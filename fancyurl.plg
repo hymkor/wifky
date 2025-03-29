@@ -1,0 +1,33 @@
+package wifky_fancyurl;
+
+$main::version ge '1.1' or die('!fancyurl.plg requires wifky 1.1 or later!');
+
+if( defined($ENV{PATH_INFO}) ){
+    my (undef,$p,$f)=split(/\//,$ENV{PATH_INFO});
+    if( defined($p) ){
+        $p =~ s/\.html$//;
+        $main::form{p}=pack('h*',$p);
+    }
+    if( defined($f) ){
+        $f =~ s/\.\w\w\w$//;
+        $main::form{f}=pack('h*',$f);
+    }
+}
+(*wifky_fancyurl::org_myurl ,*main::myurl)=(*main::myurl,*wifky_fancyurl::new_myurl);
+
+sub new_myurl{
+    my ($cgiparam,$sharp)=@_;
+    local $main::me=$ENV{SCRIPT_NAME};
+    if( defined(my $p=delete $cgiparam->{p}) ){
+        $main::me .= '/' . unpack('h*',$p) ;
+        if( defined(my $f=delete $cgiparam->{f}) ){
+            $main::me .= '/' . unpack('h*',$f) ;
+            if( $f =~ /\.(jpg|png|gif)$/ ){
+                $main::me .= $&;
+            }
+        }else{
+            $main::me .= '.html';
+        }
+    }
+    &wifky_fancyurl::org_myurl($cgiparam,$sharp);
+}
