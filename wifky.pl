@@ -2871,3 +2871,5 @@ sub make_default_pagename_{
     $title =~ s/%([ymdHMSY])/$tm{$1}/ge;
     &enc($title);
 }
+
+1;
