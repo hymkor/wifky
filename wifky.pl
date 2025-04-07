@@ -1872,15 +1872,23 @@ sub do_preview{
         template => $::edit_template ,
         main=>sub{
             &puts(@param ? '<div class="warning">'.&errmsg($param[0]).'</div>' : '');
+            &puts('<div class="preview_table">');
             if ( $::config{preview_style} ){
+                &puts('<div class="preview_edit_column">');
                 &print_form( $title , \$::form{text_t} , \$::form{orgsrc_t} );
+                &puts('</div><!-- preview_edit_column -->');
             }
+            &puts('<div class="preview_view_column">');
             &begin_day('Preview:'.$::form{p} );
             &print_page( title=>$title , source=>\$::form{text_t} , index=>1 , main=>1 );
             &end_day();
+            &puts('</div><!-- preview_view_column -->');
             if ( ! $::config{preview_style} ){
+                &puts('<div class="preview_edit_column">');
                 &print_form( $title , \$::form{text_t} , \$::form{orgsrc_t} );
+                &puts('</div><!-- preview_edit_column -->');
             }
+            &puts('</div><!-- preview_table -->');
         },
     );
 }
