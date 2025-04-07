@@ -456,6 +456,24 @@ span.frozen{ font-size:80% ; color:#008 ; font-weight:bold }
  div.main{ width:100% }
 }
 
+div.preview_table {
+ display: flex;
+ height: 90vh;
+}
+
+div.preview_edit_column {
+ width: 50%;
+ box-sizing: border-box;
+ padding: 10px;
+}
+
+div.preview_view_column {
+ width: 50%;
+ box-sizing: border-box;
+ padding: 10px;
+ overflow: auto;
+ height: 100%;
+}
 HERE
     &title2fname("Header") => <<HERE ,
 ((menubar))
