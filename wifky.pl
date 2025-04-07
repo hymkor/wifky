@@ -12,7 +12,7 @@ $::charset  = 'UTF-8';
 %::form     = %::forms = ();
 $::me       = $::postme = $ENV{SCRIPT_NAME} || (split(/[\\\/]/,$0))[-1];
 $::print    = ' 'x 10000; $::print = '';
-%::config   = ( crypt => '' , sitename => 'wifky!' );
+%::config   = ( crypt => '' , sitename => 'wifky!' , preview_style => 0 );
 %::flag     = ();
 %::cnt      = ();
 
@@ -304,6 +304,8 @@ sub init_globals{
               name=>'default_pagename_format' , size=>40 },
             { desc=>'Default <title> format(default: "%S %- %P %(%A%)" )' ,
               name=>'default_titletag_format' , size=>20 },
+            { desc=>'Preview after textarea',
+              name=>'preview_style' , type=>'checkbox' },
         ],
     );
     %::inline_syntax_plugin = (
@@ -1870,10 +1872,15 @@ sub do_preview{
         template => $::edit_template ,
         main=>sub{
             &puts(@param ? '<div class="warning">'.&errmsg($param[0]).'</div>' : '');
+            if ( $::config{preview_style} ){
+                &print_form( $title , \$::form{text_t} , \$::form{orgsrc_t} );
+            }
             &begin_day('Preview:'.$::form{p} );
             &print_page( title=>$title , source=>\$::form{text_t} , index=>1 , main=>1 );
             &end_day();
-            &print_form( $title , \$::form{text_t} , \$::form{orgsrc_t} );
+            if ( ! $::config{preview_style} ){
+                &print_form( $title , \$::form{text_t} , \$::form{orgsrc_t} );
+            }
         },
     );
 }
