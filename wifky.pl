@@ -456,6 +456,8 @@ span.frozen{ font-size:80% ; color:#008 ; font-weight:bold }
  div.main{ width:100% }
 }
 
+/*** (1) Horizontally split the preview area into two side-by-side sections ***/
+/*
 div.preview_table {
  display: flex;
  height: 90vh;
@@ -474,6 +476,28 @@ div.preview_view_column {
  overflow: auto;
  height: 100%;
 }
+*/
+
+/*** (2) Vertically split the preview area into two scrollable sections ***/
+/*
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+div.preview_table {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+div.preview_edit_column, div.preview_view_column {
+  height: 50%;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 10px;
+}
+*/
 HERE
     &title2fname("Header") => <<HERE ,
 ((menubar))
