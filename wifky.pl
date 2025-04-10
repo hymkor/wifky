@@ -2821,7 +2821,7 @@ sub block_midashi1{ ### <<...>>
             $fragment .= $line;
         }
     }
-    &puts('<p>'.&preprocess($lt.$fragment).'</p>');
+    &puts('<p>'.&preprocess($lt.$fragment,$session).'</p>');
     1;
 }
 
@@ -2852,7 +2852,7 @@ sub block_centering{ ### >> ... <<
             $fragment .= $line;
         }
     }
-    &puts('<p>'.&preprocess('&gt;&gt;'.$fragment).'</p>');
+    &puts('<p>'.&preprocess('&gt;&gt;'.$fragment,$session).'</p>');
     1;
 }
 
